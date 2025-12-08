@@ -36,7 +36,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   const isActive = (path: string) => location.pathname === path;
 
-  const menuItems = [
+  interface MenuItem {
+    id: string;
+    label: string;
+    icon: React.ElementType;
+    path?: string;
+    hasSubmenu?: boolean;
+    submenu?: { label: string; path: string }[];
+  }
+
+  const menuItems: MenuItem[] = [
     {
       id: 'dashboard',
       label: 'Dashboard',
@@ -53,12 +62,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       id: 'inventory',
       label: 'Inventory Management',
       icon: Package,
-      path: '/inventory-management',
-      hasSubmenu: true,
-      submenu: [
-        { label: 'Products', path: '/inventory-management/products' },
-        { label: 'Categories', path: '/inventory-management/categories' }
-      ]
+      hasSubmenu: false,
+      path: '/inventory-management'
+      // Example: Uncomment and edit below if you want submenu
+      // hasSubmenu: true,
+      // submenu: [
+      //   { label: 'Products', path: '/inventory-management/products' },
+      //   { label: 'Categories', path: '/inventory-management/categories' }
+      // ]
     },
     {
       id: 'orders',
@@ -108,54 +119,17 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           <ul className="space-y-1">
             {menuItems.map((item) => (
               <li key={item.id}>
-                {item.hasSubmenu ? (
-                  <>
-                    <button
-                      onClick={() => toggleSection(item.id)}
-                      className="w-full flex items-center justify-between px-3 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors"
-                    >
-                      <div className="flex items-center">
-                        <item.icon className="w-5 h-5 mr-3" />
-                        <span>{item.label}</span>
-                      </div>
-                      {expandedSections.includes(item.id) ? (
-                        <ChevronDown className="w-4 h-4" />
-                      ) : (
-                        <ChevronRight className="w-4 h-4" />
-                      )}
-                    </button>
-                    {expandedSections.includes(item.id) && (
-                      <ul className="ml-8 mt-1 space-y-1">
-                        {item.submenu?.map((subItem) => (
-                          <li key={subItem.path}>
-                            <Link
-                              to={subItem.path}
-                              className={`block px-3 py-2 rounded-lg transition-colors ${
-                                isActive(subItem.path)
-                                  ? 'bg-blue-50 text-blue-600'
-                                  : 'text-gray-600 hover:bg-gray-50'
-                              }`}
-                            >
-                              {subItem.label}
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </>
-                ) : (
-                  <Link
-                    to={item.path || '#'}
-                    className={`flex items-center px-3 py-2 rounded-lg transition-colors ${
-                      isActive(item.path || '')
-                        ? 'bg-blue-50 text-blue-600'
-                        : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
-                    }`}
-                  >
-                    <item.icon className="w-5 h-5 mr-3" />
-                    <span>{item.label}</span>
-                  </Link>
-                )}
+                <Link
+                  to={item.path || '#'}
+                  className={`flex items-center px-3 py-2 rounded-lg transition-colors ${
+                    isActive(item.path || '')
+                      ? 'bg-blue-50 text-blue-600'
+                      : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
+                  }`}
+                >
+                  <item.icon className="w-5 h-5 mr-3" />
+                  <span>{item.label}</span>
+                </Link>
               </li>
             ))}
           </ul>
