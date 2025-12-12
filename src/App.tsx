@@ -18,6 +18,8 @@ import StoreMapping from './components/modules/StoreMapping';
 import AddStore from './components/modules/store/AddStore';
 import EditStore from './components/modules/store/EditStore';
 import PrePurchaseOrders from './components/modules/PrePurchaseOrders';
+import Offers from './components/modules/Offers';
+import DeliveryLocations from './components/modules/DeliveryLocations';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -56,6 +58,8 @@ export default function App() {
                   <Route path="/store-mapping/add" element={<AddStore onBack={() => window.history.back()} />} />
                   <Route path="/store-mapping/edit/:storeId" element={<EditStore />} />
                   <Route path="/pre-purchase-orders" element={<PrePurchaseOrders />} />
+                   <Route path="/offers" element={<Offers />} />
+                  <Route path="/delivery-locations" element={<DeliveryLocations />} />
                 </Routes>
               </AdminLayout>
             }

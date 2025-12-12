@@ -14,7 +14,9 @@ import {
   X,
   LogOut,
   User,
-  ClipboardList
+  ClipboardList,
+  Tag,
+  Navigation
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -82,6 +84,18 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       label: 'Pre Purchase Order',
       icon: ClipboardList,
       path: '/pre-purchase-orders'
+    },
+     {
+      id: 'offers',
+      label: 'Offers',
+      icon: Tag,
+      path: '/offers'
+    },
+    {
+      id: 'delivery-locations',
+      label: 'Delivery Locations',
+      icon: Navigation,
+      path: '/delivery-locations'
     },
     {
       id: 'transactions',

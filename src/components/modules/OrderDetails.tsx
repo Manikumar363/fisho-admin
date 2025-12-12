@@ -4,7 +4,7 @@ import { ArrowLeft, User, Package, CreditCard, MapPin, Clock, CheckCircle } from
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { ImageWithFallback } from '../ui/ImageWithFallback';
 
 export default function OrderDetails() {
   const { orderId } = useParams();
