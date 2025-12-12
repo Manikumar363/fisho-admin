@@ -1,9 +1,12 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+// Optionally use a toast for error feedback
+import { toast } from 'sonner';
 
 interface LoginProps {
   onLogin: () => void;
@@ -14,10 +17,36 @@ export default function Login({ onLogin }: LoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin();
-    navigate('/dashboard');
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_BASE_URL}/api/admin/admin-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const msg = data?.message || 'Login failed';
+        setError(msg);
+        toast?.error?.(msg);
+        setLoading(false);
+        return;
+      }
+      // Optionally store token or user info here
+      onLogin();
+      navigate('/dashboard');
+    } catch (err: any) {
+      setError('Network error');
+      toast?.error?.('Network error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -32,6 +61,9 @@ export default function Login({ onLogin }: LoginProps) {
           <h2 className="mb-6">Admin Login</h2>
 
           <form onSubmit={handleLogin} className="space-y-4">
+            {error && (
+              <div className="text-red-600 text-sm text-center">{error}</div>
+            )}
             <div>
               <Label htmlFor="email">Email ID</Label>
               <div className="relative mt-1">
@@ -74,8 +106,8 @@ export default function Login({ onLogin }: LoginProps) {
               </button>
             </div>
 
-            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-              Login
+            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
+              {loading ? 'Logging in...' : 'Login'}
             </Button>
           </form>
         </div>
