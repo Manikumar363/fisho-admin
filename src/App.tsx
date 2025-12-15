@@ -20,6 +20,7 @@ import EditStore from './components/modules/store/EditStore';
 import PrePurchaseOrders from './components/modules/PrePurchaseOrders';
 import Offers from './components/modules/Offers';
 import DeliveryLocations from './components/modules/DeliveryLocations';
+import CMS from './components/modules/CMS';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -60,6 +61,7 @@ export default function App() {
                   <Route path="/pre-purchase-orders" element={<PrePurchaseOrders />} />
                    <Route path="/offers" element={<Offers />} />
                   <Route path="/delivery-locations" element={<DeliveryLocations />} />
+                  <Route path="/cms" element={<CMS />} />
                 </Routes>
               </AdminLayout>
             }
