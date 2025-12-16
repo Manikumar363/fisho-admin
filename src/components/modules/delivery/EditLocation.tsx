@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
@@ -14,9 +14,11 @@ import {
   SelectValue,
 } from '../../ui/select';
 import { toast } from 'sonner';
+import { apiFetch } from '../../../lib/api';
 
 interface DeliveryLocation {
   id: string;
+  code: string;
   locationName: string;
   deliveryType: string[];
   nearestStore: string;
@@ -51,6 +53,7 @@ export default function EditLocation({ location, onBack, onSave }: EditLocationP
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -93,7 +96,7 @@ export default function EditLocation({ location, onBack, onSave }: EditLocationP
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!validateForm()) {
@@ -101,23 +104,61 @@ export default function EditLocation({ location, onBack, onSave }: EditLocationP
       return;
     }
 
-    const selectedTypes = [];
-    if (deliveryTypes.express) selectedTypes.push('Express Delivery');
-    if (deliveryTypes.nextDay) selectedTypes.push('Next Day Delivery');
+    setLoading(true);
+    try {
+      const selectedTypes = [];
+      if (deliveryTypes.express) selectedTypes.push('Express Delivery');
+      if (deliveryTypes.nextDay) selectedTypes.push('Next Day Delivery');
 
-    onSave({
-      ...location,
-      locationName: formData.locationName.trim(),
-      deliveryType: selectedTypes,
-      nearestStore: formData.nearestStore,
-      status: formData.status ? 'Active' : 'Inactive'
-    });
+      // Prepare the payload for the API
+      const payload = {
+        name: formData.locationName.trim(),
+        expressDelivery: deliveryTypes.express,
+        isActive: formData.status
+      };
+
+      // Call the PUT API
+      const response = await apiFetch<{
+        success: boolean;
+        community: any;
+        message?: string;
+      }>(
+        `/api/community/${location.code}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        }
+      );
+
+      // Update the location locally
+      const updatedLocation: DeliveryLocation = {
+        ...location,
+        locationName: formData.locationName.trim(),
+        deliveryType: selectedTypes,
+        nearestStore: formData.nearestStore,
+        status: formData.status ? 'Active' : 'Inactive'
+      };
+
+      toast.success(response.message || 'Location updated successfully');
+      onSave(updatedLocation);
+    } catch (error: any) {
+      const errorMsg = error?.message || 'Failed to update location';
+      toast.error(errorMsg);
+      console.error('Error updating location:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={onBack}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onBack}
+          disabled={loading}
+        >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back
         </Button>
@@ -145,6 +186,7 @@ export default function EditLocation({ location, onBack, onSave }: EditLocationP
                 value={formData.locationName}
                 onChange={handleChange}
                 className={errors.locationName ? 'border-red-500' : ''}
+                disabled={loading}
               />
               {errors.locationName && (
                 <p className="text-sm text-red-500">{errors.locationName}</p>
@@ -162,6 +204,7 @@ export default function EditLocation({ location, onBack, onSave }: EditLocationP
                     id="express"
                     checked={deliveryTypes.express}
                     onCheckedChange={(checked) => handleDeliveryTypeChange('express', checked as boolean)}
+                    disabled={loading}
                   />
                   <div className="flex-1">
                     <label
@@ -179,6 +222,7 @@ export default function EditLocation({ location, onBack, onSave }: EditLocationP
                     id="nextDay"
                     checked={deliveryTypes.nextDay}
                     onCheckedChange={(checked) => handleDeliveryTypeChange('nextDay', checked as boolean)}
+                    disabled={loading}
                   />
                   <div className="flex-1">
                     <label
@@ -201,7 +245,11 @@ export default function EditLocation({ location, onBack, onSave }: EditLocationP
               <Label htmlFor="nearestStore">
                 Select Nearest Store <span className="text-red-500">*</span>
               </Label>
-              <Select value={formData.nearestStore} onValueChange={handleStoreChange}>
+              <Select
+                value={formData.nearestStore}
+                onValueChange={handleStoreChange}
+                disabled={loading}
+              >
                 <SelectTrigger className={errors.nearestStore ? 'border-red-500' : ''}>
                   <SelectValue placeholder="Select a store" />
                 </SelectTrigger>
@@ -241,16 +289,33 @@ export default function EditLocation({ location, onBack, onSave }: EditLocationP
                 id="status"
                 checked={formData.status}
                 onCheckedChange={(checked) => setFormData(prev => ({ ...prev, status: checked }))}
+                disabled={loading}
               />
             </div>
 
             {/* Action Buttons */}
             <div className="flex justify-end gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={onBack}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onBack}
+                disabled={loading}
+              >
                 Cancel
               </Button>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-                Update Location
+              <Button
+                type="submit"
+                className="bg-blue-600 hover:bg-blue-700"
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader className="w-4 h-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  'Update Location'
+                )}
               </Button>
             </div>
           </form>

@@ -1,9 +1,6 @@
-import React, { useMemo, useState } from 'react';
-import { Search, Edit, Trash2, FileText, ShieldCheck, Scale, BookOpen } from 'lucide-react';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Input } from '../ui/input';
+import React, { useState } from 'react';
+import { FileText, Image, Plus, Edit, Trash2, Shield, ScrollText, ChevronUp, ChevronDown } from 'lucide-react';
+import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import {
@@ -14,317 +11,398 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle
+  AlertDialogTitle,
 } from '../ui/alert-dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '../ui/select';
 import { toast } from 'sonner';
+import BannerManagement from './cms/BannerManagement';
+import TextContentEditor from './cms/TextContentEditor';
 
-interface CMSPage {
+type ContentType = 'banners' | 'terms' | 'privacy' | 'legal';
+
+interface ContentItem {
   id: string;
   title: string;
-  status: 'Published' | 'Draft';
-  updatedBy: string;
   lastUpdated: string;
-  content: string;
+  status?: 'Active' | 'Inactive';
+  type: ContentType;
+  sequence?: number;
 }
 
-const initialPages: CMSPage[] = [
-  {
-    id: 'CMS-001',
-    title: 'Privacy Policy',
-    status: 'Published',
-    updatedBy: 'Legal Team',
-    lastUpdated: '2025-11-12',
-    content: '<h2>Privacy Policy</h2><p>Describe how user data is collected, stored, and used. Outline consent, cookies, analytics, and data sharing practices.</p>'
-  },
-  {
-    id: 'CMS-002',
-    title: 'Terms & Conditions',
-    status: 'Published',
-    updatedBy: 'Admin User',
-    lastUpdated: '2025-10-28',
-    content: '<h2>Terms & Conditions</h2><p>Detail user responsibilities, acceptable use, payment terms, and disclaimers. Include termination and liability clauses.</p>'
-  },
-  {
-    id: 'CMS-003',
-    title: 'Legal / Compliance',
-    status: 'Draft',
-    updatedBy: 'Compliance',
-    lastUpdated: '2025-09-15',
-    content: '<h2>Legal / Compliance</h2><p>Summarize legal notices, grievance contacts, and compliance statements (e.g., PCI, GDPR equivalents where applicable).</p>'
-  }
-];
-
-const quillModules = {
-  toolbar: [
-    [{ header: [1, 2, 3, false] }],
-    ['bold', 'italic', 'underline', 'strike'],
-    [{ list: 'ordered' }, { list: 'bullet' }],
-    ['link'],
-    ['clean']
-  ]
-};
-
 export default function CMS() {
-  const [pages, setPages] = useState<CMSPage[]>(initialPages);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'Published' | 'Draft'>('all');
-  const [selectedPageId, setSelectedPageId] = useState<string | null>(initialPages[0]?.id ?? null);
-  const [editorContent, setEditorContent] = useState(initialPages[0]?.content ?? '');
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [selectedContent, setSelectedContent] = useState<ContentType | null>(null);
+  const [editingItem, setEditingItem] = useState<ContentItem | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<ContentItem | null>(null);
 
-  const filteredPages = useMemo(() => {
-    return pages.filter((page) => {
-      const matchesStatus = statusFilter === 'all' || page.status === statusFilter;
-      const matchesSearch =
-        page.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        page.id.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesStatus && matchesSearch;
+  const [banners, setBanners] = useState<ContentItem[]>([
+    {
+      id: 'BAN-001',
+      title: 'Summer Sale Banner',
+      lastUpdated: '2025-12-10',
+      status: 'Active',
+      type: 'banners'
+    },
+    {
+      id: 'BAN-002',
+      title: 'New Year Special',
+      lastUpdated: '2025-12-01',
+      status: 'Active',
+      type: 'banners'
+    },
+    {
+      id: 'BAN-003',
+      title: 'Weekend Offer',
+      lastUpdated: '2025-11-25',
+      status: 'Inactive',
+      type: 'banners'
+    }
+  ]);
+
+  const [textContents, setTextContents] = useState<ContentItem[]>([
+    {
+      id: 'TERMS-001',
+      title: 'Terms of Use',
+      lastUpdated: '2025-11-15',
+      type: 'terms'
+    },
+    {
+      id: 'PRIVACY-001',
+      title: 'Privacy Policy',
+      lastUpdated: '2025-11-10',
+      type: 'privacy'
+    },
+    {
+      id: 'LEGAL-001',
+      title: 'Legal & Compliances',
+      lastUpdated: '2025-11-05',
+      type: 'legal'
+    }
+  ]);
+
+  const contentTypes = [
+    {
+      id: 'banners' as ContentType,
+      title: 'Banners',
+      description: 'Manage promotional banners and carousel images',
+      icon: Image,
+      color: 'blue',
+      items: banners
+    },
+    {
+      id: 'terms' as ContentType,
+      title: 'Terms of Use',
+      description: 'Manage terms and conditions for platform usage',
+      icon: ScrollText,
+      color: 'green',
+      items: textContents.filter(item => item.type === 'terms')
+    },
+    {
+      id: 'privacy' as ContentType,
+      title: 'Privacy Policy',
+      description: 'Manage privacy policy and data protection information',
+      icon: Shield,
+      color: 'purple',
+      items: textContents.filter(item => item.type === 'privacy')
+    },
+    {
+      id: 'legal' as ContentType,
+      title: 'Legal & Compliances',
+      description: 'Manage legal documents and compliance information',
+      icon: FileText,
+      color: 'orange',
+      items: textContents.filter(item => item.type === 'legal')
+    }
+  ];
+
+  const handleAddContent = (type: ContentType) => {
+    setSelectedContent(type);
+    setEditingItem(null);
+  };
+
+  const handleEditContent = (item: ContentItem) => {
+    setSelectedContent(item.type);
+    setEditingItem(item);
+  };
+
+  const handleDeleteContent = (item: ContentItem) => {
+    setItemToDelete(item);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (itemToDelete) {
+      if (itemToDelete.type === 'banners') {
+        setBanners(banners.filter(banner => banner.id !== itemToDelete.id));
+      } else {
+        setTextContents(textContents.filter(content => content.id !== itemToDelete.id));
+      }
+      toast.success(`${itemToDelete.title} deleted successfully`);
+    }
+    setDeleteDialogOpen(false);
+    setItemToDelete(null);
+  };
+
+  const handleSaveBanner = (bannerData: any) => {
+    if (editingItem) {
+      // Update existing banner
+      setBanners(banners.map(banner =>
+        banner.id === editingItem.id
+          ? { ...banner, title: bannerData.title, status: bannerData.status, lastUpdated: new Date().toISOString().split('T')[0] }
+          : banner
+      ));
+      toast.success('Banner updated successfully');
+    } else {
+      // Add new banner
+      const newBanner: ContentItem = {
+        id: `BAN-${String(banners.length + 1).padStart(3, '0')}`,
+        title: bannerData.title,
+        status: bannerData.status,
+        lastUpdated: new Date().toISOString().split('T')[0],
+        type: 'banners'
+      };
+      setBanners([...banners, newBanner]);
+      toast.success('Banner added successfully');
+    }
+    setSelectedContent(null);
+    setEditingItem(null);
+  };
+
+  const handleSaveTextContent = (contentData: any) => {
+    if (editingItem) {
+      // Update existing content
+      setTextContents(textContents.map(content =>
+        content.id === editingItem.id
+          ? { ...content, title: contentData.title, lastUpdated: new Date().toISOString().split('T')[0] }
+          : content
+      ));
+      toast.success('Content updated successfully');
+    } else {
+      // Add new content
+      const typePrefix = selectedContent === 'terms' ? 'TERMS' : selectedContent === 'privacy' ? 'PRIVACY' : 'LEGAL';
+      const existingCount = textContents.filter(c => c.type === selectedContent).length;
+      const newContent: ContentItem = {
+        id: `${typePrefix}-${String(existingCount + 1).padStart(3, '0')}`,
+        title: contentData.title,
+        lastUpdated: new Date().toISOString().split('T')[0],
+        type: selectedContent!
+      };
+      setTextContents([...textContents, newContent]);
+      toast.success('Content added successfully');
+    }
+    setSelectedContent(null);
+    setEditingItem(null);
+  };
+
+  const handleCancel = () => {
+    setSelectedContent(null);
+    setEditingItem(null);
+  };
+
+  const moveBannerUp = (index: number) => {
+    if (index > 0) {
+      const newBanners = [...banners];
+      [newBanners[index], newBanners[index - 1]] = [newBanners[index - 1], newBanners[index]];
+      setBanners(newBanners);
+      toast.success('Banner order updated');
+    }
+  };
+
+  const moveBannerDown = (index: number) => {
+    if (index < banners.length - 1) {
+      const newBanners = [...banners];
+      [newBanners[index], newBanners[index + 1]] = [newBanners[index + 1], newBanners[index]];
+      setBanners(newBanners);
+      toast.success('Banner order updated');
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
     });
-  }, [pages, searchQuery, statusFilter]);
-
-  const selectedPage = useMemo(
-    () => pages.find((page) => page.id === selectedPageId) ?? null,
-    [pages, selectedPageId]
-  );
-
-  const handleSelectPage = (pageId: string) => {
-    setSelectedPageId(pageId);
-    const page = pages.find((item) => item.id === pageId);
-    setEditorContent(page?.content ?? '');
   };
 
-  const handleSave = () => {
-    if (!selectedPageId) {
-      return;
-    }
+  const getColorClasses = (color: string) => {
+    const colors: Record<string, { bg: string; text: string; border: string }> = {
+      blue: { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' },
+      green: { bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-200' },
+      purple: { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200' },
+      orange: { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200' }
+    };
+    return colors[color] || colors.blue;
+  };
 
-    setPages((prev) =>
-      prev.map((page) =>
-        page.id === selectedPageId
-          ? {
-              ...page,
-              content: editorContent,
-              lastUpdated: new Date().toISOString().slice(0, 10),
-              updatedBy: 'Admin User'
-            }
-          : page
-      )
+  // Show Banner Management or Text Content Editor if a content type is selected
+  if (selectedContent === 'banners') {
+    return (
+      <BannerManagement
+        banner={editingItem}
+        onSave={handleSaveBanner}
+        onCancel={handleCancel}
+      />
     );
+  }
 
-    toast.success('Page content saved');
-  };
+  if (selectedContent && ['terms', 'privacy', 'legal'].includes(selectedContent)) {
+    return (
+      <TextContentEditor
+        contentType={selectedContent}
+        contentItem={editingItem}
+        onSave={handleSaveTextContent}
+        onCancel={handleCancel}
+      />
+    );
+  }
 
-  const handleDelete = () => {
-    if (!deleteTarget) return;
-
-    setPages((prev) => prev.filter((page) => page.id !== deleteTarget));
-
-    if (selectedPageId === deleteTarget) {
-      const remaining = pages.filter((page) => page.id !== deleteTarget);
-      const nextSelection = remaining[0];
-      setSelectedPageId(nextSelection?.id ?? null);
-      setEditorContent(nextSelection?.content ?? '');
-    }
-
-    setDeleteTarget(null);
-    toast.success('Page deleted');
-  };
-
+  // Main CMS Screen
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="mb-2">Content Management</h1>
-          <p className="text-gray-600">Review, edit, and publish static policy pages</p>
-        </div>
+      {/* Header */}
+      <div>
+        <h1 className="text-gray-900">Content Management System</h1>
+        <p className="text-gray-500">Manage banners, policies, and legal content</p>
       </div>
 
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row md:items-center gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <Input
-                placeholder="Search by title"
-                className="pl-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <div className="w-full md:w-56">
-              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as 'all' | 'Published' | 'Draft')}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All statuses</SelectItem>
-                  <SelectItem value="Published">Published</SelectItem>
-                  <SelectItem value="Draft">Draft</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Content Types Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {contentTypes.map((contentType) => {
+          const colors = getColorClasses(contentType.color);
+          const Icon = contentType.icon;
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-blue-600" />
-              Pages
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200 text-left text-sm text-gray-500">
-                    <th className="py-3 px-4">Title</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredPages.length === 0 ? (
-                    <tr>
-                      <td colSpan={3} className="text-center py-6 text-gray-500">
-                        No pages found
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredPages.map((page) => (
-                      <tr
-                        key={page.id}
-                        className={`border-b border-gray-100 hover:bg-gray-50 ${
-                          selectedPageId === page.id ? 'bg-blue-50/40' : ''
-                        }`}
+          return (
+            <Card key={contentType.id} className="overflow-hidden">
+              <div className={`${colors.bg} border-b ${colors.border} p-4`}>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className={`${colors.bg} p-2 rounded-lg border ${colors.border}`}>
+                      <Icon className={`w-6 h-6 ${colors.text}`} />
+                    </div>
+                    <div>
+                      <h3 className={`${colors.text}`}>{contentType.title}</h3>
+                      <p className="text-gray-600 mt-1">{contentType.description}</p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => handleAddContent(contentType.id)}
+                    size="sm"
+                    className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300"
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Add
+                  </Button>
+                </div>
+              </div>
+
+              <CardContent className="p-0">
+                {contentType.items.length > 0 ? (
+                  <div className="divide-y divide-gray-200">
+                    {contentType.items.map((item, index) => (
+                      <div
+                        key={item.id}
+                        className="p-4 hover:bg-gray-50 transition-colors"
                       >
-                        <td className="py-3 px-4">
-                          <div className="font-medium text-gray-900">{page.title}</div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <Badge
-                            variant={page.status === 'Published' ? 'default' : 'secondary'}
-                            className={
-                              page.status === 'Published'
-                                ? 'bg-green-100 text-green-700 hover:bg-green-100'
-                                : 'bg-amber-100 text-amber-700 hover:bg-amber-100'
-                            }
-                          >
-                            {page.status}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex gap-2">
+                        <div className="flex items-center gap-4">
+                          {/* Sequence Number and Reorder Controls (Only for Banners) */}
+                          {item.type === 'banners' && (
+                            <div className="flex flex-col items-center">
+                              <div className="flex items-center justify-center w-10 h-10 bg-blue-50 text-blue-600 rounded-full border border-blue-200">
+                                {index + 1}
+                              </div>
+                              <div className="flex flex-col mt-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => moveBannerUp(index)}
+                                  disabled={index === 0}
+                                  className="p-1 h-6 text-gray-600 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30"
+                                >
+                                  <ChevronUp className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => moveBannerDown(index)}
+                                  disabled={index === contentType.items.length - 1}
+                                  className="p-1 h-6 text-gray-600 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30"
+                                >
+                                  <ChevronDown className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Content Info */}
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-gray-900">{item.title}</p>
+                              {item.status && (
+                                <Badge
+                                  variant={item.status === 'Active' ? 'default' : 'secondary'}
+                                  className={
+                                    item.status === 'Active'
+                                      ? 'bg-green-100 text-green-700 hover:bg-green-100'
+                                      : 'bg-gray-100 text-gray-700 hover:bg-gray-100'
+                                  }
+                                >
+                                  {item.status}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-gray-500 mt-1">
+                              Last updated: {formatDate(item.lastUpdated)}
+                            </p>
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div className="flex items-center gap-2">
                             <Button
+                              variant="ghost"
                               size="sm"
-                              variant="outline"
-                              onClick={() => handleSelectPage(page.id)}
+                              onClick={() => handleEditContent(item)}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                             >
-                              <Edit className="w-4 h-4 mr-1" />
-                              Edit
+                              <Edit className="w-4 h-4" />
                             </Button>
                             <Button
-                              size="sm"
                               variant="ghost"
-                              onClick={() => setDeleteTarget(page.id)}
+                              size="sm"
+                              onClick={() => handleDeleteContent(item)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
                             >
-                              <Trash2 className="w-4 h-4 text-red-600" />
+                              <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {selectedPage?.title || 'Select a page'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {selectedPage ? (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-blue-600" />
-                    <span>Status: </span>
-                    <Badge
-                      variant={selectedPage.status === 'Published' ? 'default' : 'secondary'}
-                      className={
-                        selectedPage.status === 'Published'
-                          ? 'bg-green-100 text-green-700 hover:bg-green-100'
-                          : 'bg-amber-100 text-amber-700 hover:bg-amber-100'
-                      }
-                    >
-                      {selectedPage.status}
-                    </Badge>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Scale className="w-4 h-4 text-blue-600" />
-                    <span>Last updated: {selectedPage.lastUpdated}</span>
+                ) : (
+                  <div className="p-8 text-center text-gray-500">
+                    No content available. Click "Add" to create new content.
                   </div>
-                  <div className="flex items-center gap-2">
-                    <BookOpen className="w-4 h-4 text-blue-600" />
-                    <span>Updated by: {selectedPage.updatedBy}</span>
-                  </div>
-                </div>
-
-                <div className="border border-gray-200 rounded-lg">
-                  <ReactQuill
-                    theme="snow"
-                    value={editorContent}
-                    onChange={setEditorContent}
-                    modules={quillModules}
-                    className="min-h-[280px]"
-                  />
-                </div>
-
-                <div className="flex justify-end gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={() => setEditorContent(selectedPage.content)}
-                  >
-                    Reset
-                  </Button>
-                  <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleSave}>
-                    Save Changes
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <div className="text-gray-500 text-sm">Select a page to edit its content.</div>
-            )}
-          </CardContent>
-        </Card>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
-      <AlertDialog open={Boolean(deleteTarget)} onOpenChange={() => setDeleteTarget(null)}>
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete page</AlertDialogTitle>
+            <AlertDialogTitle>Delete Content</AlertDialogTitle>
             <AlertDialogDescription>
-              Deleting a CMS page will remove it from the list. This cannot be undone.
+              Are you sure you want to delete "{itemToDelete?.title}"? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
+              onClick={confirmDelete}
               className="bg-red-600 hover:bg-red-700"
             >
               Delete

@@ -16,7 +16,8 @@ import {
   User,
   ClipboardList,
   Tag,
-  Navigation
+  Navigation,
+  MessageSquare
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -108,6 +109,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       label: 'CMS',
       icon: FileText,
       path: '/cms'
+    },
+    {
+      id: 'enquiries',
+      label: 'Enquiries',
+      icon: MessageSquare,
+      path: '/enquiries'
     },
     {
       id: 'mapping',

@@ -7,6 +7,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 // Optionally use a toast for error feedback
 import { toast } from 'sonner';
+import { setToken } from '../../lib/api';
 
 interface LoginProps {
   onLogin: () => void;
@@ -38,7 +39,13 @@ export default function Login({ onLogin }: LoginProps) {
         setLoading(false);
         return;
       }
-      // Optionally store token or user info here
+      // Store token if returned
+      const json = await res.json().catch(() => ({}));
+      const token: string | undefined =
+        json?.token || json?.accessToken || json?.data?.token || json?.data?.accessToken;
+      if (token) {
+        setToken(token);
+      }
       onLogin();
       navigate('/dashboard');
     } catch (err: any) {

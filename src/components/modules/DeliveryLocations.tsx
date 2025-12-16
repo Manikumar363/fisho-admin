@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Search, Plus, Edit, Trash2 } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Plus, Edit, Trash2, Eye, Loader } from 'lucide-react';
 import { Card, CardContent } from '../ui/card';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -14,12 +15,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
 import { toast } from 'sonner';
+import { apiFetch } from '../../lib/api';
 import AddLocation from './delivery/AddLocation';
 import EditLocation from './delivery/EditLocation';
 
 interface DeliveryLocation {
   id: string;
+  code: string;
   locationName: string;
   deliveryType: string[];
   nearestStore: string;
@@ -27,127 +31,131 @@ interface DeliveryLocation {
   status: 'Active' | 'Inactive';
 }
 
+interface ApiCommunity {
+  _id: string;
+  id: number;
+  name: string;
+  expressDelivery: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export default function DeliveryLocations() {
+  const navigate = useNavigate();
   const [showAddLocation, setShowAddLocation] = useState(false);
   const [editingLocation, setEditingLocation] = useState<DeliveryLocation | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [locationToDelete, setLocationToDelete] = useState<string | null>(null);
+  const [locationToDelete, setLocationToDelete] = useState<DeliveryLocation | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [locations, setLocations] = useState<DeliveryLocation[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewLoading, setViewLoading] = useState(false);
+  const [viewError, setViewError] = useState<string | null>(null);
+  const [viewData, setViewData] = useState<ApiCommunity | null>(null);
+  const [viewCode, setViewCode] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const [locations, setLocations] = useState<DeliveryLocation[]>([
-    {
-      id: 'LOC-001',
-      locationName: 'Bandra West',
-      deliveryType: ['Express Delivery', 'Next Day Delivery'],
-      nearestStore: 'Fisho Bandra West',
-      ordersReceived: 1245,
-      status: 'Active'
-    },
-    {
-      id: 'LOC-002',
-      locationName: 'Andheri East',
-      deliveryType: ['Express Delivery', 'Next Day Delivery'],
-      nearestStore: 'Fisho Andheri',
-      ordersReceived: 2103,
-      status: 'Active'
-    },
-    {
-      id: 'LOC-003',
-      locationName: 'Marine Drive',
-      deliveryType: ['Next Day Delivery'],
-      nearestStore: 'Fisho Marine Drive',
-      ordersReceived: 856,
-      status: 'Active'
-    },
-    {
-      id: 'LOC-004',
-      locationName: 'Juhu',
-      deliveryType: ['Express Delivery'],
-      nearestStore: 'Fisho Juhu',
-      ordersReceived: 743,
-      status: 'Active'
-    },
-    {
-      id: 'LOC-005',
-      locationName: 'Powai',
-      deliveryType: ['Next Day Delivery'],
-      nearestStore: 'Fisho Powai',
-      ordersReceived: 512,
-      status: 'Inactive'
-    },
-    {
-      id: 'LOC-006',
-      locationName: 'Colaba',
-      deliveryType: ['Express Delivery', 'Next Day Delivery'],
-      nearestStore: 'Fisho Marine Drive',
-      ordersReceived: 934,
-      status: 'Active'
-    },
-    {
-      id: 'LOC-007',
-      locationName: 'Worli',
-      deliveryType: ['Express Delivery'],
-      nearestStore: 'Fisho Marine Drive',
-      ordersReceived: 678,
-      status: 'Active'
-    },
-    {
-      id: 'LOC-008',
-      locationName: 'Goregaon',
-      deliveryType: ['Next Day Delivery'],
-      nearestStore: 'Fisho Andheri',
-      ordersReceived: 421,
-      status: 'Active'
-    },
-    {
-      id: 'LOC-009',
-      locationName: 'Malad',
-      deliveryType: ['Express Delivery', 'Next Day Delivery'],
-      nearestStore: 'Fisho Andheri',
-      ordersReceived: 567,
-      status: 'Inactive'
-    },
-    {
-      id: 'LOC-010',
-      locationName: 'Versova',
-      deliveryType: ['Express Delivery'],
-      nearestStore: 'Fisho Andheri',
-      ordersReceived: 823,
-      status: 'Active'
-    }
-  ]);
-
-  const handleAddLocation = (newLocation: Omit<DeliveryLocation, 'id' | 'ordersReceived'>) => {
-    const location: DeliveryLocation = {
-      id: `LOC-${String(locations.length + 1).padStart(3, '0')}`,
-      ...newLocation,
-      ordersReceived: 0
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await apiFetch<{ success: boolean; communities: ApiCommunity[]; message?: string }>(
+          '/api/community'
+        );
+        if (!mounted) return;
+        const mapped: DeliveryLocation[] = (data?.communities || []).map((c) => ({
+          id: `LOC-${String(c.id ?? c._id).padStart(3, '0')}`,
+          code: String(c._id || ''),
+          locationName: c.name,
+          deliveryType: c.expressDelivery ? ['Express Delivery'] : ['Next Day Delivery'],
+          nearestStore: '-',
+          ordersReceived: 0,
+          status: c.isActive ? 'Active' : 'Inactive',
+        }));
+        setLocations(mapped);
+      } catch (e: any) {
+        if (!mounted) return;
+        const status = e?.status;
+        const msg = e?.message || 'Failed to load communities';
+        setError(msg);
+        toast.error(msg);
+        if (status === 401) {
+          navigate('/login');
+        }
+      } finally {
+        if (mounted) setLoading(false);
+      }
     };
-    setLocations([...locations, location]);
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [navigate]);
+
+  const handleAddLocation = (newLocation: {
+    id: string;
+    code: string;
+    locationName: string;
+    deliveryType: string[];
+    nearestStore: string;
+    ordersReceived: number;
+    status: 'Active' | 'Inactive';
+  }) => {
+    setLocations([...locations, newLocation]);
     setShowAddLocation(false);
     toast.success('Location added successfully');
   };
 
-  const handleEditLocation = (updatedLocation: DeliveryLocation) => {
+  const handleEditLocation = (updatedLocation: Omit<DeliveryLocation, 'code'> & { code?: string }) => {
+    const locationToUpdate: DeliveryLocation = {
+      ...updatedLocation,
+      code: updatedLocation.code || editingLocation?.code || ''
+    };
     setLocations(locations.map(location => 
-      location.id === updatedLocation.id ? updatedLocation : location
+      location.id === locationToUpdate.id ? locationToUpdate : location
     ));
     setEditingLocation(null);
     toast.success('Location updated successfully');
   };
 
-  const handleDeleteLocation = (locationId: string) => {
-    setLocationToDelete(locationId);
+  const handleDeleteLocation = (location: DeliveryLocation) => {
+    setLocationToDelete(location);
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
-    if (locationToDelete) {
-      setLocations(locations.filter(location => location.id !== locationToDelete));
-      toast.success('Location deleted successfully');
+  const confirmDelete = async () => {
+    if (!locationToDelete?.code) return;
+
+    setDeleteLoading(true);
+    try {
+      const response = await apiFetch<{
+        success: boolean;
+        community: any;
+        message?: string;
+      }>(
+        `/api/community/${locationToDelete.code}`,
+        {
+          method: 'DELETE'
+        }
+      );
+
+      // Remove from local state
+      setLocations(locations.filter(location => location.code !== locationToDelete.code));
+      toast.success(response.message || 'Location deleted successfully');
+    } catch (err: any) {
+      const errorMsg = err?.message || 'Failed to delete location';
+      toast.error(errorMsg);
+      console.error('Error deleting location:', err);
+    } finally {
+      setDeleteLoading(false);
+      setDeleteDialogOpen(false);
+      setLocationToDelete(null);
     }
-    setDeleteDialogOpen(false);
-    setLocationToDelete(null);
   };
 
   const getDeliveryTypeDisplay = (types: string[]) => {
@@ -157,11 +165,43 @@ export default function DeliveryLocations() {
     return types[0]?.replace(' Delivery', '') || '';
   };
 
-  const filteredLocations = locations.filter(location =>
-    location.locationName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    location.nearestStore.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    location.id.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredLocations = useMemo(() =>
+    locations.filter(location =>
+      location.locationName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      location.nearestStore.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      location.id.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  , [locations, searchQuery]);
+
+  const openView = async (code: string) => {
+    setViewCode(code);
+    setViewOpen(true);
+    setViewLoading(true);
+    setViewError(null);
+    setViewData(null);
+    try {
+      const res = await apiFetch<{ success: boolean; community: ApiCommunity; message?: string }>(
+        `/api/community/${code}`
+      );
+      setViewData(res.community);
+    } catch (e: any) {
+      const status = e?.status;
+      const msg = e?.message || 'Failed to fetch community';
+      setViewError(msg);
+      toast.error(msg);
+      if (status === 401) navigate('/login');
+    } finally {
+      setViewLoading(false);
+    }
+  };
+
+  const closeView = () => {
+    setViewOpen(false);
+    setViewCode(null);
+    setViewData(null);
+    setViewError(null);
+    setViewLoading(false);
+  };
 
   if (showAddLocation) {
     return <AddLocation onBack={() => setShowAddLocation(false)} onSave={handleAddLocation} />;
@@ -206,6 +246,9 @@ export default function DeliveryLocations() {
       <Card>
         <CardContent className="p-6">
           <div className="overflow-x-auto">
+            {loading ? (
+              <div className="py-8 text-center text-gray-500">Loading communities…</div>
+            ) : (
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">
@@ -219,7 +262,11 @@ export default function DeliveryLocations() {
                 </tr>
               </thead>
               <tbody>
-                {filteredLocations.length === 0 ? (
+                {error ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-8 text-red-600">{error}</td>
+                  </tr>
+                ) : filteredLocations.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="text-center py-8 text-gray-500">
                       No locations found
@@ -263,6 +310,15 @@ export default function DeliveryLocations() {
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => location.code ? openView(location.code) : toast.error('No community id available')}
+                            disabled={!location.code}
+                            title="View"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setEditingLocation(location)}
                           >
                             <Edit className="w-4 h-4" />
@@ -270,7 +326,8 @@ export default function DeliveryLocations() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDeleteLocation(location.id)}
+                            onClick={() => handleDeleteLocation(location)}
+                            disabled={deleteLoading}
                           >
                             <Trash2 className="w-4 h-4 text-red-600" />
                           </Button>
@@ -281,6 +338,7 @@ export default function DeliveryLocations() {
                 )}
               </tbody>
             </table>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -291,20 +349,67 @@ export default function DeliveryLocations() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Location</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this delivery location? This action cannot be undone.
+              Are you sure you want to delete <span className="font-semibold text-gray-900">"{locationToDelete?.locationName}"</span>? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteLoading}
+              className="bg-red-600 hover:bg-red-700 disabled:opacity-70"
             >
-              Delete
+              {deleteLoading ? (
+                <>
+                  <Loader className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* View Location Dialog */}
+      <Dialog open={viewOpen} onOpenChange={(o) => (o ? setViewOpen(true) : closeView())}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Community Details</DialogTitle>
+            <DialogDescription>View delivery location information</DialogDescription>
+          </DialogHeader>
+
+          {viewLoading && <div className="py-4 text-gray-500">Loading…</div>}
+          {!viewLoading && viewError && (
+            <div className="py-2 text-red-600">{viewError}</div>
+          )}
+          {!viewLoading && !viewError && viewData && (
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Name</span>
+                <span className="font-medium">{viewData.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Express Delivery</span>
+                <span className="font-medium">{viewData.expressDelivery ? 'Yes' : 'No'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Status</span>
+                <span className="font-medium">{viewData.isActive ? 'Active' : 'Inactive'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Numeric ID</span>
+                <span className="font-medium">{viewData.id}</span>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeView}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

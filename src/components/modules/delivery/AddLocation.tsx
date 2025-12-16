@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
@@ -14,13 +14,17 @@ import {
   SelectValue,
 } from '../../ui/select';
 import { toast } from 'sonner';
+import { apiFetch } from '../../../lib/api';
 
 interface AddLocationProps {
   onBack: () => void;
   onSave: (location: {
+    id: string;
+    code: string;
     locationName: string;
     deliveryType: string[];
     nearestStore: string;
+    ordersReceived: number;
     status: 'Active' | 'Inactive';
   }) => void;
 }
@@ -46,6 +50,7 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -88,7 +93,7 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!validateForm()) {
@@ -96,22 +101,75 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
       return;
     }
 
-    const selectedTypes = [];
-    if (deliveryTypes.express) selectedTypes.push('Express Delivery');
-    if (deliveryTypes.nextDay) selectedTypes.push('Next Day Delivery');
+    setLoading(true);
+    try {
+      const selectedTypes = [];
+      if (deliveryTypes.express) selectedTypes.push('Express Delivery');
+      if (deliveryTypes.nextDay) selectedTypes.push('Next Day Delivery');
 
-    onSave({
-      locationName: formData.locationName.trim(),
-      deliveryType: selectedTypes,
-      nearestStore: formData.nearestStore,
-      status: formData.status ? 'Active' : 'Inactive'
-    });
+      // Prepare the payload for the API
+      const payload = {
+        name: formData.locationName.trim(),
+        expressDelivery: deliveryTypes.express,
+        isActive: formData.status
+      };
+
+      console.log('Sending payload:', payload);
+
+      // Call the POST API with proper error handling
+      const response = await apiFetch<{
+        success: boolean;
+        community: {
+          _id: string;
+          id: number;
+          name: string;
+          expressDelivery: boolean;
+          isActive: boolean;
+        };
+        message?: string;
+      }>(
+        '/api/community',
+        {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        }
+      );
+
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to create community');
+      }
+
+      // Prepare the location object with API response
+      const newLocation = {
+        id: `LOC-${String(response.community.id).padStart(3, '0')}`,
+        code: response.community._id,
+        locationName: response.community.name,
+        deliveryType: response.community.expressDelivery ? ['Express Delivery'] : ['Next Day Delivery'],
+        nearestStore: formData.nearestStore,
+        ordersReceived: 0,
+        status: (response.community.isActive ? 'Active' : 'Inactive') as 'Active' | 'Inactive'
+      };
+
+      toast.success(response.message || 'Location added successfully');
+      onSave(newLocation);
+    } catch (error: any) {
+      console.error('Error adding location:', error);
+      const errorMsg = error?.message || 'Failed to add location';
+      toast.error(errorMsg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={onBack}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onBack}
+          disabled={loading}
+        >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back
         </Button>
@@ -139,6 +197,7 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
                 value={formData.locationName}
                 onChange={handleChange}
                 className={errors.locationName ? 'border-red-500' : ''}
+                disabled={loading}
               />
               {errors.locationName && (
                 <p className="text-sm text-red-500">{errors.locationName}</p>
@@ -156,6 +215,7 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
                     id="express"
                     checked={deliveryTypes.express}
                     onCheckedChange={(checked) => handleDeliveryTypeChange('express', checked as boolean)}
+                    disabled={loading}
                   />
                   <div className="flex-1">
                     <label
@@ -173,6 +233,7 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
                     id="nextDay"
                     checked={deliveryTypes.nextDay}
                     onCheckedChange={(checked) => handleDeliveryTypeChange('nextDay', checked as boolean)}
+                    disabled={loading}
                   />
                   <div className="flex-1">
                     <label
@@ -195,7 +256,11 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
               <Label htmlFor="nearestStore">
                 Select Nearest Store <span className="text-red-500">*</span>
               </Label>
-              <Select value={formData.nearestStore} onValueChange={handleStoreChange}>
+              <Select
+                value={formData.nearestStore}
+                onValueChange={handleStoreChange}
+                disabled={loading}
+              >
                 <SelectTrigger className={errors.nearestStore ? 'border-red-500' : ''}>
                   <SelectValue placeholder="Select a store" />
                 </SelectTrigger>
@@ -224,16 +289,33 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
                 id="status"
                 checked={formData.status}
                 onCheckedChange={(checked) => setFormData(prev => ({ ...prev, status: checked }))}
+                disabled={loading}
               />
             </div>
 
             {/* Action Buttons */}
             <div className="flex justify-end gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={onBack}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onBack}
+                disabled={loading}
+              >
                 Cancel
               </Button>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-                Save Location
+              <Button
+                type="submit"
+                className="bg-blue-600 hover:bg-blue-700"
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader className="w-4 h-4 mr-2 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  'Save Location'
+                )}
               </Button>
             </div>
           </form>
