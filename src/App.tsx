@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './components/auth/Login';
 import ForgotPassword from './components/auth/ForgotPassword';
@@ -22,13 +22,37 @@ import Offers from './components/modules/Offers';
 import DeliveryLocations from './components/modules/DeliveryLocations';
 import CMS from './components/modules/CMS';
 import Enquiries from './components/modules/Enquiries';
+import { getToken } from './lib/api';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Check for existing token on app load
+  useEffect(() => {
+    const token = getToken();
+    if (token) {
+      setIsAuthenticated(true);
+    }
+    setIsLoading(false);
+  }, []);
 
   const handleLogin = () => {
     setIsAuthenticated(true);
   };
+
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token');
+    setIsAuthenticated(false);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-600">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <BrowserRouter>
@@ -44,7 +68,7 @@ export default function App() {
           <Route
             path="/*"
             element={
-              <AdminLayout>
+              <AdminLayout onLogout={handleLogout}>
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/dashboard" element={<Dashboard />} />

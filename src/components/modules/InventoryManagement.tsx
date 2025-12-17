@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Search, Filter, Edit, Trash2, ChevronRight, ToggleLeft, ToggleRight, ChevronUp, ChevronDown, GripVertical, Eye } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Plus, Search, Filter, Edit, Trash2, ChevronRight, ToggleLeft, ToggleRight, ChevronUp, ChevronDown, GripVertical, Eye, Loader } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -12,6 +12,10 @@ import { Switch } from '../ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { ImageWithFallback } from '../ui/ImageWithFallback';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { apiFetch } from '../../lib/api';
+import { toast } from 'sonner';
+
+const IMAGE_BASE = (import.meta.env as any).VITE_IMAGE_BASE_URL || (import.meta.env as any).VITE_BASE_URL as string | undefined;
 
 export default function InventoryManagement() {
   const [activeTab, setActiveTab] = useState('categories');
@@ -20,6 +24,11 @@ export default function InventoryManagement() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showCategoryViewModal, setShowCategoryViewModal] = useState(false);
+  const [viewingCategory, setViewingCategory] = useState<any>(null);
+  const [isLoadingCategoryView, setIsLoadingCategoryView] = useState(false);
 
   // Category state
   const [categoryForm, setCategoryForm] = useState({
@@ -59,14 +68,67 @@ export default function InventoryManagement() {
     availability: true
   });
 
-  // Mock data - now using state for reordering
-  const [categories, setCategories] = useState([
-    { id: 1, icon: '🦐', name: 'Prawns', availability: 'Available', dateCreated: '2024-01-15', lastUpdated: '2024-11-20' },
-    { id: 2, icon: '🐟', name: 'Fish', availability: 'Available', dateCreated: '2024-01-15', lastUpdated: '2024-11-18' },
-    { id: 3, icon: '🦀', name: 'Crab', availability: 'Available', dateCreated: '2024-01-16', lastUpdated: '2024-11-15' },
-    { id: 4, icon: '🦑', name: 'Squid', availability: 'Unavailable', dateCreated: '2024-01-20', lastUpdated: '2024-11-10' },
-    { id: 5, icon: '🦞', name: 'Lobster', availability: 'Available', dateCreated: '2024-02-01', lastUpdated: '2024-11-22' }
-  ]);
+  // Categories from API
+  const [categories, setCategories] = useState<Array<{
+    id: string | number;
+    icon: string; // image url or emoji
+    name: string;
+    availability: 'Available' | 'Unavailable';
+    dateCreated: string;
+    lastUpdated: string;
+  }>>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [categoriesError, setCategoriesError] = useState<string | null>(null);
+  const [isReordering, setIsReordering] = useState(false);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      setCategoriesLoading(true);
+      setCategoriesError(null);
+      try {
+        const res = await apiFetch<{
+          success: boolean;
+          categories: Array<{
+            _id: string;
+            name: string;
+            description?: string;
+            image?: string;
+            order?: number;
+            isActive: boolean;
+            isDeleted?: boolean;
+            createdAt: string;
+            updatedAt: string;
+            slug?: string;
+          }>;
+          message?: string;
+        }>('\/api\/categories');
+
+        if (!res.success) throw new Error(res.message || 'Failed to fetch categories');
+
+        const mapped = (res.categories || []).map((c) => {
+          const raw = c.image || '';
+          const icon = raw ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${raw}` : raw) : '🗂️';
+          return {
+            id: c._id,
+            icon,
+            name: c.name,
+            availability: (c.isActive ? 'Available' : 'Unavailable') as 'Available' | 'Unavailable',
+            dateCreated: new Date(c.createdAt).toISOString().split('T')[0],
+            lastUpdated: new Date(c.updatedAt).toISOString().split('T')[0],
+          };
+        });
+        setCategories(mapped);
+      } catch (e: any) {
+        const msg = e?.message || 'Failed to load categories';
+        setCategoriesError(msg);
+        toast.error(msg);
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
+
+    if (activeTab === 'categories') fetchCategories();
+  }, [activeTab]);
 
   const [products, setProducts] = useState([
     { id: 1, image: '', name: 'Tiger Prawns', species: 'Prawns', cutTypes: ['Whole Cleaned', 'Peeled'], stock: 125, costPrice: 320, profit: 15, discount: 10, status: 'Active', lastUpdated: '2024-11-28' },
@@ -85,14 +147,42 @@ export default function InventoryManagement() {
   ]);
 
   // Reorder functions
-  const moveCategory = (index: number, direction: 'up' | 'down') => {
-    const newCategories = [...categories];
+  const moveCategory = async (index: number, direction: 'up' | 'down') => {
+    if (isReordering) return;
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    
-    if (targetIndex < 0 || targetIndex >= newCategories.length) return;
-    
-    [newCategories[index], newCategories[targetIndex]] = [newCategories[targetIndex], newCategories[index]];
-    setCategories(newCategories);
+    if (targetIndex < 0 || targetIndex >= categories.length) return;
+
+    const movingCategory = categories[index];
+    const previous = [...categories];
+    const optimistic = [...categories];
+    [optimistic[index], optimistic[targetIndex]] = [optimistic[targetIndex], optimistic[index]];
+    setCategories(optimistic);
+
+    setIsReordering(true);
+    try {
+      const body = {
+        id: String(movingCategory.id),
+        from: index + 1,
+        to: targetIndex + 1,
+      };
+      const res = await apiFetch<{ success: boolean; message?: string }>(
+        '/api/categories/reorder',
+        {
+          method: 'PUT',
+          body: JSON.stringify(body),
+        }
+      );
+      if (!res?.success) {
+        throw new Error(res?.message || 'Failed to reorder category');
+      }
+      toast.success(res?.message || 'Category reordered successfully');
+    } catch (e: any) {
+      setCategories(previous);
+      const msg = e?.message || 'Failed to reorder category';
+      toast.error(msg);
+    } finally {
+      setIsReordering(false);
+    }
   };
 
   const moveProduct = (index: number, direction: 'up' | 'down') => {
@@ -139,8 +229,98 @@ export default function InventoryManagement() {
     return { displayPrice: displayPrice.toFixed(2), sellingPrice: sellingPrice.toFixed(2) };
   };
 
+  const handleEditCategory = (category: any) => {
+    setEditingCategoryId(category.id);
+    setCategoryForm({
+      speciesName: category.name,
+      speciesIcon: null,
+      availability: category.availability === 'Available'
+    });
+    setShowAddModal(true);
+  };
+
+  const handleViewCategory = async (categoryId: string) => {
+    setIsLoadingCategoryView(true);
+    setShowCategoryViewModal(true);
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        category?: {
+          _id: string;
+          name: string;
+          description?: string;
+          image: string;
+          order?: number;
+          isActive: boolean;
+          isDeleted: boolean;
+          createdAt: string;
+          updatedAt: string;
+          slug?: string;
+        };
+        message?: string;
+      }>(`/api/categories/${categoryId}`);
+
+      if (!res.success) throw new Error(res.message || 'Failed to fetch category');
+      if (!res.category) throw new Error('No category data in response');
+
+      const categoryData = {
+        id: res.category._id,
+        icon: IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${res.category.image}` : res.category.image,
+        name: res.category.name,
+        description: res.category.description || 'N/A',
+        status: res.category.isActive ? 'Active' : 'Inactive',
+        isDeleted: res.category.isDeleted,
+        dateCreated: new Date(res.category.createdAt).toISOString().split('T')[0],
+        lastUpdated: new Date(res.category.updatedAt).toISOString().split('T')[0],
+        slug: res.category.slug || 'N/A',
+        order: res.category.order || 0,
+      };
+
+      setViewingCategory(categoryData);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to load category details';
+      console.error('View category error:', e);
+      toast.error(msg);
+      setShowCategoryViewModal(false);
+    } finally {
+      setIsLoadingCategoryView(false);
+    }
+  };
+
+  const handleDeleteCategory = async () => {
+    if (!selectedItem || activeTab !== 'categories') return;
+
+    setIsSubmitting(true);
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        category?: {
+          _id: string;
+          isDeleted: boolean;
+        };
+        message?: string;
+      }>(`/api/categories/${selectedItem.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.success) throw new Error(res.message || 'Failed to delete category');
+
+      setCategories(categories.filter(cat => cat.id !== selectedItem.id));
+      toast.success('Category deleted successfully');
+      setShowDeleteDialog(false);
+      setSelectedItem(null);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to delete category';
+      console.error('Delete category error:', e);
+      toast.error(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleOpenAddModal = () => {
     // Reset forms
+    setEditingCategoryId(null);
     setCategoryForm({ speciesName: '', speciesIcon: null, availability: true });
     setProductForm({
       species: '',
@@ -172,60 +352,144 @@ export default function InventoryManagement() {
     setShowAddModal(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle form submission based on active tab
-    console.log('Submitting:', activeTab);
-    setShowAddModal(false);
+    
+    if (activeTab === 'categories') {
+      if (!categoryForm.speciesName.trim()) {
+        toast.error('Category name is required');
+        return;
+      }
+      if (!editingCategoryId && !categoryForm.speciesIcon) {
+        toast.error('Category icon is required');
+        return;
+      }
+
+      setIsSubmitting(true);
+      try {
+        const formData = new FormData();
+        formData.append('name', categoryForm.speciesName.trim());
+        if (categoryForm.speciesIcon) {
+          formData.append('image', categoryForm.speciesIcon);
+        }
+        formData.append('isActive', String(categoryForm.availability));
+
+        const isEdit = editingCategoryId !== null;
+        const endpoint = isEdit ? `/api/categories/${editingCategoryId}` : '/api/categories';
+        const method = isEdit ? 'PUT' : 'POST';
+
+        const res = await apiFetch<{
+          success: boolean;
+          category?: {
+            _id: string;
+            name: string;
+            image: string;
+            isActive: boolean;
+            createdAt: string;
+            updatedAt: string;
+          };
+          message?: string;
+        }>(endpoint, {
+          method,
+          body: formData,
+        });
+
+        if (!res.success) throw new Error(res.message || (isEdit ? 'Failed to update category' : 'Failed to add category'));
+        if (!res.category) throw new Error('No category data in response');
+
+        const categoryData = {
+          id: res.category._id,
+          icon: IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${res.category.image}` : res.category.image,
+          name: res.category.name,
+          availability: (res.category.isActive ? 'Available' : 'Unavailable') as 'Available' | 'Unavailable',
+          dateCreated: new Date(res.category.createdAt).toISOString().split('T')[0],
+          lastUpdated: new Date(res.category.updatedAt).toISOString().split('T')[0],
+        };
+
+        if (isEdit) {
+          const updatedCategories = categories.map(cat => cat.id === editingCategoryId ? categoryData : cat);
+          setCategories(updatedCategories);
+          toast.success('Category updated successfully');
+        } else {
+          setCategories([...categories, categoryData]);
+          toast.success('Category added successfully');
+        }
+
+        setCategoryForm({ speciesName: '', speciesIcon: null, availability: true });
+        setEditingCategoryId(null);
+        setShowAddModal(false);
+      } catch (e: any) {
+        const msg = e?.message || (editingCategoryId ? 'Failed to update category' : 'Failed to add category');
+        console.error('Category operation error:', e);
+        toast.error(msg);
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
   };
 
-  const renderCategoryModal = () => (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="speciesName">Species Name *</Label>
-        <Input
-          id="speciesName"
-          value={categoryForm.speciesName}
-          onChange={(e) => setCategoryForm({ ...categoryForm, speciesName: e.target.value })}
-          placeholder="e.g., Prawns, Fish, Crab"
-          required
-        />
-      </div>
-
-      <div>
-        <Label htmlFor="speciesIcon">Species Icon *</Label>
-        <Input
-          id="speciesIcon"
-          type="file"
-          accept="image/*"
-          onChange={(e) => setCategoryForm({ ...categoryForm, speciesIcon: e.target.files?.[0] || null })}
-          required
-        />
-        <p className="text-sm text-gray-500 mt-1">Upload an icon or image for this species</p>
-      </div>
-
-      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+  const renderCategoryModal = () => {
+    const isEdit = editingCategoryId !== null;
+    return (
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <Label htmlFor="availability">Availability</Label>
-          <p className="text-sm text-gray-600">Make this category available to users</p>
+          <Label htmlFor="speciesName">Species Name *</Label>
+          <Input
+            id="speciesName"
+            value={categoryForm.speciesName}
+            onChange={(e) => setCategoryForm({ ...categoryForm, speciesName: e.target.value })}
+            placeholder="e.g., Prawns, Fish, Crab"
+            required
+            disabled={isSubmitting}
+          />
         </div>
-        <Switch
-          id="availability"
-          checked={categoryForm.availability}
-          onCheckedChange={(checked: boolean) => setCategoryForm({ ...categoryForm, availability: checked })}
-        />
-      </div>
 
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={() => setShowAddModal(false)}>
-          Cancel
-        </Button>
-        <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-          Add Category
-        </Button>
-      </DialogFooter>
-    </form>
-  );
+        <div>
+          <Label htmlFor="speciesIcon">Species Icon {!isEdit && '*'}</Label>
+          <Input
+            id="speciesIcon"
+            type="file"
+            accept="image/*"
+            onChange={(e) => setCategoryForm({ ...categoryForm, speciesIcon: e.target.files?.[0] || null })}
+            required={!isEdit}
+            disabled={isSubmitting}
+          />
+          <p className="text-sm text-gray-500 mt-1">
+            {isEdit ? 'Upload a new icon to replace the current one (optional)' : 'Upload an icon or image for this species'}
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+          <div>
+            <Label htmlFor="availability">Availability</Label>
+            <p className="text-sm text-gray-600">Make this category available to users</p>
+          </div>
+          <Switch
+            id="availability"
+            checked={categoryForm.availability}
+            onCheckedChange={(checked: boolean) => setCategoryForm({ ...categoryForm, availability: checked })}
+            disabled={isSubmitting}
+          />
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => setShowAddModal(false)} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={isSubmitting}>
+            {isSubmitting ? (
+              <>
+                <Loader className="w-4 h-4 mr-2 animate-spin" />
+                {isEdit ? 'Updating...' : 'Adding...'}
+              </>
+            ) : (
+              isEdit ? 'Update Category' : 'Add Category'
+            )}
+          </Button>
+        </DialogFooter>
+      </form>
+    );
+  };
 
   const renderProductModal = () => (
     <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto">
@@ -650,57 +914,87 @@ export default function InventoryManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {categories.map((category, index) => (
-                      <tr key={category.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-3 px-4">
-                          <div className="flex flex-col gap-1">
-                            <button
-                              onClick={() => moveCategory(index, 'up')}
-                              disabled={index === 0}
-                              className={`p-1 rounded ${index === 0 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
-                            >
-                              <ChevronUp className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => moveCategory(index, 'down')}
-                              disabled={index === categories.length - 1}
-                              className={`p-1 rounded ${index === categories.length - 1 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
-                            >
-                              <ChevronDown className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">{index + 1}</td>
-                        <td className="py-3 px-4">
-                          <span className="text-3xl">{category.icon}</span>
-                        </td>
-                        <td className="py-3 px-4">{category.name}</td>
-                        <td className="py-3 px-4">
-                          <Badge variant={category.availability === 'Available' ? 'default' : 'secondary'}>
-                            {category.availability}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4">{category.dateCreated}</td>
-                        <td className="py-3 px-4">{category.lastUpdated}</td>
-                        <td className="py-3 px-4">
-                          <div className="flex gap-2">
-                            <button className="p-1 hover:bg-gray-100 rounded">
-                              <Edit className="w-4 h-4 text-blue-600" />
-                            </button>
-                            <button className="p-1 hover:bg-gray-100 rounded">
-                              <Trash2 className="w-4 h-4 text-red-600" />
-                            </button>
-                            <button className="p-1 hover:bg-gray-100 rounded">
-                              {category.availability === 'Available' ? (
-                                <ToggleRight className="w-4 h-4 text-green-600" />
+                    {
+                      categoriesLoading ? (
+                        <tr>
+                          <td colSpan={8} className="py-8 text-center text-gray-500">
+                            <div className="inline-flex items-center gap-2">
+                              <Loader className="w-4 h-4 animate-spin" />
+                              Loading categories...
+                            </div>
+                          </td>
+                        </tr>
+                      ) : categoriesError ? (
+                        <tr>
+                          <td colSpan={8} className="py-8 text-center text-red-600">{categoriesError}</td>
+                        </tr>
+                      ) : categories.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="py-8 text-center text-gray-500">No categories found</td>
+                        </tr>
+                      ) : (
+                        categories.map((category, index) => (
+                          <tr key={category.id} className="border-b border-gray-100 hover:bg-gray-50">
+                            <td className="py-3 px-4">
+                              <div className="flex flex-col gap-1">
+                                <button
+                                  onClick={() => moveCategory(index, 'up')}
+                                  disabled={index === 0}
+                                  className={`p-1 rounded ${index === 0 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
+                                >
+                                  <ChevronUp className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => moveCategory(index, 'down')}
+                                  disabled={index === categories.length - 1}
+                                  className={`p-1 rounded ${index === categories.length - 1 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
+                                >
+                                  <ChevronDown className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4">{index + 1}</td>
+                            <td className="py-3 px-4">
+                              {typeof category.icon === 'string' && (category.icon.startsWith('http') || category.icon.startsWith('/')) ? (
+                                <ImageWithFallback src={category.icon} alt={String(category.name)} className="w-10 h-10 rounded object-cover" />
                               ) : (
-                                <ToggleLeft className="w-4 h-4 text-gray-400" />
+                                <span className="text-3xl">{category.icon}</span>
                               )}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                            </td>
+                            <td className="py-3 px-4">{category.name}</td>
+                            <td className="py-3 px-4">
+                              <Badge variant={category.availability === 'Available' ? 'default' : 'secondary'}>
+                                {category.availability}
+                              </Badge>
+                            </td>
+                            <td className="py-3 px-4">{category.dateCreated}</td>
+                            <td className="py-3 px-4">{category.lastUpdated}</td>
+                            <td className="py-3 px-4">
+                              <div className="flex gap-2">
+                                <button onClick={() => handleViewCategory(String(category.id))} className="p-1 hover:bg-gray-100 rounded" title="View category details">
+                                  <Eye className="w-4 h-4 text-gray-600" />
+                                </button>
+                                <button onClick={() => handleEditCategory(category)} className="p-1 hover:bg-gray-100 rounded" title="Edit category">
+                                  <Edit className="w-4 h-4 text-blue-600" />
+                                </button>
+                                <button onClick={() => {
+                                  setSelectedItem(category);
+                                  setShowDeleteDialog(true);
+                                }} className="p-1 hover:bg-gray-100 rounded" title="Delete category">
+                                  <Trash2 className="w-4 h-4 text-red-600" />
+                                </button>
+                                <button className="p-1 hover:bg-gray-100 rounded">
+                                  {category.availability === 'Available' ? (
+                                    <ToggleRight className="w-4 h-4 text-green-600" />
+                                  ) : (
+                                    <ToggleLeft className="w-4 h-4 text-gray-400" />
+                                  )}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                   </tbody>
                 </table>
               </div>
@@ -953,7 +1247,7 @@ export default function InventoryManagement() {
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>
-              Add New {activeTab === 'categories' ? 'Category' : activeTab === 'products' ? 'Product' : 'Product Variant'}
+              {editingCategoryId ? 'Edit' : 'Add New'} {activeTab === 'categories' ? 'Category' : activeTab === 'products' ? 'Product' : 'Product Variant'}
             </DialogTitle>
           </DialogHeader>
           {activeTab === 'categories' && renderCategoryModal()}
@@ -1002,7 +1296,7 @@ export default function InventoryManagement() {
                   checked={selectedItem?.availability === 'Available'}
                   onCheckedChange={(checked: boolean) => {
                     const updatedCategories = categories.map(cat => 
-                      cat.id === selectedItem.id ? { ...cat, availability: checked ? 'Available' : 'Unavailable' } : cat
+                      cat.id === selectedItem.id ? { ...cat, availability: (checked ? 'Available' : 'Unavailable') as 'Available' | 'Unavailable' } : cat
                     );
                     setCategories(updatedCategories);
                   }}
@@ -1326,6 +1620,90 @@ export default function InventoryManagement() {
         </DialogContent>
       </Dialog>
 
+      {/* View Category Dialog */}
+      <Dialog open={showCategoryViewModal} onOpenChange={setShowCategoryViewModal}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Category Details</DialogTitle>
+          </DialogHeader>
+          {isLoadingCategoryView ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader className="w-6 h-6 animate-spin text-blue-600" />
+            </div>
+          ) : viewingCategory ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-semibold text-gray-600">Category Icon</Label>
+                  <div className="mt-2">
+                    {typeof viewingCategory.icon === 'string' && (viewingCategory.icon.includes('http') || viewingCategory.icon.includes('/')) ? (
+                      <ImageWithFallback 
+                        src={viewingCategory.icon} 
+                        alt={viewingCategory.name}
+                        className="w-20 h-20 rounded object-cover"
+                      />
+                    ) : (
+                      <span className="text-4xl">{viewingCategory.icon}</span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold text-gray-600">Category Name</Label>
+                  <p className="mt-2 text-base font-medium">{viewingCategory.name}</p>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-sm font-semibold text-gray-600">Description</Label>
+                <p className="mt-2 text-base text-gray-700">{viewingCategory.description}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-semibold text-gray-600">Status</Label>
+                  <div className="mt-2">
+                    <Badge variant={viewingCategory.status === 'Active' ? 'default' : 'secondary'}>
+                      {viewingCategory.status}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold text-gray-600">Slug</Label>
+                  <p className="mt-2 text-base text-gray-700">{viewingCategory.slug}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-semibold text-gray-600">Order</Label>
+                  <p className="mt-2 text-base text-gray-700">{viewingCategory.order}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold text-gray-600">Is Deleted</Label>
+                  <p className="mt-2 text-base text-gray-700">{viewingCategory.isDeleted ? 'Yes' : 'No'}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-semibold text-gray-600">Date Created</Label>
+                  <p className="mt-2 text-base text-gray-700">{viewingCategory.dateCreated}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold text-gray-600">Last Updated</Label>
+                  <p className="mt-2 text-base text-gray-700">{viewingCategory.lastUpdated}</p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setShowCategoryViewModal(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
@@ -1336,23 +1714,32 @@ export default function InventoryManagement() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>
+            <AlertDialogCancel disabled={isSubmitting}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                // Delete item from state
                 if (activeTab === 'categories') {
-                  setCategories(categories.filter(cat => cat.id !== selectedItem.id));
+                  handleDeleteCategory();
                 } else if (activeTab === 'products') {
                   setProducts(products.filter(prod => prod.id !== selectedItem.id));
+                  setShowDeleteDialog(false);
                 } else if (activeTab === 'variants') {
                   setVariants(variants.filter(variant => variant.id !== selectedItem.id));
+                  setShowDeleteDialog(false);
                 }
-                setShowDeleteDialog(false);
               }}
+              disabled={isSubmitting}
+              className="bg-red-600 hover:bg-red-700"
             >
-              Delete
+              {isSubmitting && activeTab === 'categories' ? (
+                <>
+                  <Loader className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

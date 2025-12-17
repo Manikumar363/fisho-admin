@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -22,12 +22,19 @@ import {
 
 interface AdminLayoutProps {
   children: React.ReactNode;
+  onLogout: () => void;
 }
 
-export default function AdminLayout({ children }: AdminLayoutProps) {
+export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [expandedSections, setExpandedSections] = useState<string[]>(['inventory']);
+
+  const handleLogout = () => {
+    onLogout();
+    navigate('/login');
+  };
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev =>
@@ -175,8 +182,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               </div>
               <span>Admin User</span>
             </div>
-            <button className="p-2 hover:bg-gray-100 rounded-lg">
-              <LogOut className="w-5 h-5 text-gray-600" />
+            <button 
+              onClick={handleLogout}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Logout"
+            >
+              <LogOut className="w-5 h-5 text-gray-600 hover:text-red-600" />
             </button>
           </div>
         </header>
