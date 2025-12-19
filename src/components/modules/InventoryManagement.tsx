@@ -14,8 +14,9 @@ import { ImageWithFallback } from '../ui/ImageWithFallback';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { apiFetch } from '../../lib/api';
 import { toast } from 'sonner';
+import CutTypeSection from './inventory/CutTypeSection';
 
-const IMAGE_BASE = (import.meta.env as any).VITE_IMAGE_BASE_URL || (import.meta.env as any).VITE_BASE_URL as string | undefined;
+const IMAGE_BASE = ((import.meta as any).env?.VITE_IMAGE_BASE_URL || (import.meta as any).env?.VITE_BASE_URL) as string | undefined;
 
 export default function InventoryManagement() {
   const [activeTab, setActiveTab] = useState('categories');
@@ -29,6 +30,7 @@ export default function InventoryManagement() {
   const [showCategoryViewModal, setShowCategoryViewModal] = useState(false);
   const [viewingCategory, setViewingCategory] = useState<any>(null);
   const [isLoadingCategoryView, setIsLoadingCategoryView] = useState(false);
+  const [openCutTypeAdd, setOpenCutTypeAdd] = useState(false);
 
   // Category state
   const [categoryForm, setCategoryForm] = useState({
@@ -53,7 +55,7 @@ export default function InventoryManagement() {
     availability: true
   });
 
-  // Product Variant state
+  // Variant state (for add/edit modal forms)
   const [variantForm, setVariantForm] = useState({
     species: '',
     product: '',
@@ -68,10 +70,10 @@ export default function InventoryManagement() {
     availability: true
   });
 
-  // Categories from API
+  // Categories state
   const [categories, setCategories] = useState<Array<{
-    id: string | number;
-    icon: string; // image url or emoji
+    id: string;
+    icon: string | any;
     name: string;
     availability: 'Available' | 'Unavailable';
     dateCreated: string;
@@ -88,7 +90,7 @@ export default function InventoryManagement() {
       try {
         const res = await apiFetch<{
           success: boolean;
-          categories: Array<{
+          categories?: Array<{
             _id: string;
             name: string;
             description?: string;
@@ -101,7 +103,7 @@ export default function InventoryManagement() {
             slug?: string;
           }>;
           message?: string;
-        }>('\/api\/categories');
+        }>('/api/categories');
 
         if (!res.success) throw new Error(res.message || 'Failed to fetch categories');
 
@@ -319,6 +321,11 @@ export default function InventoryManagement() {
   };
 
   const handleOpenAddModal = () => {
+    // If Cut Types tab, open child dialog instead
+    if (activeTab === 'cuttypes') {
+      setOpenCutTypeAdd(true);
+      return;
+    }
     // Reset forms
     setEditingCategoryId(null);
     setCategoryForm({ speciesName: '', speciesIcon: null, availability: true });
@@ -841,6 +848,13 @@ export default function InventoryManagement() {
     );
   };
 
+  const tabLabelMap: Record<string, string> = {
+    categories: 'Categories',
+    products: 'Products',
+    variants: 'Product Variants',
+    cuttypes: 'Cut Types',
+  };
+
   return (
     <div className="space-y-6">
       {/* Breadcrumbs */}
@@ -848,7 +862,7 @@ export default function InventoryManagement() {
         <span>Inventory</span>
         <ChevronRight className="w-4 h-4" />
         <span className="text-blue-600">
-          {activeTab === 'categories' ? 'Categories' : activeTab === 'products' ? 'Products' : 'Product Variants'}
+          {tabLabelMap[activeTab] || 'Inventory'}
         </span>
       </div>
 
@@ -856,9 +870,12 @@ export default function InventoryManagement() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="mb-2">Inventory Management</h1>
-          <p className="text-gray-600">Manage categories, products, and variants</p>
+          <p className="text-gray-600">Manage categories, products, variants, and cut types</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleOpenAddModal}>
+        <Button
+          className="bg-blue-600 hover:bg-blue-700"
+          onClick={handleOpenAddModal}
+        >
           <Plus className="w-4 h-4 mr-2" />
           Add
         </Button>
@@ -866,10 +883,11 @@ export default function InventoryManagement() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="categories">Categories</TabsTrigger>
-          <TabsTrigger value="products">Products</TabsTrigger>
-          <TabsTrigger value="variants">Product Variants</TabsTrigger>
+        <TabsList className="w-full flex flex-wrap gap-2 bg-muted p-1 rounded-lg">
+          <TabsTrigger className="min-w-[240px] flex-1" value="categories">Categories</TabsTrigger>
+          <TabsTrigger className="min-w-[240px] flex-1" value="products">Products</TabsTrigger>
+          <TabsTrigger className="min-w-[240px] flex-1" value="variants">Product Variants</TabsTrigger>
+          <TabsTrigger className="min-w-[300px] flex-1" value="cuttypes">Cut Types</TabsTrigger>
         </TabsList>
 
         {/* Categories Tab */}
@@ -1240,6 +1258,11 @@ export default function InventoryManagement() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Cut Types Tab */}
+        <TabsContent value="cuttypes" className="space-y-4">
+          <CutTypeSection openAdd={openCutTypeAdd} onAddClose={() => setOpenCutTypeAdd(false)} />
+        </TabsContent>
       </Tabs>
 
       {/* Add Modal */}
@@ -1247,7 +1270,7 @@ export default function InventoryManagement() {
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>
-              {editingCategoryId ? 'Edit' : 'Add New'} {activeTab === 'categories' ? 'Category' : activeTab === 'products' ? 'Product' : 'Product Variant'}
+              {editingCategoryId ? 'Edit' : 'Add New'} {tabLabelMap[activeTab] || 'Item'}
             </DialogTitle>
           </DialogHeader>
           {activeTab === 'categories' && renderCategoryModal()}
@@ -1509,9 +1532,9 @@ export default function InventoryManagement() {
                     <SelectValue placeholder="Choose cut type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {selectedItem?.cutTypes.map((ct: string, idx: number) => (
-                      <SelectItem key={idx} value={ct}>{ct}</SelectItem>
-                    ))}
+                      {products.find(p => p.name === selectedItem?.product)?.cutTypes?.map((ct: string, idx: number) => (
+                        <SelectItem key={idx} value={ct}>{ct}</SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
