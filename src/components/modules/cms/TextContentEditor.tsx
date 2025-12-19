@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Loader } from 'lucide-react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { Card, CardContent } from '../../ui/card';
 import { Input } from '../../ui/input';
 import { Button } from '../../ui/button';
 import { Label } from '../../ui/label';
+import { apiFetch, getToken } from '../../../lib/api';
+import { toast } from 'sonner';
 
 interface TextContentEditorProps {
-  contentType: 'terms' | 'privacy' | 'legal';
+  contentType: 'terms' | 'privacy' | 'about';
   contentItem?: any;
   onSave: (contentData: any) => void;
   onCancel: () => void;
@@ -52,19 +54,125 @@ export default function TextContentEditor({
 }: TextContentEditorProps) {
   const [title, setTitle] = useState(contentItem?.title || '');
   const [content, setContent] = useState(contentItem?.content || '');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pageId, setPageId] = useState<string | null>(null);
 
   const contentTypeLabels = {
     terms: 'Terms of Use',
     privacy: 'Privacy Policy',
-    legal: 'Legal & Compliances'
+    about: 'About Us'
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const contentTypeIds = {
+    terms: '69412955d430ff450e4ac0b8',
+    privacy: '694128ead430ff450e4ac0b2',
+    about: '69442a843fcd660eec9c89ed'
+  };
+
+  useEffect(() => {
+    const fetchContent = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const id = contentTypeIds[contentType];
+        const res = await apiFetch<{
+          success: boolean;
+          page?: {
+            _id: string;
+            title: string;
+            description: string;
+            isDeleted: boolean;
+            isActive: boolean;
+            createdAt: string;
+            updatedAt: string;
+          };
+          message?: string;
+        }>(`/api/page/get-page/${id}`);
+
+        if (!res?.success) throw new Error(res?.message || 'Failed to fetch content');
+        if (res.page) {
+          setTitle(res.page.title);
+          setContent(res.page.description);
+          setPageId(res.page._id);
+        }
+      } catch (e: any) {
+        const msg = e?.message || 'Failed to load content';
+        setError(msg);
+        toast.error(msg);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchContent();
+  }, [contentType]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({
-      title,
-      content
-    });
+    if (!pageId) {
+      toast.error('Page ID not found');
+      return;
+    }
+
+    const token = getToken() || (import.meta as any)?.env?.VITE_STATIC_TOKEN;
+    if (!token) {
+      toast.error('Missing auth token. Please log in or set VITE_STATIC_TOKEN.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const url = `/api/page/update-page/${pageId}`;
+      // Debug aids for environment/auth issues
+      console.info('Updating page', {
+        url,
+        baseUrl: (import.meta as any)?.env?.VITE_BASE_URL,
+        hasToken: Boolean(localStorage.getItem('auth_token')),
+        staticToken: Boolean((import.meta as any)?.env?.VITE_STATIC_TOKEN),
+        tokenPreview: token ? `${String(token).slice(0, 4)}...${String(token).slice(-4)}` : 'none',
+      });
+
+      const res = await apiFetch<{
+        success: boolean;
+        page?: {
+          _id: string;
+          title: string;
+          description: string;
+          isDeleted: boolean;
+          isActive: boolean;
+          createdAt: string;
+          updatedAt: string;
+        };
+        message?: string;
+      }>(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: content })
+      });
+
+      if (!res?.success) throw new Error(res?.message || 'Failed to update content');
+
+      const updatedAt = res.page?.updatedAt || new Date().toISOString();
+      toast.success(res.message || 'Content updated successfully');
+      onSave({ 
+        title, 
+        content, 
+        lastUpdated: updatedAt,
+        updatedAtIso: updatedAt  // Pass ISO for consistent formatting
+      });
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to save content';
+      toast.error(msg);
+      console.error('Update page failed', {
+        urlTried: `/api/page/update-page/${pageId}`,
+        status: err?.status,
+        message: msg,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -89,75 +197,103 @@ export default function TextContentEditor({
         <p className="text-gray-500">Create and format content using the rich text editor</p>
       </div>
 
-      {/* Form */}
-      <form onSubmit={handleSubmit}>
+      {loading ? (
         <Card>
-          <CardContent className="p-6 space-y-6">
-            {/* Content Title */}
-            <div className="space-y-2">
-              <Label htmlFor="title">Title *</Label>
-              <Input
-                id="title"
-                placeholder="Enter content title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
-              />
-            </div>
-
-            {/* Rich Text Editor */}
-            <div className="space-y-2">
-              <Label>Content *</Label>
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <ReactQuill
-                  theme="snow"
-                  value={content}
-                  onChange={setContent}
-                  modules={modules}
-                  formats={formats}
-                  placeholder="Write your content here..."
-                  style={{ minHeight: '400px' }}
-                />
-              </div>
-              <p className="text-gray-500 text-sm mt-2">
-                Use the toolbar above to format your content
-              </p>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3 pt-4">
-              <Button
-                type="submit"
-                className="bg-blue-600 hover:bg-blue-700"
-                disabled={!title || !content}
-              >
-                Save Content
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onCancel}
-              >
-                Cancel
-              </Button>
+          <CardContent className="p-12 text-center">
+            <div className="inline-flex items-center gap-2 text-gray-500">
+              <Loader className="w-5 h-5 animate-spin" />
+              Loading content...
             </div>
           </CardContent>
         </Card>
-      </form>
+      ) : error ? (
+        <Card>
+          <CardContent className="p-12 text-center text-red-600">
+            {error}
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Form */}
+          <form onSubmit={handleSubmit}>
+            <Card>
+              <CardContent className="p-6 space-y-6">
+                {/* Content Title (read-only) */}
+                <div className="space-y-2">
+                  <Label htmlFor="title">Title (read-only)</Label>
+                  <Input
+                    id="title"
+                    placeholder="Content title"
+                    value={title}
+                    readOnly
+                    disabled
+                  />
+                  <p className="text-xs text-gray-500">Title is managed by the server and not editable here.</p>
+                </div>
 
-      {/* Preview Section */}
-      <Card>
-        <CardContent className="p-6">
-          <h3 className="text-gray-900 mb-4">Preview</h3>
-          <div className="prose max-w-none">
-            {title && <h2 className="text-gray-900 mb-4">{title}</h2>}
-            <div
-              className="text-gray-700"
-              dangerouslySetInnerHTML={{ __html: content || '<p class="text-gray-400">Content will appear here...</p>' }}
-            />
-          </div>
-        </CardContent>
-      </Card>
+                {/* Rich Text Editor */}
+                <div className="space-y-2">
+                  <Label>Content *</Label>
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <ReactQuill
+                      theme="snow"
+                      value={content}
+                      onChange={setContent}
+                      modules={modules}
+                      formats={formats}
+                      placeholder="Write your content here..."
+                      style={{ minHeight: '400px' }}
+                    />
+                  </div>
+                  <p className="text-gray-500 text-sm mt-2">
+                    Use the toolbar above to format your content
+                  </p>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-3 pt-4">
+                  <Button
+                    type="submit"
+                    className="bg-blue-600 hover:bg-blue-700"
+                    disabled={!content || isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Loader className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </span>
+                    ) : (
+                      'Save Content'
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onCancel}
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </form>
+
+          {/* Preview Section */}
+          <Card>
+            <CardContent className="p-6">
+              <h3 className="text-gray-900 mb-4">Preview</h3>
+              <div className="prose max-w-none">
+                {title && <h2 className="text-gray-900 mb-4">{title}</h2>}
+                <div
+                  className="text-gray-700"
+                  dangerouslySetInnerHTML={{ __html: content || '<p class="text-gray-400">Content will appear here...</p>' }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }

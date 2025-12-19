@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 export const API_BASE_URL = import.meta.env.VITE_BASE_URL as string;
 
 export function getToken(): string | null {

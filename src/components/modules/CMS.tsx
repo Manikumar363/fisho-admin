@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 import BannerManagement from './cms/BannerManagement';
 import TextContentEditor from './cms/TextContentEditor';
 
-type ContentType = 'banners' | 'terms' | 'privacy' | 'legal';
+type ContentType = 'banners' | 'terms' | 'privacy' | 'about';
 
 interface ContentItem {
   id: string;
@@ -61,7 +61,7 @@ export default function CMS() {
   const [textContents, setTextContents] = useState<ContentItem[]>([
     {
       id: 'TERMS-001',
-      title: 'Terms of Use',
+      title: 'Terms and Conditions',
       lastUpdated: '2025-11-15',
       type: 'terms'
     },
@@ -72,10 +72,10 @@ export default function CMS() {
       type: 'privacy'
     },
     {
-      id: 'LEGAL-001',
-      title: 'Legal & Compliances',
+      id: 'ABOUT-001',
+      title: 'About Us',
       lastUpdated: '2025-11-05',
-      type: 'legal'
+      type: 'about'
     }
   ]);
 
@@ -90,7 +90,7 @@ export default function CMS() {
     },
     {
       id: 'terms' as ContentType,
-      title: 'Terms of Use',
+      title: 'Terms and Conditions',
       description: 'Manage terms and conditions for platform usage',
       icon: ScrollText,
       color: 'green',
@@ -105,12 +105,12 @@ export default function CMS() {
       items: textContents.filter(item => item.type === 'privacy')
     },
     {
-      id: 'legal' as ContentType,
-      title: 'Legal & Compliances',
-      description: 'Manage legal documents and compliance information',
+      id: 'about' as ContentType,
+      title: 'About Us',
+      description: 'Manage company information for About Us page',
       icon: FileText,
       color: 'orange',
-      items: textContents.filter(item => item.type === 'legal')
+      items: textContents.filter(item => item.type === 'about')
     }
   ];
 
@@ -168,22 +168,27 @@ export default function CMS() {
   };
 
   const handleSaveTextContent = (contentData: any) => {
+    // Use the server's updatedAt timestamp if available, otherwise use now
+    const updatedDate = contentData.updatedAtIso
+      ? new Date(contentData.updatedAtIso).toISOString().split('T')[0]
+      : new Date().toISOString().split('T')[0];
+
     if (editingItem) {
-      // Update existing content
+      // Update existing content with server timestamp
       setTextContents(textContents.map(content =>
         content.id === editingItem.id
-          ? { ...content, title: contentData.title, lastUpdated: new Date().toISOString().split('T')[0] }
+          ? { ...content, title: contentData.title, lastUpdated: updatedDate }
           : content
       ));
       toast.success('Content updated successfully');
     } else {
       // Add new content
-      const typePrefix = selectedContent === 'terms' ? 'TERMS' : selectedContent === 'privacy' ? 'PRIVACY' : 'LEGAL';
+      const typePrefix = selectedContent === 'terms' ? 'TERMS' : selectedContent === 'privacy' ? 'PRIVACY' : 'ABOUT';
       const existingCount = textContents.filter(c => c.type === selectedContent).length;
       const newContent: ContentItem = {
         id: `${typePrefix}-${String(existingCount + 1).padStart(3, '0')}`,
         title: contentData.title,
-        lastUpdated: new Date().toISOString().split('T')[0],
+        lastUpdated: updatedDate,
         type: selectedContent!
       };
       setTextContents([...textContents, newContent]);
@@ -246,7 +251,7 @@ export default function CMS() {
     );
   }
 
-  if (selectedContent && ['terms', 'privacy', 'legal'].includes(selectedContent)) {
+  if (selectedContent && ['terms', 'privacy', 'about'].includes(selectedContent)) {
     return (
       <TextContentEditor
         contentType={selectedContent}
@@ -263,7 +268,7 @@ export default function CMS() {
       {/* Header */}
       <div>
         <h1 className="text-gray-900">Content Management System</h1>
-        <p className="text-gray-500">Manage banners, policies, and legal content</p>
+        <p className="text-gray-500">Manage banners, policies, and about us content</p>
       </div>
 
       {/* Content Types Grid */}
@@ -285,14 +290,16 @@ export default function CMS() {
                       <p className="text-gray-600 mt-1">{contentType.description}</p>
                     </div>
                   </div>
-                  <Button
-                    onClick={() => handleAddContent(contentType.id)}
-                    size="sm"
-                    className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300"
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Add
-                  </Button>
+                  {contentType.id === 'banners' && (
+                    <Button
+                      onClick={() => handleAddContent(contentType.id)}
+                      size="sm"
+                      className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300"
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add
+                    </Button>
+                  )}
                 </div>
               </div>
 
