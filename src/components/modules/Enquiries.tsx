@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Search, Eye, Trash2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Eye, Trash2, Loader } from 'lucide-react';
+import { apiFetch } from '../../lib/api';
 import { Card, CardContent } from '../ui/card';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -39,122 +40,94 @@ export default function Enquiries() {
   const [viewingEnquiry, setViewingEnquiry] = useState<Enquiry | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [enquiryToDelete, setEnquiryToDelete] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const [enquiries, setEnquiries] = useState<Enquiry[]>([
-    {
-      id: 'ENQ-001',
-      date: '2025-12-16',
-      name: 'Rajesh Kumar',
-      email: 'rajesh.kumar@example.com',
-      mobile: '+91 98765 43210',
-      platform: 'Web',
-      subject: 'Bulk Order Inquiry',
-      message: 'I am interested in placing a bulk order for fresh prawns. Can you provide pricing for 50kg and delivery options to South Mumbai?'
-    },
-    {
-      id: 'ENQ-002',
-      date: '2025-12-16',
-      name: 'Priya Sharma',
-      email: 'priya.sharma@example.com',
-      mobile: '+91 87654 32109',
-      platform: 'Mobile',
-      subject: 'Product Availability',
-      message: 'Do you have fresh salmon available? Also, what are your delivery timings for Bandra area?'
-    },
-    {
-      id: 'ENQ-003',
-      date: '2025-12-15',
-      name: 'Amit Patel',
-      email: 'amit.patel@example.com',
-      mobile: '+91 76543 21098',
-      platform: 'Web',
-      subject: 'Partnership Opportunity',
-      message: 'I run a restaurant in Juhu and would like to discuss a potential partnership for regular seafood supply. Please contact me at your earliest convenience.'
-    },
-    {
-      id: 'ENQ-004',
-      date: '2025-12-15',
-      name: 'Sneha Desai',
-      email: 'sneha.desai@example.com',
-      mobile: '+91 65432 10987',
-      platform: 'Mobile',
-      subject: 'Delivery Issue',
-      message: 'I placed an order yesterday but haven\'t received any update on delivery status. Order ID: ORD-12345'
-    },
-    {
-      id: 'ENQ-005',
-      date: '2025-12-14',
-      name: 'Vikram Singh',
-      email: 'vikram.singh@example.com',
-      mobile: '+91 54321 09876',
-      platform: 'Web',
-      subject: 'Product Quality Feedback',
-      message: 'The pomfret I received was excellent quality. Would like to know if you offer a subscription service for weekly deliveries?'
-    },
-    {
-      id: 'ENQ-006',
-      date: '2025-12-14',
-      name: 'Anjali Mehta',
-      email: 'anjali.mehta@example.com',
-      mobile: '+91 43210 98765',
-      platform: 'Mobile',
-      subject: 'Refund Request',
-      message: 'I received a damaged product in my last order. Need assistance with refund process.'
-    },
-    {
-      id: 'ENQ-007',
-      date: '2025-12-13',
-      name: 'Rahul Verma',
-      email: 'rahul.verma@example.com',
-      mobile: '+91 32109 87654',
-      platform: 'Web',
-      subject: 'Franchise Inquiry',
-      message: 'Interested in opening a Fisho franchise in Pune. Would like to know more about franchise opportunities and requirements.'
-    },
-    {
-      id: 'ENQ-008',
-      date: '2025-12-13',
-      name: 'Kavita Reddy',
-      email: 'kavita.reddy@example.com',
-      mobile: '+91 21098 76543',
-      platform: 'Mobile',
-      subject: 'App Technical Issue',
-      message: 'Unable to apply discount coupon on mobile app. Getting error message. Please help.'
-    },
-    {
-      id: 'ENQ-009',
-      date: '2025-12-12',
-      name: 'Suresh Nair',
-      email: 'suresh.nair@example.com',
-      mobile: '+91 10987 65432',
-      platform: 'Web',
-      subject: 'Custom Order Request',
-      message: 'Need 30kg of cleaned and marinated fish for a family function on Dec 25th. Can you arrange?'
-    },
-    {
-      id: 'ENQ-010',
-      date: '2025-12-12',
-      name: 'Meera Iyer',
-      email: 'meera.iyer@example.com',
-      mobile: '+91 09876 54321',
-      platform: 'Mobile',
-      subject: 'Payment Gateway Issue',
-      message: 'Payment was deducted from my account but order status shows failed. Need urgent resolution.'
+  const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
+
+  const fetchEnquiries = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        querys?: Array<{
+          _id: string;
+          firstName: string;
+          lastName: string;
+          platform?: string;
+          email: string;
+          phone: string;
+          message: string;
+          isDeleted: boolean;
+          createdAt: string;
+          updatedAt: string;
+        }>;
+        message?: string;
+      }>('/api/query/get-all');
+
+      if (!res?.success) throw new Error(res?.message || 'Failed to fetch enquiries');
+
+      const mapped = (res.querys || [])
+        .filter(q => !q.isDeleted)
+        .map(q => ({
+          id: q._id,
+          date: new Date(q.createdAt).toISOString().split('T')[0],
+          name: `${q.firstName} ${q.lastName}`.trim(),
+          email: q.email,
+          mobile: q.phone,
+          platform: (q.platform || 'Web') as 'Web' | 'Mobile',
+          message: q.message,
+        }));
+
+      setEnquiries(mapped);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to load enquiries';
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    fetchEnquiries();
+  }, []);
 
   const handleDeleteEnquiry = (enquiryId: string) => {
     setEnquiryToDelete(enquiryId);
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
-    if (enquiryToDelete) {
+  const confirmDelete = async () => {
+    if (!enquiryToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        query?: {
+          _id: string;
+          isDeleted: boolean;
+        };
+        message?: string;
+      }>(`/api/query/delete-query/${enquiryToDelete}`, {
+        method: 'DELETE',
+      });
+
+      if (!res?.success) throw new Error(res?.message || 'Failed to delete enquiry');
+
       setEnquiries(enquiries.filter(enquiry => enquiry.id !== enquiryToDelete));
-      toast.success('Enquiry deleted successfully');
+      toast.success(res.message || 'Enquiry deleted successfully');
+      setDeleteDialogOpen(false);
+      setEnquiryToDelete(null);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to delete enquiry';
+      toast.error(msg);
+    } finally {
+      setIsDeleting(false);
     }
-    setDeleteDialogOpen(false);
-    setEnquiryToDelete(null);
   };
 
   const filteredEnquiries = enquiries.filter(enquiry =>
@@ -215,7 +188,22 @@ export default function Enquiries() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredEnquiries.length > 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                      <div className="inline-flex items-center gap-2">
+                        <Loader className="w-4 h-4 animate-spin" />
+                        Loading enquiries...
+                      </div>
+                    </td>
+                  </tr>
+                ) : error ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center text-red-600">
+                      {error}
+                    </td>
+                  </tr>
+                ) : filteredEnquiries.length > 0 ? (
                   filteredEnquiries.map((enquiry) => (
                     <tr key={enquiry.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 text-gray-900">
@@ -358,12 +346,20 @@ export default function Enquiries() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
+              disabled={isDeleting}
               className="bg-red-600 hover:bg-red-700"
             >
-              Delete
+              {isDeleting ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader className="w-4 h-4 animate-spin" />
+                  Deleting...
+                </span>
+              ) : (
+                'Delete'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
