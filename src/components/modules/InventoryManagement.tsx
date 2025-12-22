@@ -48,6 +48,7 @@ export default function InventoryManagement() {
     nutritionFacts: '',
     cutTypes: [] as string[],
     currentCutType: '',
+    availableWeight: '',
     availableStock: '',
     defaultProfit: '',
     defaultDiscount: '',
@@ -337,6 +338,7 @@ export default function InventoryManagement() {
       nutritionFacts: '',
       cutTypes: [],
       currentCutType: '',
+      availableWeight: '',
       availableStock: '',
       defaultProfit: '',
       defaultDiscount: '',
@@ -593,6 +595,17 @@ export default function InventoryManagement() {
             ))}
           </div>
         )}
+      </div>
+      <div>
+        <Label htmlFor="availableWeight">Available Weight *</Label>
+        <Textarea
+          id="availableWeight"
+          value={productForm.availableWeight}
+          onChange={(e) => setProductForm({ ...productForm, availableWeight: e.target.value })}
+          placeholder="Enter available weights (e.g., 250g, 500g, 1kg, 2kg)"
+          rows={3}
+          required
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
