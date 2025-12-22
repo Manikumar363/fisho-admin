@@ -313,13 +313,14 @@ export default function CutTypeSection({ openAdd, onAddClose }: CutTypeSectionPr
                   <th className="text-left py-3 px-4">Serial No</th>
                   <th className="text-left py-3 px-4">Name</th>
                   <th className="text-left py-3 px-4">Order</th>
+                  <th className="text-left py-3 px-4">Status</th>
                   <th className="text-left py-3 px-4">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={4} className="py-8 text-center text-gray-500">
+                    <td colSpan={5} className="py-8 text-center text-gray-500">
                       <div className="inline-flex items-center gap-2">
                         <Loader className="w-4 h-4 animate-spin" />
                         Loading cut types...
@@ -328,11 +329,11 @@ export default function CutTypeSection({ openAdd, onAddClose }: CutTypeSectionPr
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan={4} className="py-8 text-center text-red-600">{error}</td>
+                    <td colSpan={5} className="py-8 text-center text-red-600">{error}</td>
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-8 text-center text-gray-500">No cut types found</td>
+                    <td colSpan={5} className="py-8 text-center text-gray-500">No cut types found</td>
                   </tr>
                 ) : (
                   filtered.map((ct, index) => (
@@ -340,6 +341,13 @@ export default function CutTypeSection({ openAdd, onAddClose }: CutTypeSectionPr
                       <td className="py-3 px-4">{index + 1}</td>
                       <td className="py-3 px-4 font-medium">{ct.name}</td>
                       <td className="py-3 px-4">{ct.order}</td>
+                      <td className="py-3 px-4">
+                        <span
+                          className={`inline-flex items-center rounded px-2 py-1 text-xs font-medium ${ct.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}
+                        >
+                          {ct.status}
+                        </span>
+                      </td>
                       <td className="py-3 px-4">
                         <div className="flex gap-2">
                           <button
