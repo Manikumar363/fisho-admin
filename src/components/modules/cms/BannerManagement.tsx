@@ -5,6 +5,7 @@ import { Input } from '../../ui/input';
 import { Button } from '../../ui/button';
 import { Label } from '../../ui/label';
 import { Badge } from '../../ui/badge';
+import { apiFetch } from '../../../lib/api';
 
 interface BannerManagementProps {
   banner?: any;
@@ -18,6 +19,8 @@ export default function BannerManagement({ banner, onSave, onCancel }: BannerMan
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>(banner?.image || '');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -54,22 +57,76 @@ export default function BannerManagement({ banner, onSave, onCancel }: BannerMan
     if (!title.trim()) {
       newErrors.title = 'Banner title is required';
     }
-    if (!imagePreview) {
+    if (!imagePreview || (!banner && !imageFile)) {
       newErrors.image = 'Banner image is required';
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
+    if (!imageFile && !banner) {
+      setErrors({ image: 'Please upload a banner image' });
+      return;
+    }
 
-    onSave({
-      title: title.trim(),
-      status,
-      image: imagePreview
-    });
+    setSubmitError('');
+    setIsSubmitting(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('name', title.trim());
+      // Include active status if your backend uses it
+      formData.append('isActive', String(status === 'Active'));
+      if (imageFile) {
+        formData.append('image', imageFile);
+      }
+
+      const isEdit = !!(banner && (banner.id || banner._id));
+      const bannerId = banner?.id || banner?._id;
+      const endpoint = isEdit ? `/api/banners/${bannerId}` : '/api/banners';
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const res = await apiFetch<{
+        success: boolean;
+        banner?: {
+          _id: string;
+          name: string;
+          image: string;
+          order?: number;
+          isActive?: boolean;
+          isDeleted?: boolean;
+          createdAt?: string;
+          updatedAt?: string;
+        };
+        message?: string;
+      }>(endpoint, {
+        method,
+        body: formData,
+      });
+
+      if (!res?.success || !res.banner) {
+        throw new Error(res?.message || 'Failed to create banner');
+      }
+
+      onSave({
+        id: res.banner._id,
+        title: res.banner.name,
+        image: res.banner.image,
+        status: res.banner.isActive ? 'Active' : 'Inactive',
+        order: res.banner.order,
+        isDeleted: res.banner.isDeleted,
+        createdAt: res.banner.createdAt,
+        updatedAt: res.banner.updatedAt,
+      });
+    } catch (err: any) {
+      const message = err?.message || 'Something went wrong while saving the banner';
+      setSubmitError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -252,8 +309,9 @@ export default function BannerManagement({ banner, onSave, onCancel }: BannerMan
                   <Button
                     type="submit"
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                    disabled={isSubmitting}
                   >
-                    Save Banner
+                    {isSubmitting ? 'Saving...' : 'Save Banner'}
                   </Button>
                   <Button
                     type="button"
@@ -265,6 +323,11 @@ export default function BannerManagement({ banner, onSave, onCancel }: BannerMan
                   </Button>
                 </div>
               </form>
+              {submitError && (
+                <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                  {submitError}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

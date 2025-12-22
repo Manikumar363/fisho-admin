@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FileText, Image, Plus, Edit, Trash2, Shield, ScrollText, ChevronUp, ChevronDown } from 'lucide-react';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
@@ -16,6 +16,7 @@ import {
 import { toast } from 'sonner';
 import BannerManagement from './cms/BannerManagement';
 import TextContentEditor from './cms/TextContentEditor';
+import { apiFetch } from '../../lib/api';
 
 type ContentType = 'banners' | 'terms' | 'privacy' | 'about';
 
@@ -26,6 +27,7 @@ interface ContentItem {
   status?: 'Active' | 'Inactive';
   type: ContentType;
   sequence?: number;
+  image?: string;
 }
 
 export default function CMS() {
@@ -33,51 +35,41 @@ export default function CMS() {
   const [editingItem, setEditingItem] = useState<ContentItem | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<ContentItem | null>(null);
+  const [banners, setBanners] = useState<ContentItem[]>([]);
+  const [bannersLoading, setBannersLoading] = useState(false);
+  const [bannersError, setBannersError] = useState<string | null>(null);
+  const [isReordering, setIsReordering] = useState(false);
+  const [pagesLoading, setPagesLoading] = useState(false);
+  const [pagesError, setPagesError] = useState<string | null>(null);
 
-  const [banners, setBanners] = useState<ContentItem[]>([
-    {
-      id: 'BAN-001',
-      title: 'Summer Sale Banner',
-      lastUpdated: '2025-12-10',
-      status: 'Active',
-      type: 'banners'
-    },
-    {
-      id: 'BAN-002',
-      title: 'New Year Special',
-      lastUpdated: '2025-12-01',
-      status: 'Active',
-      type: 'banners'
-    },
-    {
-      id: 'BAN-003',
-      title: 'Weekend Offer',
-      lastUpdated: '2025-11-25',
-      status: 'Inactive',
-      type: 'banners'
-    }
-  ]);
+  const IMAGE_BASE = ((import.meta as any).env?.VITE_IMAGE_BASE_URL || (import.meta as any).env?.VITE_BASE_URL) as string | undefined;
 
   const [textContents, setTextContents] = useState<ContentItem[]>([
     {
-      id: 'TERMS-001',
+      id: 'terms-loading',
       title: 'Terms and Conditions',
-      lastUpdated: '2025-11-15',
+      lastUpdated: '',
       type: 'terms'
     },
     {
-      id: 'PRIVACY-001',
+      id: 'privacy-loading',
       title: 'Privacy Policy',
-      lastUpdated: '2025-11-10',
+      lastUpdated: '',
       type: 'privacy'
     },
     {
-      id: 'ABOUT-001',
+      id: 'about-loading',
       title: 'About Us',
-      lastUpdated: '2025-11-05',
+      lastUpdated: '',
       type: 'about'
     }
   ]);
+
+  const PAGE_IDS: Record<'terms' | 'privacy' | 'about', string> = {
+    terms: '69412955d430ff450e4ac0b8',
+    privacy: '694128ead430ff450e4ac0b2',
+    about: '69442a843fcd660eec9c89ed',
+  };
 
   const contentTypes = [
     {
@@ -114,6 +106,52 @@ export default function CMS() {
     }
   ];
 
+  // Fetch banners from API
+  const loadBanners = async () => {
+    setBannersLoading(true);
+    setBannersError(null);
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        banners?: Array<{
+          _id: string;
+          name: string;
+          image: string;
+          order?: number;
+          isActive: boolean;
+          isDeleted?: boolean;
+          createdAt: string;
+          updatedAt: string;
+        }>;
+        message?: string;
+      }>('/api/banners');
+
+      if (!res.success) throw new Error(res.message || 'Failed to fetch banners');
+
+      const mapped: ContentItem[] = (res.banners || []).map((b) => ({
+        id: b._id,
+        title: b.name,
+        lastUpdated: new Date(b.updatedAt).toISOString().split('T')[0],
+        status: b.isActive ? 'Active' : 'Inactive',
+        type: 'banners',
+        sequence: b.order ?? undefined,
+        image: b.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${b.image}` : b.image) : undefined,
+      }));
+      setBanners(mapped);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to load banners';
+      setBannersError(msg);
+      toast.error(msg);
+    } finally {
+      setBannersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadBanners();
+    loadPages();
+  }, []);
+
   const handleAddContent = (type: ContentType) => {
     setSelectedContent(type);
     setEditingItem(null);
@@ -129,17 +167,81 @@ export default function CMS() {
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
-    if (itemToDelete) {
+  const confirmDelete = async () => {
+    if (!itemToDelete) return;
+    try {
       if (itemToDelete.type === 'banners') {
-        setBanners(banners.filter(banner => banner.id !== itemToDelete.id));
+        setBannersLoading(true);
+        const res = await apiFetch<{
+          success: boolean;
+          banner?: {
+            _id: string;
+            name: string;
+            image: string;
+            order?: number;
+            isActive: boolean;
+            isDeleted: boolean;
+            createdAt: string;
+            updatedAt: string;
+          };
+          message?: string;
+        }>(`/api/banners/${itemToDelete.id}`, { method: 'DELETE' });
+
+        if (!res.success) throw new Error(res.message || 'Failed to delete banner');
+        toast.success(res.message || 'Banner deleted successfully');
+        await loadBanners();
       } else {
         setTextContents(textContents.filter(content => content.id !== itemToDelete.id));
+        toast.success(`${itemToDelete.title} deleted successfully`);
       }
-      toast.success(`${itemToDelete.title} deleted successfully`);
+    } catch (e: any) {
+      const msg = e?.message || 'Delete failed';
+      toast.error(msg);
+    } finally {
+      setDeleteDialogOpen(false);
+      setItemToDelete(null);
+      setBannersLoading(false);
     }
-    setDeleteDialogOpen(false);
-    setItemToDelete(null);
+  };
+
+  const loadPages = async () => {
+    setPagesLoading(true);
+    setPagesError(null);
+    try {
+      const entries: Array<Promise<ContentItem>> = (['terms', 'privacy', 'about'] as const).map(async (key) => {
+        const res = await apiFetch<{
+          success: boolean;
+          page?: {
+            _id: string;
+            title: string;
+            description: string;
+            isDeleted: boolean;
+            isActive: boolean;
+            createdAt: string;
+            updatedAt: string;
+          };
+          message?: string;
+        }>(`/api/page/get-page/${PAGE_IDS[key]}`);
+
+        if (!res?.success || !res.page) throw new Error(res?.message || `Failed to fetch ${key}`);
+        return {
+          id: res.page._id,
+          title: res.page.title,
+          lastUpdated: new Date(res.page.updatedAt).toISOString().split('T')[0],
+          status: res.page.isActive ? 'Active' : 'Inactive',
+          type: key,
+        } as ContentItem;
+      });
+
+      const results = await Promise.all(entries);
+      setTextContents(results);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to load pages';
+      setPagesError(msg);
+      toast.error(msg);
+    } finally {
+      setPagesLoading(false);
+    }
   };
 
   const handleSaveBanner = (bannerData: any) => {
@@ -147,18 +249,29 @@ export default function CMS() {
       // Update existing banner
       setBanners(banners.map(banner =>
         banner.id === editingItem.id
-          ? { ...banner, title: bannerData.title, status: bannerData.status, lastUpdated: new Date().toISOString().split('T')[0] }
+          ? {
+              ...banner,
+              title: bannerData.title ?? banner.title,
+              status: bannerData.status ?? banner.status,
+              lastUpdated: bannerData.updatedAt
+                ? new Date(bannerData.updatedAt).toISOString().split('T')[0]
+                : new Date().toISOString().split('T')[0],
+              sequence: bannerData.order ?? banner.sequence,
+            }
           : banner
       ));
       toast.success('Banner updated successfully');
     } else {
       // Add new banner
       const newBanner: ContentItem = {
-        id: `BAN-${String(banners.length + 1).padStart(3, '0')}`,
+        id: bannerData.id,
         title: bannerData.title,
         status: bannerData.status,
-        lastUpdated: new Date().toISOString().split('T')[0],
-        type: 'banners'
+        lastUpdated: bannerData.updatedAt
+          ? new Date(bannerData.updatedAt).toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0],
+        type: 'banners',
+        sequence: bannerData.order,
       };
       setBanners([...banners, newBanner]);
       toast.success('Banner added successfully');
@@ -203,21 +316,42 @@ export default function CMS() {
     setEditingItem(null);
   };
 
-  const moveBannerUp = (index: number) => {
-    if (index > 0) {
-      const newBanners = [...banners];
-      [newBanners[index], newBanners[index - 1]] = [newBanners[index - 1], newBanners[index]];
-      setBanners(newBanners);
-      toast.success('Banner order updated');
-    }
-  };
+  const moveBanner = async (index: number, direction: 'up' | 'down') => {
+    if (isReordering) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= banners.length) return;
 
-  const moveBannerDown = (index: number) => {
-    if (index < banners.length - 1) {
-      const newBanners = [...banners];
-      [newBanners[index], newBanners[index + 1]] = [newBanners[index + 1], newBanners[index]];
-      setBanners(newBanners);
-      toast.success('Banner order updated');
+    const movingBanner = banners[index];
+    const previous = [...banners];
+    const optimistic = [...banners];
+    [optimistic[index], optimistic[targetIndex]] = [optimistic[targetIndex], optimistic[index]];
+    setBanners(optimistic);
+
+    setIsReordering(true);
+    try {
+      const body = {
+        id: String(movingBanner.id),
+        from: index + 1,
+        to: targetIndex + 1,
+      };
+      const res = await apiFetch<{ success: boolean; message?: string }>(
+        '/api/banners/reorder',
+        {
+          method: 'PUT',
+          body: JSON.stringify(body),
+        }
+      );
+      if (!res?.success) {
+        throw new Error(res?.message || 'Failed to reorder banner');
+      }
+      toast.success(res?.message || 'Banner reordered successfully');
+      await loadBanners();
+    } catch (e: any) {
+      setBanners(previous);
+      const msg = e?.message || 'Failed to reorder banner';
+      toast.error(msg);
+    } finally {
+      setIsReordering(false);
     }
   };
 
@@ -306,6 +440,12 @@ export default function CMS() {
               <CardContent className="p-0">
                 {contentType.items.length > 0 ? (
                   <div className="divide-y divide-gray-200">
+                    {contentType.id === 'banners' && bannersLoading && (
+                      <div className="p-4 text-gray-600">Loading banners...</div>
+                    )}
+                    {contentType.id === 'banners' && bannersError && (
+                      <div className="p-4 text-red-600">{bannersError}</div>
+                    )}
                     {contentType.items.map((item, index) => (
                       <div
                         key={item.id}
@@ -316,14 +456,14 @@ export default function CMS() {
                           {item.type === 'banners' && (
                             <div className="flex flex-col items-center">
                               <div className="flex items-center justify-center w-10 h-10 bg-blue-50 text-blue-600 rounded-full border border-blue-200">
-                                {index + 1}
+                                {item.sequence ?? index + 1}
                               </div>
                               <div className="flex flex-col mt-1">
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => moveBannerUp(index)}
-                                  disabled={index === 0}
+                                  onClick={() => moveBanner(index, 'up')}
+                                  disabled={index === 0 || isReordering}
                                   className="p-1 h-6 text-gray-600 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30"
                                 >
                                   <ChevronUp className="w-4 h-4" />
@@ -331,8 +471,8 @@ export default function CMS() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => moveBannerDown(index)}
-                                  disabled={index === contentType.items.length - 1}
+                                  onClick={() => moveBanner(index, 'down')}
+                                  disabled={index === contentType.items.length - 1 || isReordering}
                                   className="p-1 h-6 text-gray-600 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30"
                                 >
                                   <ChevronDown className="w-4 h-4" />

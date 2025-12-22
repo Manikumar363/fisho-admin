@@ -381,7 +381,7 @@ export default function CutTypeSection({ openAdd, onAddClose }: CutTypeSectionPr
           if (!next) onAddClose?.();
         }}
       >
-        <DialogContent className="sm:max-w-[350px]">
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Add Cut Type</DialogTitle>
           </DialogHeader>
@@ -432,7 +432,7 @@ export default function CutTypeSection({ openAdd, onAddClose }: CutTypeSectionPr
           }
         }}
       >
-        <DialogContent className="sm:max-w-[350px]">
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Edit Cut Type</DialogTitle>
           </DialogHeader>
@@ -481,7 +481,7 @@ export default function CutTypeSection({ openAdd, onAddClose }: CutTypeSectionPr
           if (!next) setViewingCutType(null);
         }}
       >
-        <DialogContent className="sm:max-w-[350px]">
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Cut Type Details</DialogTitle>
           </DialogHeader>
