@@ -18,7 +18,7 @@ import BannerManagement from './cms/BannerManagement';
 import TextContentEditor from './cms/TextContentEditor';
 import { apiFetch } from '../../lib/api';
 
-type ContentType = 'banners' | 'terms' | 'privacy' | 'about';
+type ContentType = 'banners' | 'terms' | 'privacy' | 'about' | 'deliveryTc' | 'deliveryPrivacy';
 
 interface ContentItem {
   id: string;
@@ -58,17 +58,31 @@ export default function CMS() {
       type: 'privacy'
     },
     {
+      id: 'deliveryPrivacy-loading',
+      title: 'Delivery Privacy',
+      lastUpdated: '',
+      type: 'deliveryPrivacy'
+    },
+    {
       id: 'about-loading',
       title: 'About Us',
       lastUpdated: '',
       type: 'about'
+    },
+    {
+      id: 'deliveryTc-loading',
+      title: 'Delivery T&C',
+      lastUpdated: '',
+      type: 'deliveryTc'
     }
   ]);
 
-  const PAGE_IDS: Record<'terms' | 'privacy' | 'about', string> = {
+  const PAGE_IDS: Record<'terms' | 'privacy' | 'about' | 'deliveryTc' | 'deliveryPrivacy', string> = {
     terms: '69412955d430ff450e4ac0b8',
     privacy: '694128ead430ff450e4ac0b2',
     about: '69442a843fcd660eec9c89ed',
+    deliveryTc: '694babb9463a57211a1cbdbb',
+    deliveryPrivacy: '694bb389463a57211a1cbde0',
   };
 
   const contentTypes = [
@@ -86,7 +100,7 @@ export default function CMS() {
       description: 'Manage terms and conditions for platform usage',
       icon: ScrollText,
       color: 'green',
-      items: textContents.filter(item => item.type === 'terms')
+      items: textContents.filter(item => item.type === 'terms' || item.type === 'deliveryTc')
     },
     {
       id: 'privacy' as ContentType,
@@ -94,7 +108,7 @@ export default function CMS() {
       description: 'Manage privacy policy and data protection information',
       icon: Shield,
       color: 'purple',
-      items: textContents.filter(item => item.type === 'privacy')
+      items: textContents.filter(item => item.type === 'privacy' || item.type === 'deliveryPrivacy')
     },
     {
       id: 'about' as ContentType,
@@ -208,7 +222,7 @@ export default function CMS() {
     setPagesLoading(true);
     setPagesError(null);
     try {
-      const entries: Array<Promise<ContentItem>> = (['terms', 'privacy', 'about'] as const).map(async (key) => {
+      const entries: Array<Promise<ContentItem>> = (['terms', 'privacy', 'about', 'deliveryTc', 'deliveryPrivacy'] as const).map(async (key) => {
         const res = await apiFetch<{
           success: boolean;
           page?: {
@@ -369,7 +383,8 @@ export default function CMS() {
       blue: { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' },
       green: { bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-200' },
       purple: { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200' },
-      orange: { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200' }
+      orange: { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200' },
+      red: { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' }
     };
     return colors[color] || colors.blue;
   };
@@ -385,7 +400,7 @@ export default function CMS() {
     );
   }
 
-  if (selectedContent && ['terms', 'privacy', 'about'].includes(selectedContent)) {
+  if (selectedContent && ['terms', 'privacy', 'about', 'deliveryTc', 'deliveryPrivacy'].includes(selectedContent)) {
     return (
       <TextContentEditor
         contentType={selectedContent}

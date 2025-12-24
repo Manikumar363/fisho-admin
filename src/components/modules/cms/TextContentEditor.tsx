@@ -10,7 +10,7 @@ import { apiFetch, getToken } from '../../../lib/api';
 import { toast } from 'sonner';
 
 interface TextContentEditorProps {
-  contentType: 'terms' | 'privacy' | 'about';
+  contentType: 'terms' | 'privacy' | 'about' | 'deliveryTc' | 'deliveryPrivacy';
   contentItem?: any;
   onSave: (contentData: any) => void;
   onCancel: () => void;
@@ -62,13 +62,17 @@ export default function TextContentEditor({
   const contentTypeLabels = {
     terms: 'Terms of Use',
     privacy: 'Privacy Policy',
-    about: 'About Us'
+    about: 'About Us',
+    deliveryTc: 'Delivery T&C',
+    deliveryPrivacy: 'Delivery Privacy'
   };
 
   const contentTypeIds = {
     terms: '69412955d430ff450e4ac0b8',
     privacy: '694128ead430ff450e4ac0b2',
-    about: '69442a843fcd660eec9c89ed'
+    about: '69442a843fcd660eec9c89ed',
+    deliveryTc: '694babb9463a57211a1cbdbb',
+    deliveryPrivacy: '694bb389463a57211a1cbde0'
   };
 
   useEffect(() => {

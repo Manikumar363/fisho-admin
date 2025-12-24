@@ -26,6 +26,7 @@ export default function InventoryManagement() {
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCategoryViewModal, setShowCategoryViewModal] = useState(false);
   const [viewingCategory, setViewingCategory] = useState<any>(null);
@@ -41,20 +42,48 @@ export default function InventoryManagement() {
 
   // Product state
   const [productForm, setProductForm] = useState({
-    species: '',
+    category: '',
     productName: '',
     productImage: null as File | null,
     description: '',
     nutritionFacts: '',
     cutTypes: [] as string[],
     currentCutType: '',
-    availableWeight: '',
+    availableWeights: [] as number[],
+    currentWeight: '',
     availableStock: '',
     defaultProfit: '',
     defaultDiscount: '',
     costPricePerKg: '',
     availability: true
   });
+
+  // Fetch cut types for product form
+  const [cutTypesData, setCutTypesData] = useState<Array<{ _id: string; name: string }>>([]);
+  const [loadingCutTypes, setLoadingCutTypes] = useState(false);
+
+  useEffect(() => {
+    const fetchCutTypes = async () => {
+      setLoadingCutTypes(true);
+      try {
+        // Use the backend-specified endpoint
+        const res = await apiFetch<{
+          success: boolean;
+          cutTypes?: Array<{ _id: string; name: string; isActive?: boolean }>;
+          cuttypes?: Array<{ _id: string; name: string; isActive?: boolean }>;
+          message?: string;
+        }>('/api/cuttype');
+
+        const list = (res.cutTypes || res.cuttypes || []) as Array<{ _id: string; name: string; isActive?: boolean }>;
+        setCutTypesData(list.filter(ct => ct.isActive !== false));
+      } catch (e: any) {
+        console.error('Failed to fetch cut types:', e);
+      } finally {
+        setLoadingCutTypes(false);
+      }
+    };
+    if (activeTab === 'products') fetchCutTypes();
+  }, [activeTab]);
 
   // Variant state (for add/edit modal forms)
   const [variantForm, setVariantForm] = useState({
@@ -130,16 +159,129 @@ export default function InventoryManagement() {
       }
     };
 
-    if (activeTab === 'categories') fetchCategories();
+    // Also load categories for the Products tab so the form has options
+    if (activeTab === 'categories' || activeTab === 'products') fetchCategories();
   }, [activeTab]);
 
-  const [products, setProducts] = useState([
-    { id: 1, image: '', name: 'Tiger Prawns', species: 'Prawns', cutTypes: ['Whole Cleaned', 'Peeled'], stock: 125, costPrice: 320, profit: 15, discount: 10, status: 'Active', lastUpdated: '2024-11-28' },
-    { id: 2, image: '', name: 'King Prawns', species: 'Prawns', cutTypes: ['Whole', 'Peeled', 'Deveined'], stock: 80, costPrice: 450, profit: 20, discount: 5, status: 'Active', lastUpdated: '2024-11-27' },
-    { id: 3, image: '', name: 'Salmon', species: 'Fish', cutTypes: ['Fillet', 'Steak', 'Whole'], stock: 45, costPrice: 580, profit: 18, discount: 8, status: 'Active', lastUpdated: '2024-11-26' },
-    { id: 4, image: '', name: 'Pomfret', species: 'Fish', cutTypes: ['Whole Cleaned', 'Curry Cut'], stock: 60, costPrice: 340, profit: 15, discount: 12, status: 'Active', lastUpdated: '2024-11-25' },
-    { id: 5, image: '', name: 'Mud Crab', species: 'Crab', cutTypes: ['Whole', 'Cleaned'], stock: 15, costPrice: 680, profit: 22, discount: 5, status: 'Low Stock', lastUpdated: '2024-11-24' }
-  ]);
+  // Load products when Products tab is active
+  useEffect(() => {
+    if (activeTab === 'products') {
+      fetchProducts();
+    }
+  }, [activeTab]);
+
+  const [products, setProducts] = useState<Array<{
+    id: string;
+    image: string;
+    name: string;
+    species: string;
+    categoryId?: string;
+    cutTypes: string[];
+    cutTypeIds?: string[];
+    stock: number;
+    costPrice: number;
+    profit: number;
+    discount: number;
+    status: string;
+    lastUpdated: string;
+    description?: string;
+    nutritionFacts?: string;
+    availability?: boolean;
+    weightUnit?: string;
+    availableWeights?: number[];
+  }>>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productsError, setProductsError] = useState<string | null>(null);
+
+  // Fallback ID generator (rarely needed if _id present)
+  const cryptoRandomId = () => Math.random().toString(36).slice(2);
+
+  const fetchProducts = async () => {
+    setProductsLoading(true);
+    setProductsError(null);
+    try {
+      type ProductRes = {
+        success: boolean;
+        products?: Array<{
+          _id: string;
+          name: string;
+          description?: string;
+          nutritionFacts?: string;
+          category?: { _id: string; name: string; image?: string };
+          availableCutTypes?: Array<{ _id: string; name: string }>;
+          stock: number;
+          lowStockThreshold?: number;
+          cost: number;
+          defaultProfit: number;
+          defaultDiscount: number;
+          availableWeights?: number[];
+          weightUnit?: string;
+          image?: string;
+          isActive: boolean;
+          createdAt: string;
+          updatedAt: string;
+          slug?: string;
+          id?: string;
+        }>;
+        message?: string;
+      };
+
+      let res: ProductRes | null = null;
+      try {
+        res = await apiFetch<ProductRes>('/api/products');
+      } catch (err: any) {
+        if (err?.status === 404) {
+          // Some backends require trailing slash
+          res = await apiFetch<ProductRes>('/api/products/');
+        } else {
+          throw err;
+        }
+      }
+
+      if (!res?.success) throw new Error(res?.message || 'Failed to fetch products');
+
+      const mapped = (res.products || []).map((p) => {
+        const raw = p.image || '';
+        const image = raw ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${raw}` : raw) : '';
+        const species = p.category?.name || '—';
+        const cutTypes = (p.availableCutTypes || []).map((ct) => ct.name);
+        const cutTypeIds = (p.availableCutTypes || []).map((ct) => ct._id);
+        const low = typeof p.lowStockThreshold === 'number' ? p.lowStockThreshold : undefined;
+        const status = !p.isActive
+          ? 'Inactive'
+          : typeof low === 'number' && p.stock <= low
+          ? 'Low Stock'
+          : 'Active';
+        return {
+          id: (p as any)._id || p.id || cryptoRandomId(),
+          image,
+          name: p.name,
+          species,
+          categoryId: p.category?._id,
+          cutTypes,
+          cutTypeIds,
+          stock: p.stock,
+          costPrice: p.cost,
+          profit: p.defaultProfit,
+          discount: p.defaultDiscount,
+          status,
+          lastUpdated: new Date(p.updatedAt).toISOString().split('T')[0],
+          description: p.description,
+          nutritionFacts: p.nutritionFacts,
+          availability: p.isActive,
+          weightUnit: p.weightUnit,
+          availableWeights: p.availableWeights || [],
+        };
+      });
+      setProducts(mapped);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to load products';
+      setProductsError(msg);
+      toast.error(msg);
+    } finally {
+      setProductsLoading(false);
+    }
+  };
 
   const [variants, setVariants] = useState([
     { id: 1, variantName: 'Tiger Prawns - Whole Cleaned - 500g', product: 'Tiger Prawns', species: 'Prawns', cutType: 'Whole Cleaned', featured: true, bestSeller: true, costPrice: 320, profit: 15, displayPrice: 368, discount: 10, sellingPrice: 331, status: 'Active', lastUpdated: '2024-11-28' },
@@ -208,20 +350,39 @@ export default function InventoryManagement() {
     setVariants(newVariants);
   };
 
-  const handleAddCutType = () => {
-    if (productForm.currentCutType.trim()) {
+  const handleAddCutType = (cutTypeId: string) => {
+    if (!cutTypeId) return;
+    setProductForm((prev) => {
+      if (prev.cutTypes.includes(cutTypeId)) return prev;
+      return {
+        ...prev,
+        cutTypes: [...prev.cutTypes, cutTypeId],
+      };
+    });
+  };
+
+  const handleRemoveCutType = (cutTypeId: string) => {
+    setProductForm((prev) => ({
+      ...prev,
+      cutTypes: prev.cutTypes.filter((id) => id !== cutTypeId),
+    }));
+  };
+
+  const handleAddWeight = () => {
+    const weight = parseFloat(productForm.currentWeight);
+    if (!isNaN(weight) && weight > 0 && !productForm.availableWeights.includes(weight)) {
       setProductForm({
         ...productForm,
-        cutTypes: [...productForm.cutTypes, productForm.currentCutType.trim()],
-        currentCutType: ''
+        availableWeights: [...productForm.availableWeights, weight],
+        currentWeight: ''
       });
     }
   };
 
-  const handleRemoveCutType = (index: number) => {
+  const handleRemoveWeight = (weight: number) => {
     setProductForm({
       ...productForm,
-      cutTypes: productForm.cutTypes.filter((_, i) => i !== index)
+      availableWeights: productForm.availableWeights.filter(w => w !== weight)
     });
   };
 
@@ -329,16 +490,18 @@ export default function InventoryManagement() {
     }
     // Reset forms
     setEditingCategoryId(null);
+    setEditingProductId(null);
     setCategoryForm({ speciesName: '', speciesIcon: null, availability: true });
     setProductForm({
-      species: '',
+      category: '',
       productName: '',
       productImage: null,
       description: '',
       nutritionFacts: '',
       cutTypes: [],
       currentCutType: '',
-      availableWeight: '',
+      availableWeights: [],
+      currentWeight: '',
       availableStock: '',
       defaultProfit: '',
       defaultDiscount: '',
@@ -434,6 +597,117 @@ export default function InventoryManagement() {
       } finally {
         setIsSubmitting(false);
       }
+    } else if (activeTab === 'products') {
+      // Validate product form
+      if (!productForm.category) {
+        toast.error('Please select a category');
+        return;
+      }
+      if (!productForm.productName.trim()) {
+        toast.error('Product name is required');
+        return;
+      }
+      if (!editingProductId && !productForm.productImage) {
+        toast.error('Product image is required');
+        return;
+      }
+      if (!productForm.description.trim()) {
+        toast.error('Description is required');
+        return;
+      }
+      if (!productForm.nutritionFacts.trim()) {
+        toast.error('Nutrition facts are required');
+        return;
+      }
+      if (productForm.cutTypes.length === 0) {
+        toast.error('At least one cut type is required');
+        return;
+      }
+      if (productForm.availableWeights.length === 0) {
+        toast.error('At least one weight is required');
+        return;
+      }
+      if (!productForm.availableStock || parseFloat(productForm.availableStock) <= 0) {
+        toast.error('Valid stock amount is required');
+        return;
+      }
+      if (!productForm.costPricePerKg || parseFloat(productForm.costPricePerKg) <= 0) {
+        toast.error('Valid cost price is required');
+        return;
+      }
+      if (!productForm.defaultProfit || parseFloat(productForm.defaultProfit) < 0) {
+        toast.error('Valid default profit is required');
+        return;
+      }
+      if (!productForm.defaultDiscount || parseFloat(productForm.defaultDiscount) < 0) {
+        toast.error('Valid default discount is required');
+        return;
+      }
+
+      setIsSubmitting(true);
+      try {
+        const endpoint = editingProductId ? `/api/products/${editingProductId}` : '/api/products';
+        const method = editingProductId ? 'PUT' : 'POST';
+
+        // Always use FormData for both POST and PUT to match backend
+        // behavior (works in Postman with multipart/form-data).
+        const formData = new FormData();
+        formData.append('name', productForm.productName.trim());
+        formData.append('description', productForm.description.trim());
+        formData.append('nutritionFacts', productForm.nutritionFacts.trim());
+        formData.append('category', productForm.category);
+        formData.append('stock', productForm.availableStock);
+        formData.append('cost', productForm.costPricePerKg);
+        formData.append('defaultProfit', productForm.defaultProfit);
+        formData.append('defaultDiscount', productForm.defaultDiscount);
+        formData.append('isActive', String(productForm.availability));
+        if (productForm.productImage) {
+          formData.append('image', productForm.productImage);
+        }
+        productForm.cutTypes.forEach((cutTypeId) => {
+          formData.append('availableCutTypes[]', cutTypeId);
+        });
+        productForm.availableWeights.forEach((weight) => {
+          formData.append('availableWeights[]', String(weight));
+        });
+        const requestInit: RequestInit = { method, body: formData };
+
+        const res = await apiFetch<{ success: boolean; product?: any; message?: string }>(endpoint, requestInit);
+
+        if (!res.success) throw new Error(res.message || (editingProductId ? 'Failed to update product' : 'Failed to add product'));
+        if (!res.product) throw new Error('No product data in response');
+
+        toast.success(res.message || (editingProductId ? 'Product updated successfully' : 'Product added successfully'));
+        setShowAddModal(false);
+        
+        // Reset form
+        setProductForm({
+          category: '',
+          productName: '',
+          productImage: null,
+          description: '',
+          nutritionFacts: '',
+          cutTypes: [],
+          currentCutType: '',
+          availableWeights: [],
+          currentWeight: '',
+          availableStock: '',
+          defaultProfit: '',
+          defaultDiscount: '',
+          costPricePerKg: '',
+          availability: true
+        });
+        setEditingProductId(null);
+        
+        // Refresh products list
+        fetchProducts();
+      } catch (e: any) {
+        const msg = e?.message || (editingProductId ? 'Failed to update product' : 'Failed to add product');
+        console.error('Add product error:', e);
+        toast.error(msg);
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -504,17 +778,21 @@ export default function InventoryManagement() {
     <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="species">Select Species *</Label>
-          <Select value={productForm.species} onValueChange={(value: string) => setProductForm({ ...productForm, species: value })}>
+          <Label htmlFor="category">Select Category *</Label>
+          <Select 
+            value={productForm.category} 
+            onValueChange={(value: string) => setProductForm({ ...productForm, category: value })}
+            disabled={isSubmitting || categoriesLoading}
+          >
             <SelectTrigger>
-              <SelectValue placeholder="Choose species" />
+              <SelectValue placeholder="Choose category" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="prawns">Prawns</SelectItem>
-              <SelectItem value="fish">Fish</SelectItem>
-              <SelectItem value="crab">Crab</SelectItem>
-              <SelectItem value="squid">Squid</SelectItem>
-              <SelectItem value="lobster">Lobster</SelectItem>
+              {categories.map((cat) => (
+                <SelectItem key={cat.id} value={cat.id}>
+                  {cat.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -527,18 +805,20 @@ export default function InventoryManagement() {
             onChange={(e) => setProductForm({ ...productForm, productName: e.target.value })}
             placeholder="e.g., Tiger Prawns"
             required
+            disabled={isSubmitting}
           />
         </div>
       </div>
 
       <div>
-        <Label htmlFor="productImage">Product Image *</Label>
+        <Label htmlFor="productImage">Product Image {!editingProductId && '*'}</Label>
         <Input
           id="productImage"
           type="file"
           accept="image/*"
           onChange={(e) => setProductForm({ ...productForm, productImage: e.target.files?.[0] || null })}
-          required
+          required={!editingProductId}
+          disabled={isSubmitting}
         />
       </div>
 
@@ -551,6 +831,7 @@ export default function InventoryManagement() {
           placeholder="Enter product description, origin, characteristics..."
           rows={3}
           required
+          disabled={isSubmitting}
         />
       </div>
 
@@ -563,31 +844,98 @@ export default function InventoryManagement() {
           placeholder="Enter nutritional information (e.g., Protein: 20g per 100g, Omega-3: 500mg...)"
           rows={3}
           required
+          disabled={isSubmitting}
         />
       </div>
 
       <div>
         <Label>Available Cut Types *</Label>
+        <div className="space-y-2">
+          <Select
+            value={productForm.currentCutType}
+            onValueChange={(value) => {
+              // Single functional update to avoid overwriting state
+              setProductForm((prev) => {
+                if (!value || value === '__empty__' || prev.cutTypes.includes(value)) {
+                  return { ...prev, currentCutType: '' };
+                }
+                return {
+                  ...prev,
+                  cutTypes: [...prev.cutTypes, value],
+                  currentCutType: ''
+                };
+              });
+            }}
+            disabled={isSubmitting || loadingCutTypes}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select cut types to add" />
+            </SelectTrigger>
+            <SelectContent>
+                  {cutTypesData.length === 0 ? (
+                    <SelectItem value="__empty__" disabled>
+                      No cut types found
+                    </SelectItem>
+                  ) : (
+                    cutTypesData.map((ct) => (
+                      <SelectItem 
+                        key={ct._id} 
+                        value={ct._id}
+                        disabled={productForm.cutTypes.includes(ct._id)}
+                      >
+                        {ct.name}
+                      </SelectItem>
+                    ))
+                  )}
+            </SelectContent>
+          </Select>
+          {productForm.cutTypes.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {productForm.cutTypes.map((cutTypeId: string) => {
+                const cutType = cutTypesData.find(ct => ct._id === cutTypeId);
+                return (
+                  <Badge key={cutTypeId} variant="secondary" className="flex items-center gap-1">
+                    {cutType?.name || cutTypeId}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveCutType(cutTypeId)}
+                      className="ml-1 hover:text-red-600"
+                      disabled={isSubmitting}
+                    >
+                      ×
+                    </button>
+                  </Badge>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+      <div>
+        <Label htmlFor="availableWeights">Available Weights (in grams) *</Label>
         <div className="flex gap-2 mb-2">
           <Input
-            value={productForm.currentCutType}
-            onChange={(e) => setProductForm({ ...productForm, currentCutType: e.target.value })}
-            placeholder="Enter cut type (e.g., Whole Cleaned, Curry Cut)"
-            onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCutType())}
+            value={productForm.currentWeight}
+            onChange={(e) => setProductForm({ ...productForm, currentWeight: e.target.value })}
+            placeholder="Enter weight (e.g., 250, 500, 1000)"
+            type="number"
+            onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddWeight())}
+            disabled={isSubmitting}
           />
-          <Button type="button" onClick={handleAddCutType} variant="outline">
+          <Button type="button" onClick={handleAddWeight} variant="outline" disabled={isSubmitting}>
             <Plus className="w-4 h-4" />
           </Button>
         </div>
-        {productForm.cutTypes.length > 0 && (
+        {productForm.availableWeights.length > 0 && (
           <div className="flex flex-wrap gap-2">
-            {productForm.cutTypes.map((cutType: string, index: number) => (
-              <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                {cutType}
+            {productForm.availableWeights.map((weight: number) => (
+              <Badge key={weight} variant="secondary" className="flex items-center gap-1">
+                {weight}g
                 <button
                   type="button"
-                  onClick={() => handleRemoveCutType(index)}
+                  onClick={() => handleRemoveWeight(weight)}
                   className="ml-1 hover:text-red-600"
+                  disabled={isSubmitting}
                 >
                   ×
                 </button>
@@ -595,17 +943,6 @@ export default function InventoryManagement() {
             ))}
           </div>
         )}
-      </div>
-      <div>
-        <Label htmlFor="availableWeight">Available Weight *</Label>
-        <Textarea
-          id="availableWeight"
-          value={productForm.availableWeight}
-          onChange={(e) => setProductForm({ ...productForm, availableWeight: e.target.value })}
-          placeholder="Enter available weights (e.g., 250g, 500g, 1kg, 2kg)"
-          rows={3}
-          required
-        />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -618,6 +955,7 @@ export default function InventoryManagement() {
             onChange={(e) => setProductForm({ ...productForm, availableStock: e.target.value })}
             placeholder="Enter stock in kilograms"
             required
+            disabled={isSubmitting}
           />
         </div>
 
@@ -630,6 +968,7 @@ export default function InventoryManagement() {
             onChange={(e) => setProductForm({ ...productForm, costPricePerKg: e.target.value })}
             placeholder="Enter cost price"
             required
+            disabled={isSubmitting}
           />
         </div>
       </div>
@@ -644,6 +983,7 @@ export default function InventoryManagement() {
             onChange={(e) => setProductForm({ ...productForm, defaultProfit: e.target.value })}
             placeholder="e.g., 15"
             required
+            disabled={isSubmitting}
           />
         </div>
 
@@ -656,6 +996,7 @@ export default function InventoryManagement() {
             onChange={(e) => setProductForm({ ...productForm, defaultDiscount: e.target.value })}
             placeholder="e.g., 10"
             required
+            disabled={isSubmitting}
           />
         </div>
       </div>
@@ -669,15 +1010,18 @@ export default function InventoryManagement() {
           id="productAvailability"
           checked={productForm.availability}
           onCheckedChange={(checked: boolean) => setProductForm({ ...productForm, availability: checked })}
+          disabled={isSubmitting}
         />
       </div>
 
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={() => setShowAddModal(false)}>
+        <Button type="button" variant="outline" onClick={() => setShowAddModal(false)} disabled={isSubmitting}>
           Cancel
         </Button>
-        <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-          Add Product
+        <Button type="submit" className="bg-blue-600 cursor-pointer hover:bg-blue-700" disabled={isSubmitting}>
+          {isSubmitting
+            ? (editingProductId ? 'Updating Product...' : 'Adding Product...')
+            : (editingProductId ? 'Update Product' : 'Add Product')}
         </Button>
       </DialogFooter>
     </form>
@@ -1080,7 +1424,24 @@ export default function InventoryManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {products.map((product, index) => (
+                    {productsLoading ? (
+                      <tr>
+                        <td colSpan={13} className="py-8 text-center text-gray-500">
+                          <div className="inline-flex items-center gap-2">
+                            <Loader className="w-4 h-4 animate-spin" />
+                            Loading products...
+                          </div>
+                        </td>
+                      </tr>
+                    ) : productsError ? (
+                      <tr>
+                        <td colSpan={13} className="py-8 text-center text-red-600">{productsError}</td>
+                      </tr>
+                    ) : products.length === 0 ? (
+                      <tr>
+                        <td colSpan={13} className="py-8 text-center text-gray-500">No products found</td>
+                      </tr>
+                    ) : products.map((product, index) => (
                       <tr key={product.id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-3 px-4">
                           <div className="flex flex-col gap-1">
@@ -1103,7 +1464,7 @@ export default function InventoryManagement() {
                         <td className="py-3 px-4">{index + 1}</td>
                         <td className="py-3 px-4">
                           <ImageWithFallback
-                            src="https://images.unsplash.com/photo-1565680018434-b513d5e5fd47?w=50&h=50&fit=crop"
+                            src={product.image || 'https://via.placeholder.com/50'}
                             alt={product.name}
                             className="w-12 h-12 object-cover rounded"
                           />
@@ -1136,10 +1497,34 @@ export default function InventoryManagement() {
                         <td className="py-3 px-4">{product.lastUpdated}</td>
                         <td className="py-3 px-4">
                           <div className="flex gap-2">
-                            <button className="p-1 hover:bg-gray-100 rounded">
+                            <button
+                              className="p-1 hover:bg-gray-100 rounded"
+                              title="Edit product"
+                              onClick={() => {
+                                // Prefill form for editing
+                                setEditingProductId(product.id);
+                                setProductForm({
+                                  category: product.categoryId || '',
+                                  productName: product.name,
+                                  productImage: null,
+                                  description: product.description || '',
+                                  nutritionFacts: product.nutritionFacts || '',
+                                  cutTypes: product.cutTypeIds || [],
+                                  currentCutType: '',
+                                  availableWeights: product.availableWeights || [],
+                                  currentWeight: '',
+                                  availableStock: String(product.stock ?? ''),
+                                  defaultProfit: String(product.profit ?? ''),
+                                  defaultDiscount: String(product.discount ?? ''),
+                                  costPricePerKg: String(product.costPrice ?? ''),
+                                  availability: product.availability ?? (product.status === 'Active')
+                                });
+                                setShowAddModal(true);
+                              }}
+                            >
                               <Edit className="w-4 h-4 text-blue-600" />
                             </button>
-                            <button className="p-1 hover:bg-gray-100 rounded">
+                            <button className="p-1 hover:bg-gray-100 rounded" title="Delete product">
                               <Trash2 className="w-4 h-4 text-red-600" />
                             </button>
                           </div>
@@ -1279,11 +1664,18 @@ export default function InventoryManagement() {
       </Tabs>
 
       {/* Add Modal */}
-      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
+      <Dialog open={showAddModal} onOpenChange={(open) => {
+        if (!open) setEditingProductId(null);
+        setShowAddModal(open);
+      }}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>
-              {editingCategoryId ? 'Edit' : 'Add New'} {tabLabelMap[activeTab] || 'Item'}
+              {activeTab === 'categories'
+                ? (editingCategoryId ? 'Edit' : 'Add New')
+                : activeTab === 'products'
+                ? (editingProductId ? 'Edit' : 'Add New')
+                : 'Add New'} {tabLabelMap[activeTab] || 'Item'}
             </DialogTitle>
           </DialogHeader>
           {activeTab === 'categories' && renderCategoryModal()}
@@ -1403,11 +1795,14 @@ export default function InventoryManagement() {
               <div>
                 <Label>Available Cut Types</Label>
                 <div className="flex flex-wrap gap-2">
-                  {selectedItem?.cutTypes.map((cutType: string, index: number) => (
-                    <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                      {cutType}
-                    </Badge>
-                  ))}
+                  {selectedItem?.cutTypes.map((cutType: string, index: number) => {
+                    const cutTypeName = cutTypesData.find(ct => ct._id === cutType)?.name || cutType;
+                    return (
+                      <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                        {cutTypeName}
+                      </Badge>
+                    );
+                  })}
                 </div>
               </div>
 
