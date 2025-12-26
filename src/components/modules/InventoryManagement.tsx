@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { ImageWithFallback } from '../ui/ImageWithFallback';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { apiFetch } from '../../lib/api';
-import { toast } from 'sonner';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import CutTypeSection from './inventory/CutTypeSection';
 
 const IMAGE_BASE = ((import.meta as any).env?.VITE_IMAGE_BASE_URL || (import.meta as any).env?.VITE_BASE_URL) as string | undefined;
@@ -27,10 +28,13 @@ export default function InventoryManagement() {
   const [searchQuery, setSearchQuery] = useState('');
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [editingVariantId, setEditingVariantId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCategoryViewModal, setShowCategoryViewModal] = useState(false);
   const [viewingCategory, setViewingCategory] = useState<any>(null);
   const [isLoadingCategoryView, setIsLoadingCategoryView] = useState(false);
+  const [viewingVariant, setViewingVariant] = useState<any>(null);
+  const [isLoadingVariantView, setIsLoadingVariantView] = useState(false);
   const [openCutTypeAdd, setOpenCutTypeAdd] = useState(false);
 
   // Category state
@@ -86,7 +90,7 @@ export default function InventoryManagement() {
         setLoadingCutTypes(false);
       }
     };
-    if (activeTab === 'products') fetchCutTypes();
+    if (activeTab === 'products' || activeTab === 'variants') fetchCutTypes();
   }, [activeTab]);
 
   // Variant state (for add/edit modal forms)
@@ -94,15 +98,61 @@ export default function InventoryManagement() {
     species: '',
     product: '',
     variantName: '',
+    variantImage: null as File | null,
+    existingImage: '',
+    existingImageUrl: '',
     cutType: '',
     featured: false,
     bestSeller: false,
+    profit: '',
     displayPrice: '',
     discount: '',
     sellingPrice: '',
     notes: '',
     availability: true
   });
+
+  // Products loaded for selected species (category) in Variant modal
+  const [variantProducts, setVariantProducts] = useState<Array<{ id: string; name: string; costPrice?: number; profit?: number; discount?: number; cutTypeIds?: string[] }>>([]);
+  const [loadingVariantProducts, setLoadingVariantProducts] = useState(false);
+
+  // When species (category) changes in variant form, fetch products for that category
+  useEffect(() => {
+    const fetchProductsByCategory = async () => {
+      if (!variantForm.species) {
+        setVariantProducts([]);
+        return;
+      }
+
+      setLoadingVariantProducts(true);
+      try {
+        const res = await apiFetch<{
+          success: boolean;
+          products?: Array<{ _id: string; name: string; cost?: number; defaultProfit?: number; defaultDiscount?: number; availableCutTypes?: Array<{ _id: string; name: string }> }>;
+        }>(`/api/products/category/${variantForm.species}`);
+
+        if (res.success && res.products) {
+          setVariantProducts((res.products || []).map(p => ({ 
+            id: p._id, 
+            name: p.name, 
+            costPrice: p.cost, 
+            profit: p.defaultProfit, 
+            discount: p.defaultDiscount,
+            cutTypeIds: (p.availableCutTypes || []).map(ct => ct._id)
+          })));
+        } else {
+          setVariantProducts([]);
+        }
+      } catch (e: any) {
+        console.error('Failed to fetch products for category:', e);
+        setVariantProducts([]);
+      } finally {
+        setLoadingVariantProducts(false);
+      }
+    };
+
+    fetchProductsByCategory();
+  }, [variantForm.species]);
 
   // Categories state
   const [categories, setCategories] = useState<Array<{
@@ -165,8 +215,8 @@ export default function InventoryManagement() {
       }
     };
 
-    // Also load categories for the Products tab so the form has options
-    if (activeTab === 'categories' || activeTab === 'products') fetchCategories();
+    // Also load categories for Products and Variants tabs so the forms have options
+    if (activeTab === 'categories' || activeTab === 'products' || activeTab === 'variants') fetchCategories();
   }, [activeTab]);
 
   // Load products when Products tab is active
@@ -175,6 +225,87 @@ export default function InventoryManagement() {
       fetchProducts();
     }
   }, [activeTab]);
+
+  // Load variants when Variants tab is active
+  useEffect(() => {
+    if (activeTab === 'variants') {
+      fetchVariants();
+    }
+  }, [activeTab]);
+
+  const fetchVariants = async () => {
+    setVariantsLoading(true);
+    setVariantsError(null);
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        variants?: Array<{
+          _id: string;
+          name: string;
+          image?: string;
+          product: {
+            _id: string;
+            name: string;
+            category?: string | { _id: string; name: string };
+            image?: string;
+            cost?: number;
+          };
+          cutType: {
+            _id: string;
+            name: string;
+          };
+          featured: boolean;
+          bestSeller: boolean;
+          notes?: string;
+          profit: number;
+          discount: number;
+          displayPrice: number;
+          sellingPrice: number;
+          isActive: boolean;
+          createdAt: string;
+          updatedAt: string;
+        }>;
+        message?: string;
+      }>('/api/variants');
+
+      if (!res.success) throw new Error(res.message || 'Failed to fetch variants');
+
+      const mapped = (res.variants || []).map((v) => {
+        // Extract category/species from product
+        let species = '—';
+        const catAny = v.product?.category;
+        if (catAny && typeof catAny === 'object') {
+          species = catAny.name || '—';
+        }
+
+        return {
+          id: v._id,
+          variantName: v.name,
+          product: v.product?.name || '—',
+          species,
+          cutType: v.cutType?.name || '—',
+          featured: v.featured || false,
+          bestSeller: v.bestSeller || false,
+          costPrice: v.product?.cost || 0,
+          profit: v.profit || 0,
+          discount: v.discount || 0,
+          displayPrice: v.displayPrice || 0,
+          sellingPrice: v.sellingPrice || 0,
+          notes: v.notes,
+          image: v.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${v.image}` : v.image) : undefined,
+          status: v.isActive ? 'Active' : 'Inactive',
+          lastUpdated: new Date(v.updatedAt).toISOString().split('T')[0],
+        };
+      });
+      setVariants(mapped);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to load variants';
+      setVariantsError(msg);
+      toast.error(msg);
+    } finally {
+      setVariantsLoading(false);
+    }
+  };
 
   const [products, setProducts] = useState<Array<{
     id: string;
@@ -250,7 +381,21 @@ export default function InventoryManagement() {
       const mapped = (res.products || []).map((p) => {
         const raw = p.image || '';
         const image = raw ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${raw}` : raw) : '';
-        const species = p.category?.name || '—';
+
+        // Handle both shapes: category as object or as string id (or categoryId field)
+        let catId: string | undefined = undefined;
+        let species = '—';
+        const catAny = (p as any).category;
+        if (catAny && typeof catAny === 'object') {
+          catId = String(catAny._id || catAny.id || '');
+          species = catAny.name || '—';
+        } else if (typeof catAny === 'string') {
+          catId = String(catAny);
+          // species will remain '—' if name not provided; list still shows correctly by id
+        } else if ((p as any).categoryId) {
+          catId = String((p as any).categoryId);
+        }
+
         const cutTypes = (p.availableCutTypes || []).map((ct) => ct.name);
         const cutTypeIds = (p.availableCutTypes || []).map((ct) => ct._id);
         const low = typeof p.lowStockThreshold === 'number' ? p.lowStockThreshold : undefined;
@@ -265,7 +410,7 @@ export default function InventoryManagement() {
           imagePath: raw,
           name: p.name,
           species,
-          categoryId: p.category?._id,
+          categoryId: catId,
           cutTypes,
           cutTypeIds,
           stock: p.stock,
@@ -291,13 +436,52 @@ export default function InventoryManagement() {
     }
   };
 
-  const [variants, setVariants] = useState([
-    { id: 1, variantName: 'Tiger Prawns - Whole Cleaned - 500g', product: 'Tiger Prawns', species: 'Prawns', cutType: 'Whole Cleaned', featured: true, bestSeller: true, costPrice: 320, profit: 15, displayPrice: 368, discount: 10, sellingPrice: 331, status: 'Active', lastUpdated: '2024-11-28' },
-    { id: 2, variantName: 'Tiger Prawns - Peeled - 250g', product: 'Tiger Prawns', species: 'Prawns', cutType: 'Peeled', featured: false, bestSeller: true, costPrice: 320, profit: 15, displayPrice: 368, discount: 10, sellingPrice: 331, status: 'Active', lastUpdated: '2024-11-27' },
-    { id: 3, variantName: 'Salmon - Fillet - 500g', product: 'Salmon', species: 'Fish', cutType: 'Fillet', featured: true, bestSeller: false, costPrice: 580, profit: 18, displayPrice: 684, discount: 8, sellingPrice: 629, status: 'Active', lastUpdated: '2024-11-26' },
-    { id: 4, variantName: 'Pomfret - Whole Cleaned - 500g', product: 'Pomfret', species: 'Fish', cutType: 'Whole Cleaned', featured: false, bestSeller: false, costPrice: 340, profit: 15, displayPrice: 391, discount: 12, sellingPrice: 344, status: 'Active', lastUpdated: '2024-11-25' },
-    { id: 5, variantName: 'King Prawns - Deveined - 500g', product: 'King Prawns', species: 'Prawns', cutType: 'Deveined', featured: true, bestSeller: true, costPrice: 450, profit: 20, displayPrice: 540, discount: 5, sellingPrice: 513, status: 'Active', lastUpdated: '2024-11-28' }
-  ]);
+  const [variants, setVariants] = useState<Array<{
+    id: string;
+    variantName: string;
+    product: string;
+    species: string;
+    cutType: string;
+    featured: boolean;
+    bestSeller: boolean;
+    costPrice: number;
+    profit: number;
+    discount: number;
+    displayPrice: number;
+    sellingPrice: number;
+    notes?: string;
+    status: string;
+    lastUpdated: string;
+    image?: string;
+  }>>([]);
+  const [variantsLoading, setVariantsLoading] = useState(false);
+  const [variantsError, setVariantsError] = useState<string | null>(null);
+
+  // Helper to resolve a product's category id reliably
+  const getCategoryIdForProduct = (prod: {
+    categoryId?: string;
+    species?: string;
+  }) => {
+    if (prod.categoryId) return String(prod.categoryId);
+    if (prod.species) {
+      const match = categories.find((c) => c.name === prod.species);
+      if (match) return String(match.id);
+    }
+    return '';
+  };
+
+  // If categories load after opening edit modal, backfill or refresh the category selection
+  useEffect(() => {
+    if (editingProductId) {
+      const prod = products.find((p) => p.id === editingProductId);
+      if (prod) {
+        const resolved = getCategoryIdForProduct({ categoryId: prod.categoryId, species: prod.species });
+        if (resolved) {
+          setProductForm((prev) => ({ ...prev, category: resolved }));
+        }
+      }
+    }
+  }, [categories, products, editingProductId]);
 
   // Reorder functions
   const moveCategory = async (index: number, direction: 'up' | 'down') => {
@@ -461,6 +645,93 @@ export default function InventoryManagement() {
     }
   };
 
+  const handleViewVariant = async (variantId: string) => {
+    setIsLoadingVariantView(true);
+    setShowViewModal(true);
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        variant?: {
+          _id: string;
+          name: string;
+          image?: string;
+          product: {
+            _id: string;
+            name: string;
+            category?: string | { _id: string; name: string };
+            availableCutTypes?: string[];
+            availableWeights?: number[];
+            image?: string;
+          };
+          cutType: {
+            _id: string;
+            name: string;
+          };
+          featured: boolean;
+          bestSeller: boolean;
+          notes?: string;
+          displayPrice: number;
+          sellingPrice: number;
+          profit: number;
+          discount: number;
+          isActive: boolean;
+          isDeleted: boolean;
+          createdAt: string;
+          updatedAt: string;
+        };
+        message?: string;
+      }>(`/api/variants/${variantId}`);
+
+      if (!res.success) throw new Error(res.message || 'Failed to fetch variant');
+      if (!res.variant) throw new Error('No variant data in response');
+
+      const v = res.variant;
+
+      // Extract category name from product
+      let categoryName = 'N/A';
+      if (v.product?.category) {
+        if (typeof v.product.category === 'object') {
+          categoryName = v.product.category.name;
+        } else {
+          // Try to find in categories list
+          const cat = categories.find(c => c.id === v.product.category);
+          if (cat) categoryName = cat.name;
+        }
+      }
+
+      const variantData = {
+        id: v._id,
+        name: v.name,
+        image: v.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${v.image}` : v.image) : undefined,
+        productName: v.product?.name || 'N/A',
+        productImage: v.product?.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${v.product.image}` : v.product.image) : undefined,
+        categoryName,
+        cutTypeName: v.cutType?.name || 'N/A',
+        featured: v.featured,
+        bestSeller: v.bestSeller,
+        notes: v.notes || 'N/A',
+        displayPrice: v.displayPrice,
+        sellingPrice: v.sellingPrice,
+        profit: v.profit,
+        discount: v.discount,
+        status: v.isActive ? 'Active' : 'Inactive',
+        isDeleted: v.isDeleted,
+        dateCreated: new Date(v.createdAt).toISOString().split('T')[0],
+        lastUpdated: new Date(v.updatedAt).toISOString().split('T')[0],
+      };
+
+      setViewingVariant(variantData);
+      setSelectedItem(variantData);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to load variant details';
+      console.error('View variant error:', e);
+      toast.error(msg);
+      setShowViewModal(false);
+    } finally {
+      setIsLoadingVariantView(false);
+    }
+  };
+
   const handleDeleteCategory = async () => {
     if (!selectedItem || activeTab !== 'categories') return;
 
@@ -492,6 +763,119 @@ export default function InventoryManagement() {
     }
   };
 
+  const handleDeleteProduct = async () => {
+    if (!selectedItem || activeTab !== 'products') return;
+
+    setIsSubmitting(true);
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        product?: {
+          _id: string;
+          isDeleted: boolean;
+        };
+        message?: string;
+      }>(`/api/products/${selectedItem.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.success) throw new Error(res.message || 'Failed to delete product');
+
+      setProducts(products.filter(prod => prod.id !== selectedItem.id));
+      toast.success(res.message || 'Product deleted successfully');
+      setShowDeleteDialog(false);
+      setSelectedItem(null);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to delete product';
+      console.error('Delete product error:', e);
+      toast.error(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEditVariant = async (variantId: string) => {
+    // Find variant in list
+    const variant = variants.find(v => v.id === variantId);
+    if (!variant) return;
+
+    // Fetch full variant details from API to get product and category IDs
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        variant?: {
+          _id: string;
+          name: string;
+          image?: string;
+          product: {
+            _id: string;
+            name: string;
+            category?: string | { _id: string; name: string };
+            cost?: number;
+          };
+          cutType: {
+            _id: string;
+            name: string;
+          };
+          featured: boolean;
+          bestSeller: boolean;
+          notes?: string;
+          profit: number;
+          discount: number;
+          displayPrice: number;
+          sellingPrice: number;
+          isActive: boolean;
+        };
+        message?: string;
+      }>(`/api/variants/${variantId}`);
+
+      if (!res.success || !res.variant) {
+        toast.error('Failed to load variant details');
+        return;
+      }
+
+      const v = res.variant;
+      
+      // Extract category ID from product
+      let categoryId = '';
+      if (v.product?.category) {
+        if (typeof v.product.category === 'object') {
+          categoryId = v.product.category._id;
+        } else {
+          categoryId = v.product.category;
+        }
+      }
+
+      // Set editing state
+      setEditingVariantId(variantId);
+      
+      // Populate form with variant data
+      setVariantForm({
+        species: categoryId,
+        product: v.product._id,
+        variantName: v.name,
+        variantImage: null,
+        existingImage: v.image || '',
+        existingImageUrl: v.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${v.image}` : v.image) : '',
+        cutType: v.cutType._id,
+        featured: v.featured,
+        bestSeller: v.bestSeller,
+        profit: String(v.profit),
+        displayPrice: String(v.displayPrice),
+        discount: String(v.discount),
+        sellingPrice: String(v.sellingPrice),
+        notes: v.notes || '',
+        availability: v.isActive
+      });
+
+      setShowAddModal(true);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to load variant details';
+      console.error('Edit variant error:', e);
+      toast.error(msg);
+    }
+  };
+
   const handleOpenAddModal = () => {
     // If Cut Types tab, open child dialog instead
     if (activeTab === 'cuttypes') {
@@ -501,6 +885,7 @@ export default function InventoryManagement() {
     // Reset forms
     setEditingCategoryId(null);
     setEditingProductId(null);
+    setEditingVariantId(null);
     setCategoryForm({ speciesName: '', speciesIcon: null, existingIcon: '', existingIconUrl: '', availability: true });
     setProductForm({
       category: '',
@@ -524,9 +909,13 @@ export default function InventoryManagement() {
       species: '',
       product: '',
       variantName: '',
+      variantImage: null,
+      existingImage: '',
+      existingImageUrl: '',
       cutType: '',
       featured: false,
       bestSeller: false,
+      profit: '',
       displayPrice: '',
       discount: '',
       sellingPrice: '',
@@ -555,6 +944,9 @@ export default function InventoryManagement() {
         formData.append('name', categoryForm.speciesName.trim());
         if (categoryForm.speciesIcon) {
           formData.append('image', categoryForm.speciesIcon);
+        } else if (categoryForm.existingIcon) {
+          // Preserve existing icon on edit when no new file is provided
+          formData.append('existingImage', categoryForm.existingIcon);
         }
         formData.append('isActive', String(categoryForm.availability));
 
@@ -722,6 +1114,109 @@ export default function InventoryManagement() {
       } catch (e: any) {
         const msg = e?.message || (editingProductId ? 'Failed to update product' : 'Failed to add product');
         console.error('Add product error:', e);
+        toast.error(msg);
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else if (activeTab === 'variants') {
+      // Validate variant form
+      if (!variantForm.product) {
+        toast.error('Please select a product');
+        return;
+      }
+      if (!variantForm.variantName.trim()) {
+        toast.error('Variant name is required');
+        return;
+      }
+      if (!editingVariantId && !variantForm.variantImage) {
+        toast.error('Variant image is required');
+        return;
+      }
+      if (!variantForm.cutType) {
+        toast.error('Please select a cut type');
+        return;
+      }
+      if (!variantForm.profit || parseFloat(variantForm.profit) < 0) {
+        toast.error('Valid profit percentage is required');
+        return;
+      }
+      if (!variantForm.displayPrice || parseFloat(variantForm.displayPrice) <= 0) {
+        toast.error('Valid display price is required');
+        return;
+      }
+      if (!variantForm.discount || parseFloat(variantForm.discount) < 0) {
+        toast.error('Valid discount percentage is required');
+        return;
+      }
+
+      setIsSubmitting(true);
+      try {
+        const display = parseFloat(variantForm.displayPrice);
+        const discountPct = parseFloat(variantForm.discount) || 0;
+        const selling = display - (display * discountPct / 100);
+
+        const isEdit = editingVariantId !== null;
+        const endpoint = isEdit ? `/api/variants/${editingVariantId}` : '/api/variants';
+        const method = isEdit ? 'PUT' : 'POST';
+
+        const formData = new FormData();
+        formData.append('name', variantForm.variantName.trim());
+        if (variantForm.variantImage) {
+          formData.append('image', variantForm.variantImage);
+        } else if (variantForm.existingImage) {
+          // Preserve existing image on edit when no new file is provided
+          formData.append('existingImage', variantForm.existingImage);
+        }
+        formData.append('product', variantForm.product); // product id
+        formData.append('cutType', variantForm.cutType); // cut type id
+        formData.append('profit', variantForm.profit);
+        formData.append('discount', variantForm.discount);
+        formData.append('notes', variantForm.notes.trim());
+        formData.append('featured', String(variantForm.featured));
+        formData.append('bestSeller', String(variantForm.bestSeller));
+        formData.append('displayPrice', String(display));
+        formData.append('sellingPrice', String(selling));
+        formData.append('isActive', String(variantForm.availability));
+
+        const res = await apiFetch<{
+          success: boolean;
+          variant?: any;
+          message?: string;
+        }>(endpoint, {
+          method,
+          body: formData,
+        });
+
+        if (!res.success) throw new Error(res.message || (isEdit ? 'Failed to update variant' : 'Failed to create variant'));
+
+        toast.success(res.message || (isEdit ? 'Variant updated successfully' : 'Variant created successfully'));
+        setShowAddModal(false);
+
+        // Reset form
+        setVariantForm({
+          species: '',
+          product: '',
+          variantName: '',
+          variantImage: null,
+          existingImage: '',
+          existingImageUrl: '',
+          cutType: '',
+          featured: false,
+          bestSeller: false,
+          profit: '',
+          displayPrice: '',
+          discount: '',
+          sellingPrice: '',
+          notes: '',
+          availability: true
+        });
+        setEditingVariantId(null);
+
+        // Refresh variants list
+        fetchVariants();
+      } catch (e: any) {
+        const msg = e?.message || (editingVariantId ? 'Failed to update variant' : 'Failed to create variant');
+        console.error(editingVariantId ? 'Update variant error:' : 'Create variant error:', e);
         toast.error(msg);
       } finally {
         setIsSubmitting(false);
@@ -1077,7 +1572,7 @@ export default function InventoryManagement() {
 
   const renderVariantModal = () => {
     // Get product from selection to auto-fill defaults
-    const selectedProduct = products.find(p => p.name === variantForm.product);
+    const selectedProduct = variantProducts.find(p => p.id === variantForm.product);
     const costPrice = selectedProduct?.costPrice || 0;
     const defaultProfit = selectedProduct?.profit || 0;
     const defaultDiscount = selectedProduct?.discount || 0;
@@ -1094,11 +1589,9 @@ export default function InventoryManagement() {
                 <SelectValue placeholder="Choose species" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="prawns">Prawns</SelectItem>
-                <SelectItem value="fish">Fish</SelectItem>
-                <SelectItem value="crab">Crab</SelectItem>
-                <SelectItem value="squid">Squid</SelectItem>
-                <SelectItem value="lobster">Lobster</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -1108,11 +1601,16 @@ export default function InventoryManagement() {
             <Select 
               value={variantForm.product} 
               onValueChange={(value: string) => {
-                const product = products.find(p => p.name === value);
+                  const product = variantProducts.find(p => p.id === value);
                 setVariantForm({ 
                   ...variantForm, 
                   product: value,
-                  discount: product?.discount.toString() || ''
+                    // pre-fill helpful defaults
+                    profit: product?.profit != null ? String(product.profit) : '',
+                    displayPrice: product?.costPrice != null && product?.profit != null
+                      ? calculateVariantPrices(product.costPrice, product.profit, 0).displayPrice
+                      : '',
+                    discount: product?.discount != null ? String(product.discount) : ''
                 });
               }}
               disabled={!variantForm.species}
@@ -1121,12 +1619,9 @@ export default function InventoryManagement() {
                 <SelectValue placeholder="Choose product" />
               </SelectTrigger>
               <SelectContent>
-                {products
-                  .filter(p => p && p.species && p.species.toLowerCase() === variantForm.species)
-                  .map(p => (
-                    <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
-                  ))
-                }
+                {variantProducts.map(p => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -1144,15 +1639,42 @@ export default function InventoryManagement() {
         </div>
 
         <div>
+          <Label htmlFor="variantImage">Variant Image {!editingVariantId && '*'}</Label>
+          <Input
+            id="variantImage"
+            type="file"
+            accept="image/*"
+            onChange={(e) => setVariantForm({ ...variantForm, variantImage: e.target.files?.[0] || null })}
+            required={!editingVariantId}
+          />
+          {variantForm.existingImageUrl && !variantForm.variantImage && (
+            <div className="mt-2 text-sm text-gray-600 flex items-center gap-3">
+              <ImageWithFallback
+                src={variantForm.existingImageUrl}
+                alt={variantForm.variantName || 'Current variant image'}
+                className="w-14 h-14 rounded object-cover border"
+              />
+              <span>Current image will be kept unless you upload a new one.</span>
+            </div>
+          )}
+        </div>
+
+        <div>
           <Label htmlFor="variantCutType">Select Cut Type *</Label>
-          <Select value={variantForm.cutType} onValueChange={(value: string) => setVariantForm({ ...variantForm, cutType: value })}>
+          <Select 
+            value={variantForm.cutType} 
+            onValueChange={(value: string) => setVariantForm({ ...variantForm, cutType: value })}
+            disabled={!variantForm.product}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Choose cut type" />
             </SelectTrigger>
             <SelectContent>
-              {selectedProduct?.cutTypes.map((ct: string, idx: number) => (
-                <SelectItem key={idx} value={ct}>{ct}</SelectItem>
-              ))}
+              {cutTypesData
+                .filter(ct => selectedProduct?.cutTypeIds?.includes(ct._id))
+                .map((ct) => (
+                  <SelectItem key={ct._id} value={ct._id}>{ct.name}</SelectItem>
+                ))}
             </SelectContent>
           </Select>
         </div>
@@ -1186,12 +1708,33 @@ export default function InventoryManagement() {
               <Input value={costPrice} disabled className="bg-white" />
             </div>
             <div>
-              <Label className="text-xs text-gray-600">Profit %</Label>
-              <Input value={defaultProfit} disabled className="bg-white" />
+              <Label className="text-xs text-gray-600">Profit % *</Label>
+              <Input
+                type="number"
+                value={variantForm.profit}
+                onChange={(e) => {
+                  const profitVal = e.target.value;
+                  // optionally auto-compute display price when profit changes if product is selected
+                  let display = variantForm.displayPrice;
+                  const p = parseFloat(profitVal);
+                  if (!isNaN(p) && selectedProduct) {
+                    display = calculateVariantPrices(selectedProduct?.costPrice ?? 0, p, 0).displayPrice;
+                  }
+                  setVariantForm({ ...variantForm, profit: profitVal, displayPrice: display });
+                }}
+                placeholder="Enter profit %"
+                required
+              />
             </div>
             <div>
-              <Label className="text-xs text-gray-600">Display Price (₹)</Label>
-              <Input value={prices.displayPrice} disabled className="bg-white" />
+              <Label className="text-xs text-gray-600">Display Price (₹) *</Label>
+              <Input
+                type="number"
+                value={variantForm.displayPrice}
+                onChange={(e) => setVariantForm({ ...variantForm, displayPrice: e.target.value })}
+                placeholder="Enter display price"
+                required
+              />
             </div>
           </div>
 
@@ -1210,7 +1753,9 @@ export default function InventoryManagement() {
             <div>
               <Label className="text-xs text-gray-600">Selling Price (₹)</Label>
               <Input 
-                value={variantForm.discount ? calculateVariantPrices(costPrice, defaultProfit, parseFloat(variantForm.discount)).sellingPrice : prices.sellingPrice} 
+                value={(variantForm.displayPrice && variantForm.discount)
+                  ? (parseFloat(variantForm.displayPrice) - (parseFloat(variantForm.displayPrice) * (parseFloat(variantForm.discount) || 0) / 100)).toFixed(2)
+                  : '0.00'}
                 disabled 
                 className="bg-white font-semibold text-green-600" 
               />
@@ -1245,8 +1790,10 @@ export default function InventoryManagement() {
           <Button type="button" variant="outline" onClick={() => setShowAddModal(false)}>
             Cancel
           </Button>
-          <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-            Add Variant
+          <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={isSubmitting}>
+            {isSubmitting
+              ? (editingVariantId ? 'Updating...' : 'Adding...')
+              : (editingVariantId ? 'Update Variant' : 'Add Variant')}
           </Button>
         </DialogFooter>
       </form>
@@ -1572,8 +2119,9 @@ export default function InventoryManagement() {
                               onClick={() => {
                                 // Prefill form for editing
                                 setEditingProductId(product.id);
+                                const resolvedCategoryId = getCategoryIdForProduct(product);
                                 setProductForm({
-                                  category: product.categoryId || '',
+                                  category: resolvedCategoryId,
                                   productName: product.name,
                                   productImage: null,
                                   existingImage: product.imagePath || '',
@@ -1595,7 +2143,14 @@ export default function InventoryManagement() {
                             >
                               <Edit className="w-4 h-4 text-blue-600" />
                             </button>
-                            <button className="p-1 hover:bg-gray-100 rounded" title="Delete product">
+                            <button
+                              className="p-1 hover:bg-gray-100 rounded"
+                              title="Delete product"
+                              onClick={() => {
+                                setSelectedItem(product);
+                                setShowDeleteDialog(true);
+                              }}
+                            >
                               <Trash2 className="w-4 h-4 text-red-600" />
                             </button>
                           </div>
@@ -1638,6 +2193,7 @@ export default function InventoryManagement() {
                     <tr className="border-b border-gray-200">
                       <th className="text-left py-3 px-4">Reorder</th>
                       <th className="text-left py-3 px-4">Serial No</th>
+                      <th className="text-left py-3 px-4">Image</th>
                       <th className="text-left py-3 px-4">Variant Name</th>
                       <th className="text-left py-3 px-4">Product Name</th>
                       <th className="text-left py-3 px-4">Species</th>
@@ -1657,7 +2213,7 @@ export default function InventoryManagement() {
                   <tbody>
                     {filteredVariants.length === 0 ? (
                       <tr>
-                        <td colSpan={16} className="py-8 text-center text-gray-500">No variants found</td>
+                        <td colSpan={17} className="py-8 text-center text-gray-500">Variants Loading</td>
                       </tr>
                     ) : filteredVariants.map((variant, index) => {
                       const originalIndex = variants.findIndex((v) => v.id === variant.id);
@@ -1682,6 +2238,17 @@ export default function InventoryManagement() {
                           </div>
                         </td>
                         <td className="py-3 px-4">{originalIndex + 1}</td>
+                        <td className="py-3 px-4">
+                          {variant.image ? (
+                            <ImageWithFallback
+                              src={variant.image}
+                              alt={variant.variantName}
+                              className="w-12 h-12 rounded object-cover"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded bg-gray-100 flex items-center justify-center text-gray-400 text-xs">No img</div>
+                          )}
+                        </td>
                         <td className="py-3 px-4">{variant.variantName}</td>
                         <td className="py-3 px-4">{variant.product}</td>
                         <td className="py-3 px-4">{variant.species}</td>
@@ -1706,17 +2273,28 @@ export default function InventoryManagement() {
                         <td className="py-3 px-4">{variant.profit}%</td>
                         <td className="py-3 px-4">₹{variant.displayPrice}</td>
                         <td className="py-3 px-4">{variant.discount}%</td>
-                        <td className="py-3 px-4 font-semibold text-green-600">₹{variant.sellingPrice}</td>
+                        <td className="py-3 px-4">₹{variant.sellingPrice}</td>
                         <td className="py-3 px-4">
                           <Badge variant="default">{variant.status}</Badge>
                         </td>
                         <td className="py-3 px-4">{variant.lastUpdated}</td>
                         <td className="py-3 px-4">
                           <div className="flex gap-2">
-                            <button className="p-1 hover:bg-gray-100 rounded">
+                            <button 
+                              className="p-1 hover:bg-gray-100 rounded"
+                              onClick={() => handleViewVariant(variant.id)}
+                              title="View variant"
+                            >
+                              <Eye className="w-4 h-4 text-gray-600" />
+                            </button>
+                            <button 
+                              className="p-1 hover:bg-gray-100 rounded"
+                              onClick={() => handleEditVariant(variant.id)}
+                              title="Edit variant"
+                            >
                               <Edit className="w-4 h-4 text-blue-600" />
                             </button>
-                            <button className="p-1 hover:bg-gray-100 rounded">
+                            <button className="p-1 hover:bg-gray-100 rounded" title="Delete variant">
                               <Trash2 className="w-4 h-4 text-red-600" />
                             </button>
                           </div>
@@ -1738,7 +2316,10 @@ export default function InventoryManagement() {
 
       {/* Add Modal */}
       <Dialog open={showAddModal} onOpenChange={(open) => {
-        if (!open) setEditingProductId(null);
+        if (!open) {
+          setEditingProductId(null);
+          setEditingVariantId(null);
+        }
         setShowAddModal(open);
       }}>
         <DialogContent className="sm:max-w-[600px]">
@@ -1748,6 +2329,8 @@ export default function InventoryManagement() {
                 ? (editingCategoryId ? 'Edit' : 'Add New')
                 : activeTab === 'products'
                 ? (editingProductId ? 'Edit' : 'Add New')
+                : activeTab === 'variants'
+                ? (editingVariantId ? 'Edit' : 'Add New')
                 : 'Add New'} {tabLabelMap[activeTab] || 'Item'}
             </DialogTitle>
           </DialogHeader>
@@ -1868,7 +2451,7 @@ export default function InventoryManagement() {
               <div>
                 <Label>Available Cut Types</Label>
                 <div className="flex flex-wrap gap-2">
-                  {selectedItem?.cutTypes.map((cutType: string, index: number) => {
+                  {(selectedItem?.cutTypes || []).map((cutType: string, index: number) => {
                     const cutTypeName = cutTypesData.find(ct => ct._id === cutType)?.name || cutType;
                     return (
                       <Badge key={index} variant="secondary" className="flex items-center gap-1">
@@ -1941,178 +2524,117 @@ export default function InventoryManagement() {
               </div>
             </div>
           )}
-          {activeTab === 'variants' && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="variantSpecies">Select Species</Label>
-                <Select value={selectedItem?.species || ''} onValueChange={(value: string) => {
-                  const updatedVariants = variants.map(variant => 
-                    variant.id === selectedItem.id ? { ...variant, species: value } : variant
-                  );
-                  setVariants(updatedVariants);
-                }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose species" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="prawns">Prawns</SelectItem>
-                    <SelectItem value="fish">Fish</SelectItem>
-                    <SelectItem value="crab">Crab</SelectItem>
-                    <SelectItem value="squid">Squid</SelectItem>
-                    <SelectItem value="lobster">Lobster</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+          {activeTab === 'variants' && isLoadingVariantView && (
+            <div className="flex justify-center items-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          )}
+          {activeTab === 'variants' && !isLoadingVariantView && viewingVariant && (
+            <div className="space-y-6">
+              {/* Variant Image */}
+              {viewingVariant.image && (
+                <div className="flex justify-center">
+                  <ImageWithFallback
+                    src={viewingVariant.image}
+                    alt={viewingVariant.name}
+                    className="w-48 h-48 object-cover rounded-lg border"
+                  />
+                </div>
+              )}
 
-              <div>
-                <Label htmlFor="variantProduct">Select Product</Label>
-                <Select 
-                  value={selectedItem?.product || ''} 
-                  onValueChange={(value: string) => {
-                    const product = products.find(p => p.name === value);
-                    setVariantForm({ 
-                      ...variantForm, 
-                      product: value,
-                      discount: product?.discount.toString() || ''
-                    });
-                  }}
-                  disabled={!selectedItem?.species}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose product" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products
-                      .filter(p => p && p.species && selectedItem?.species && p.species.toLowerCase() === selectedItem.species?.toLowerCase())
-                      .map(p => (
-                        <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
-                      ))
-                    }
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="variantName">Variant Name</Label>
-                <Input
-                  id="variantName"
-                  value={selectedItem?.variantName || ''}
-                  readOnly
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="variantCutType">Select Cut Type</Label>
-                <Select value={selectedItem?.cutType || ''} onValueChange={(value: string) => {
-                  const updatedVariants = variants.map(variant => 
-                    variant.id === selectedItem.id ? { ...variant, cutType: value } : variant
-                  );
-                  setVariants(updatedVariants);
-                }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose cut type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                      {products.find(p => p.name === selectedItem?.product)?.cutTypes?.map((ct: string, idx: number) => (
-                        <SelectItem key={idx} value={ct}>{ct}</SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
+              {/* Basic Information */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <Label htmlFor="featured">Featured</Label>
-                  <Switch
-                    id="featured"
-                    checked={selectedItem?.featured}
-                    onCheckedChange={(checked: boolean) => {
-                      const updatedVariants = variants.map(variant => 
-                        variant.id === selectedItem.id ? { ...variant, featured: checked } : variant
-                      );
-                      setVariants(updatedVariants);
-                    }}
-                  />
+                <div>
+                  <Label className="text-gray-600">Variant Name</Label>
+                  <p className="font-medium">{viewingVariant.name}</p>
                 </div>
-
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <Label htmlFor="bestSeller">Best Seller</Label>
-                  <Switch
-                    id="bestSeller"
-                    checked={selectedItem?.bestSeller}
-                    onCheckedChange={(checked: boolean) => {
-                      const updatedVariants = variants.map(variant => 
-                        variant.id === selectedItem.id ? { ...variant, bestSeller: checked } : variant
-                      );
-                      setVariants(updatedVariants);
-                    }}
-                  />
+                <div>
+                  <Label className="text-gray-600">Status</Label>
+                  <Badge variant={viewingVariant.status === 'Active' ? 'default' : 'secondary'}>
+                    {viewingVariant.status}
+                  </Badge>
                 </div>
               </div>
 
+              {/* Product & Category */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-gray-600">Product</Label>
+                  <p className="font-medium">{viewingVariant.productName}</p>
+                </div>
+                <div>
+                  <Label className="text-gray-600">Category/Species</Label>
+                  <p className="font-medium">{viewingVariant.categoryName}</p>
+                </div>
+              </div>
+
+              {/* Cut Type */}
+              <div>
+                <Label className="text-gray-600">Cut Type</Label>
+                <p className="font-medium">{viewingVariant.cutTypeName}</p>
+              </div>
+
+              {/* Badges */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-gray-600">Featured</Label>
+                  <div className="mt-1">
+                    <Badge variant={viewingVariant.featured ? 'default' : 'secondary'}>
+                      {viewingVariant.featured ? 'Yes' : 'No'}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-gray-600">Best Seller</Label>
+                  <div className="mt-1">
+                    <Badge variant={viewingVariant.bestSeller ? 'default' : 'secondary'}>
+                      {viewingVariant.bestSeller ? 'Yes' : 'No'}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pricing Information */}
               <div className="p-4 bg-blue-50 rounded-lg space-y-3">
                 <h4 className="font-semibold text-blue-900">Pricing Details</h4>
-                
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-xs text-gray-600">Cost Price (₹/KG)</Label>
-                    <Input value={selectedItem?.costPrice || ''} disabled className="bg-white" />
+                    <Label className="text-gray-600">Display Price</Label>
+                    <p className="font-semibold text-lg">₹{viewingVariant.displayPrice}</p>
                   </div>
                   <div>
-                    <Label className="text-xs text-gray-600">Profit %</Label>
-                    <Input value={selectedItem?.profit || ''} disabled className="bg-white" />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-600">Display Price (₹)</Label>
-                    <Input value={selectedItem?.displayPrice || ''} disabled className="bg-white" />
+                    <Label className="text-gray-600">Selling Price</Label>
+                    <p className="font-semibold text-lg text-green-600">₹{viewingVariant.sellingPrice}</p>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="variantDiscount">Discount %</Label>
-                    <Input
-                      id="variantDiscount"
-                      type="number"
-                      value={selectedItem?.discount || ''}
-                      readOnly
-                    />
+                    <Label className="text-gray-600">Profit Margin</Label>
+                    <p className="font-medium">{viewingVariant.profit}%</p>
                   </div>
                   <div>
-                    <Label className="text-xs text-gray-600">Selling Price (₹)</Label>
-                    <Input 
-                      value={selectedItem?.sellingPrice || ''} 
-                      disabled 
-                      className="bg-white font-semibold text-green-600" 
-                    />
+                    <Label className="text-gray-600">Discount</Label>
+                    <p className="font-medium">{viewingVariant.discount}%</p>
                   </div>
                 </div>
               </div>
 
+              {/* Notes */}
               <div>
-                <Label htmlFor="notes">Notes (Optional)</Label>
-                <Textarea
-                  id="notes"
-                  value={selectedItem?.notes || ''}
-                  readOnly
-                />
+                <Label className="text-gray-600">Notes</Label>
+                <p className="mt-1 text-gray-800">{viewingVariant.notes}</p>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              {/* Timestamps */}
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="variantAvailability">Availability</Label>
-                  <p className="text-sm text-gray-600">Make this variant available to users</p>
+                  <Label className="text-gray-600">Date Created</Label>
+                  <p className="font-medium">{viewingVariant.dateCreated}</p>
                 </div>
-                <Switch
-                  id="variantAvailability"
-                  checked={selectedItem?.availability}
-                  onCheckedChange={(checked: boolean) => {
-                    const updatedVariants = variants.map(variant => 
-                      variant.id === selectedItem.id ? { ...variant, availability: checked } : variant
-                    );
-                    setVariants(updatedVariants);
-                  }}
-                />
+                <div>
+                  <Label className="text-gray-600">Last Updated</Label>
+                  <p className="font-medium">{viewingVariant.lastUpdated}</p>
+                </div>
               </div>
             </div>
           )}
@@ -2226,8 +2748,7 @@ export default function InventoryManagement() {
                 if (activeTab === 'categories') {
                   handleDeleteCategory();
                 } else if (activeTab === 'products') {
-                  setProducts(products.filter(prod => prod.id !== selectedItem.id));
-                  setShowDeleteDialog(false);
+                  handleDeleteProduct();
                 } else if (activeTab === 'variants') {
                   setVariants(variants.filter(variant => variant.id !== selectedItem.id));
                   setShowDeleteDialog(false);
@@ -2236,7 +2757,7 @@ export default function InventoryManagement() {
               disabled={isSubmitting}
               className="bg-red-600 hover:bg-red-700"
             >
-              {isSubmitting && activeTab === 'categories' ? (
+              {isSubmitting ? (
                 <>
                   <Loader className="w-4 h-4 mr-2 animate-spin" />
                   Deleting...
@@ -2248,6 +2769,20 @@ export default function InventoryManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Toast Notifications */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </div>
   );
 }

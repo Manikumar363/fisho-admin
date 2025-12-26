@@ -9,6 +9,7 @@ import Dashboard from './components/modules/Dashboard';
 import UserManagement from './components/modules/UserManagement';
 import InventoryManagement from './components/modules/InventoryManagement';
 import AddInventoryItem from './components/modules/inventory/AddInventoryItem';
+import AddProductVariant from './components/modules/inventory/AddProductVariant';
 import OrdersManagement from './components/modules/OrdersManagement';
 import OrderDetails from './components/modules/OrderDetails';
 import Transactions from './components/modules/Transactions';
@@ -75,6 +76,7 @@ export default function App() {
                   <Route path="/user-management" element={<UserManagement />} />
                   <Route path="/inventory-management" element={<InventoryManagement />} />
                   <Route path="/inventory/add" element={<AddInventoryItem />} />
+                  <Route path="/inventory/add-variant" element={<AddProductVariant />} />
                   <Route path="/orders" element={<OrdersManagement />} />
                   <Route path="/orders/:orderId" element={<OrderDetails />} />
                   <Route path="/transactions" element={<Transactions />} />

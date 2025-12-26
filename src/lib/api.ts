@@ -28,9 +28,15 @@ export async function apiFetch<T = any>(path: string, init: RequestInit = {}): P
   const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
 
   const headers = new Headers(init.headers || {});
-  if (!headers.has('Content-Type') && init.body && !(init.body instanceof FormData)) {
+  
+  // For FormData, NEVER set Content-Type - browser sets it with boundary
+  if (init.body instanceof FormData) {
+    // Remove Content-Type if it was set
+    headers.delete('Content-Type');
+  } else if (!headers.has('Content-Type') && init.body) {
     headers.set('Content-Type', 'application/json');
   }
+  
   const token = getToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);
 

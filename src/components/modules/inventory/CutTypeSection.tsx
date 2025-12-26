@@ -312,15 +312,13 @@ export default function CutTypeSection({ openAdd, onAddClose }: CutTypeSectionPr
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-4">Serial No</th>
                   <th className="text-left py-3 px-4">Name</th>
-                  <th className="text-left py-3 px-4">Order</th>
-                  <th className="text-left py-3 px-4">Status</th>
                   <th className="text-left py-3 px-4">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-gray-500">
+                    <td colSpan={3} className="py-8 text-center text-gray-500">
                       <div className="inline-flex items-center gap-2">
                         <Loader className="w-4 h-4 animate-spin" />
                         Loading cut types...
@@ -329,25 +327,17 @@ export default function CutTypeSection({ openAdd, onAddClose }: CutTypeSectionPr
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-red-600">{error}</td>
+                    <td colSpan={3} className="py-8 text-center text-red-600">{error}</td>
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-gray-500">No cut types found</td>
+                    <td colSpan={3} className="py-8 text-center text-gray-500">No cut types found</td>
                   </tr>
                 ) : (
                   filtered.map((ct, index) => (
                     <tr key={ct.id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-3 px-4">{index + 1}</td>
                       <td className="py-3 px-4 font-medium">{ct.name}</td>
-                      <td className="py-3 px-4">{ct.order}</td>
-                      <td className="py-3 px-4">
-                        <span
-                          className={`inline-flex items-center rounded px-2 py-1 text-xs font-medium ${ct.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}
-                        >
-                          {ct.status}
-                        </span>
-                      </td>
                       <td className="py-3 px-4">
                         <div className="flex gap-2">
                           <button
@@ -505,20 +495,6 @@ export default function CutTypeSection({ openAdd, onAddClose }: CutTypeSectionPr
               <div>
                 <Label className="text-gray-600">Name</Label>
                 <p className="text-sm font-medium mt-1">{viewingCutType.name}</p>
-              </div>
-              <div>
-                <Label className="text-gray-600">Order</Label>
-                <p className="text-sm mt-1">{viewingCutType.order}</p>
-              </div>
-              <div>
-                <Label className="text-gray-600">Status</Label>
-                <p className="text-sm mt-1">
-                  <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                    viewingCutType.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {viewingCutType.status}
-                  </span>
-                </p>
               </div>
               <div>
                 <Label className="text-gray-600">Last Updated</Label>
