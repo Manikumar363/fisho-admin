@@ -37,6 +37,8 @@ export default function InventoryManagement() {
   const [categoryForm, setCategoryForm] = useState({
     speciesName: '',
     speciesIcon: null as File | null,
+    existingIcon: '',
+    existingIconUrl: '',
     availability: true
   });
 
@@ -45,6 +47,8 @@ export default function InventoryManagement() {
     category: '',
     productName: '',
     productImage: null as File | null,
+    existingImage: '',
+    existingImageUrl: '',
     description: '',
     nutritionFacts: '',
     cutTypes: [] as string[],
@@ -104,6 +108,7 @@ export default function InventoryManagement() {
   const [categories, setCategories] = useState<Array<{
     id: string;
     icon: string | any;
+    iconPath?: string;
     name: string;
     availability: 'Available' | 'Unavailable';
     dateCreated: string;
@@ -143,6 +148,7 @@ export default function InventoryManagement() {
           return {
             id: c._id,
             icon,
+            iconPath: raw,
             name: c.name,
             availability: (c.isActive ? 'Available' : 'Unavailable') as 'Available' | 'Unavailable',
             dateCreated: new Date(c.createdAt).toISOString().split('T')[0],
@@ -173,6 +179,7 @@ export default function InventoryManagement() {
   const [products, setProducts] = useState<Array<{
     id: string;
     image: string;
+    imagePath?: string;
     name: string;
     species: string;
     categoryId?: string;
@@ -255,6 +262,7 @@ export default function InventoryManagement() {
         return {
           id: (p as any)._id || p.id || cryptoRandomId(),
           image,
+          imagePath: raw,
           name: p.name,
           species,
           categoryId: p.category?._id,
@@ -398,6 +406,8 @@ export default function InventoryManagement() {
     setCategoryForm({
       speciesName: category.name,
       speciesIcon: null,
+      existingIcon: category.iconPath || '',
+      existingIconUrl: typeof category.icon === 'string' && category.icon !== '🗂️' ? category.icon : '',
       availability: category.availability === 'Available'
     });
     setShowAddModal(true);
@@ -491,11 +501,13 @@ export default function InventoryManagement() {
     // Reset forms
     setEditingCategoryId(null);
     setEditingProductId(null);
-    setCategoryForm({ speciesName: '', speciesIcon: null, availability: true });
+    setCategoryForm({ speciesName: '', speciesIcon: null, existingIcon: '', existingIconUrl: '', availability: true });
     setProductForm({
       category: '',
       productName: '',
       productImage: null,
+      existingImage: '',
+      existingImageUrl: '',
       description: '',
       nutritionFacts: '',
       cutTypes: [],
@@ -572,6 +584,7 @@ export default function InventoryManagement() {
         const categoryData = {
           id: res.category._id,
           icon: IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${res.category.image}` : res.category.image,
+          iconPath: res.category.image,
           name: res.category.name,
           availability: (res.category.isActive ? 'Available' : 'Unavailable') as 'Available' | 'Unavailable',
           dateCreated: new Date(res.category.createdAt).toISOString().split('T')[0],
@@ -587,7 +600,7 @@ export default function InventoryManagement() {
           toast.success('Category added successfully');
         }
 
-        setCategoryForm({ speciesName: '', speciesIcon: null, availability: true });
+        setCategoryForm({ speciesName: '', speciesIcon: null, existingIcon: '', existingIconUrl: '', availability: true });
         setEditingCategoryId(null);
         setShowAddModal(false);
       } catch (e: any) {
@@ -663,6 +676,9 @@ export default function InventoryManagement() {
         formData.append('isActive', String(productForm.availability));
         if (productForm.productImage) {
           formData.append('image', productForm.productImage);
+        } else if (productForm.existingImage) {
+          // Preserve existing image on edit when no new file is provided
+          formData.append('existingImage', productForm.existingImage);
         }
         productForm.cutTypes.forEach((cutTypeId) => {
           formData.append('availableCutTypes[]', cutTypeId);
@@ -685,6 +701,8 @@ export default function InventoryManagement() {
           category: '',
           productName: '',
           productImage: null,
+          existingImage: '',
+          existingImageUrl: '',
           description: '',
           nutritionFacts: '',
           cutTypes: [],
@@ -716,7 +734,12 @@ export default function InventoryManagement() {
     return (
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <Label htmlFor="speciesName">Species Name *</Label>
+          <Label
+            htmlFor="speciesName"
+            className="block text-sm font-medium text-gray-900 mb-2"
+          >
+            Species Name *
+          </Label>
           <Input
             id="speciesName"
             value={categoryForm.speciesName}
@@ -728,7 +751,12 @@ export default function InventoryManagement() {
         </div>
 
         <div>
-          <Label htmlFor="speciesIcon">Species Icon {!isEdit && '*'}</Label>
+          <Label
+            htmlFor="speciesIcon"
+            className="block text-sm font-medium text-gray-900 mb-2"
+          >
+            Species Icon {!isEdit && '*'}
+          </Label>
           <Input
             id="speciesIcon"
             type="file"
@@ -737,6 +765,16 @@ export default function InventoryManagement() {
             required={!isEdit}
             disabled={isSubmitting}
           />
+          {categoryForm.existingIconUrl && !categoryForm.speciesIcon && (
+            <div className="mt-2 text-sm text-gray-600 flex items-center gap-3">
+              <ImageWithFallback
+                src={categoryForm.existingIconUrl}
+                alt={categoryForm.speciesName || 'Current category icon'}
+                className="w-14 h-14 rounded object-cover border"
+              />
+              <span>Current icon will be kept unless you upload a new one.</span>
+            </div>
+          )}
           <p className="text-sm text-gray-500 mt-1">
             {isEdit ? 'Upload a new icon to replace the current one (optional)' : 'Upload an icon or image for this species'}
           </p>
@@ -820,6 +858,16 @@ export default function InventoryManagement() {
           required={!editingProductId}
           disabled={isSubmitting}
         />
+        {productForm.existingImageUrl && !productForm.productImage && (
+          <div className="mt-2 text-sm text-gray-600 flex items-center gap-3">
+            <ImageWithFallback
+              src={productForm.existingImageUrl}
+              alt={productForm.productName || 'Current product image'}
+              className="w-14 h-14 rounded object-cover border"
+            />
+            <span>Current image will be kept unless you upload a new one.</span>
+          </div>
+        )}
       </div>
 
       <div>
@@ -1212,6 +1260,31 @@ export default function InventoryManagement() {
     cuttypes: 'Cut Types',
   };
 
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredCategories = !normalizedQuery
+    ? categories
+    : categories.filter((cat) =>
+        [cat.name, cat.availability, cat.dateCreated, cat.lastUpdated]
+          .filter(Boolean)
+          .some((field) => String(field).toLowerCase().includes(normalizedQuery))
+      );
+
+  const filteredProducts = !normalizedQuery
+    ? products
+    : products.filter((prod) =>
+        [prod.name, prod.species, prod.status]
+          .filter(Boolean)
+          .some((field) => String(field).toLowerCase().includes(normalizedQuery))
+      );
+
+  const filteredVariants = !normalizedQuery
+    ? variants
+    : variants.filter((variant) =>
+        [variant.variantName, variant.product, variant.species, variant.cutType, variant.status]
+          .filter(Boolean)
+          .some((field) => String(field).toLowerCase().includes(normalizedQuery))
+      );
+
   return (
     <div className="space-y-6">
       {/* Breadcrumbs */}
@@ -1261,17 +1334,13 @@ export default function InventoryManagement() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
-                <Button variant="outline">
-                  <Filter className="w-4 h-4 mr-2" />
-                  Filters
-                </Button>
               </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>All Categories ({categories.length})</CardTitle>
+              <CardTitle>All Categories ({filteredCategories.length} of {categories.length})</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -1303,32 +1372,34 @@ export default function InventoryManagement() {
                         <tr>
                           <td colSpan={8} className="py-8 text-center text-red-600">{categoriesError}</td>
                         </tr>
-                      ) : categories.length === 0 ? (
+                      ) : filteredCategories.length === 0 ? (
                         <tr>
                           <td colSpan={8} className="py-8 text-center text-gray-500">No categories found</td>
                         </tr>
                       ) : (
-                        categories.map((category, index) => (
+                        filteredCategories.map((category, index) => {
+                          const originalIndex = categories.findIndex((cat) => cat.id === category.id);
+                          return (
                           <tr key={category.id} className="border-b border-gray-100 hover:bg-gray-50">
                             <td className="py-3 px-4">
                               <div className="flex flex-col gap-1">
                                 <button
-                                  onClick={() => moveCategory(index, 'up')}
-                                  disabled={index === 0}
-                                  className={`p-1 rounded ${index === 0 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
+                                  onClick={() => moveCategory(originalIndex, 'up')}
+                                  disabled={originalIndex === 0}
+                                  className={`p-1 rounded ${originalIndex === 0 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
                                 >
                                   <ChevronUp className="w-4 h-4" />
                                 </button>
                                 <button
-                                  onClick={() => moveCategory(index, 'down')}
-                                  disabled={index === categories.length - 1}
-                                  className={`p-1 rounded ${index === categories.length - 1 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
+                                  onClick={() => moveCategory(originalIndex, 'down')}
+                                  disabled={originalIndex === categories.length - 1}
+                                  className={`p-1 rounded ${originalIndex === categories.length - 1 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
                                 >
                                   <ChevronDown className="w-4 h-4" />
                                 </button>
                               </div>
                             </td>
-                            <td className="py-3 px-4">{index + 1}</td>
+                            <td className="py-3 px-4">{originalIndex + 1}</td>
                             <td className="py-3 px-4">
                               {typeof category.icon === 'string' && (category.icon.startsWith('http') || category.icon.startsWith('/')) ? (
                                 <ImageWithFallback src={category.icon} alt={String(category.name)} className="w-10 h-10 rounded object-cover" />
@@ -1368,7 +1439,7 @@ export default function InventoryManagement() {
                               </div>
                             </td>
                           </tr>
-                        ))
+                        )})
                       )}
                   </tbody>
                 </table>
@@ -1391,17 +1462,13 @@ export default function InventoryManagement() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
-                <Button variant="outline">
-                  <Filter className="w-4 h-4 mr-2" />
-                  Filters
-                </Button>
               </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>All Products ({products.length})</CardTitle>
+              <CardTitle>All Products ({filteredProducts.length} of {products.length})</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -1437,31 +1504,33 @@ export default function InventoryManagement() {
                       <tr>
                         <td colSpan={13} className="py-8 text-center text-red-600">{productsError}</td>
                       </tr>
-                    ) : products.length === 0 ? (
+                    ) : filteredProducts.length === 0 ? (
                       <tr>
                         <td colSpan={13} className="py-8 text-center text-gray-500">No products found</td>
                       </tr>
-                    ) : products.map((product, index) => (
+                    ) : filteredProducts.map((product, index) => {
+                      const originalIndex = products.findIndex((p) => p.id === product.id);
+                      return (
                       <tr key={product.id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-3 px-4">
                           <div className="flex flex-col gap-1">
                             <button
-                              onClick={() => moveProduct(index, 'up')}
-                              disabled={index === 0}
-                              className={`p-1 rounded ${index === 0 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
+                              onClick={() => moveProduct(originalIndex, 'up')}
+                              disabled={originalIndex === 0}
+                              className={`p-1 rounded ${originalIndex === 0 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
                             >
                               <ChevronUp className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => moveProduct(index, 'down')}
-                              disabled={index === products.length - 1}
-                              className={`p-1 rounded ${index === products.length - 1 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
+                              onClick={() => moveProduct(originalIndex, 'down')}
+                              disabled={originalIndex === products.length - 1}
+                              className={`p-1 rounded ${originalIndex === products.length - 1 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
                             >
                               <ChevronDown className="w-4 h-4" />
                             </button>
                           </div>
                         </td>
-                        <td className="py-3 px-4">{index + 1}</td>
+                        <td className="py-3 px-4">{originalIndex + 1}</td>
                         <td className="py-3 px-4">
                           <ImageWithFallback
                             src={product.image || 'https://via.placeholder.com/50'}
@@ -1507,6 +1576,8 @@ export default function InventoryManagement() {
                                   category: product.categoryId || '',
                                   productName: product.name,
                                   productImage: null,
+                                  existingImage: product.imagePath || '',
+                                  existingImageUrl: product.image || '',
                                   description: product.description || '',
                                   nutritionFacts: product.nutritionFacts || '',
                                   cutTypes: product.cutTypeIds || [],
@@ -1530,7 +1601,7 @@ export default function InventoryManagement() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
               </div>
@@ -1552,17 +1623,13 @@ export default function InventoryManagement() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
-                <Button variant="outline">
-                  <Filter className="w-4 h-4 mr-2" />
-                  Filters
-                </Button>
               </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>All Product Variants ({variants.length})</CardTitle>
+              <CardTitle>All Product Variants ({filteredVariants.length} of {variants.length})</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -1588,27 +1655,33 @@ export default function InventoryManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {variants.map((variant, index) => (
+                    {filteredVariants.length === 0 ? (
+                      <tr>
+                        <td colSpan={16} className="py-8 text-center text-gray-500">No variants found</td>
+                      </tr>
+                    ) : filteredVariants.map((variant, index) => {
+                      const originalIndex = variants.findIndex((v) => v.id === variant.id);
+                      return (
                       <tr key={variant.id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-3 px-4">
                           <div className="flex flex-col gap-1">
                             <button
-                              onClick={() => moveVariant(index, 'up')}
-                              disabled={index === 0}
-                              className={`p-1 rounded ${index === 0 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
+                              onClick={() => moveVariant(originalIndex, 'up')}
+                              disabled={originalIndex === 0}
+                              className={`p-1 rounded ${originalIndex === 0 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
                             >
                               <ChevronUp className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => moveVariant(index, 'down')}
-                              disabled={index === variants.length - 1}
-                              className={`p-1 rounded ${index === variants.length - 1 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
+                              onClick={() => moveVariant(originalIndex, 'down')}
+                              disabled={originalIndex === variants.length - 1}
+                              className={`p-1 rounded ${originalIndex === variants.length - 1 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
                             >
                               <ChevronDown className="w-4 h-4" />
                             </button>
                           </div>
                         </td>
-                        <td className="py-3 px-4">{index + 1}</td>
+                        <td className="py-3 px-4">{originalIndex + 1}</td>
                         <td className="py-3 px-4">{variant.variantName}</td>
                         <td className="py-3 px-4">{variant.product}</td>
                         <td className="py-3 px-4">{variant.species}</td>
@@ -1649,7 +1722,7 @@ export default function InventoryManagement() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
               </div>
