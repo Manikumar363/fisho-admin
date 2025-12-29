@@ -167,6 +167,8 @@ export default function InventoryManagement() {
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
   const [isReordering, setIsReordering] = useState(false);
+  const [draggedCategoryIndex, setDraggedCategoryIndex] = useState<number | null>(null);
+  const [dragOverCategoryIndex, setDragOverCategoryIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -520,6 +522,69 @@ export default function InventoryManagement() {
     } finally {
       setIsReordering(false);
     }
+  };
+
+  const handleDragStart = (index: number) => {
+    setDraggedCategoryIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDragOverCategoryIndex(index);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverCategoryIndex(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    
+    if (draggedCategoryIndex === null || draggedCategoryIndex === dropIndex || isReordering) {
+      setDraggedCategoryIndex(null);
+      setDragOverCategoryIndex(null);
+      return;
+    }
+
+    const previous = [...categories];
+    const reordered = [...categories];
+    const [movedItem] = reordered.splice(draggedCategoryIndex, 1);
+    reordered.splice(dropIndex, 0, movedItem);
+    
+    setCategories(reordered);
+    setDraggedCategoryIndex(null);
+    setDragOverCategoryIndex(null);
+    setIsReordering(true);
+
+    try {
+      const body = {
+        id: String(movedItem.id),
+        from: draggedCategoryIndex + 1,
+        to: dropIndex + 1,
+      };
+      const res = await apiFetch<{ success: boolean; message?: string }>(
+        '/api/categories/reorder',
+        {
+          method: 'PUT',
+          body: JSON.stringify(body),
+        }
+      );
+      if (!res?.success) {
+        throw new Error(res?.message || 'Failed to reorder category');
+      }
+      toast.success(res?.message || 'Category reordered successfully');
+    } catch (e: any) {
+      setCategories(previous);
+      const msg = e?.message || 'Failed to reorder category';
+      toast.error(msg);
+    } finally {
+      setIsReordering(false);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedCategoryIndex(null);
+    setDragOverCategoryIndex(null);
   };
 
   const moveProduct = (index: number, direction: 'up' | 'down') => {
@@ -1926,21 +1991,37 @@ export default function InventoryManagement() {
                       ) : (
                         filteredCategories.map((category, index) => {
                           const originalIndex = categories.findIndex((cat) => cat.id === category.id);
+                          const isDragging = draggedCategoryIndex === originalIndex;
+                          const isDragOver = dragOverCategoryIndex === originalIndex;
                           return (
-                          <tr key={category.id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <tr 
+                            key={category.id} 
+                            className={`border-b border-gray-100 transition-all ${
+                              isDragging ? 'opacity-50 bg-blue-50' : 
+                              isDragOver ? 'bg-blue-100 border-blue-300' : 
+                              'hover:bg-gray-50'
+                            }`}
+                            draggable={!isReordering}
+                            onDragStart={() => handleDragStart(originalIndex)}
+                            onDragOver={(e) => handleDragOver(e, originalIndex)}
+                            onDragLeave={handleDragLeave}
+                            onDrop={(e) => handleDrop(e, originalIndex)}
+                            onDragEnd={handleDragEnd}
+                            style={{ cursor: isReordering ? 'not-allowed' : 'grab' }}
+                          >
                             <td className="py-3 px-4">
                               <div className="flex flex-col gap-1">
                                 <button
                                   onClick={() => moveCategory(originalIndex, 'up')}
-                                  disabled={originalIndex === 0}
-                                  className={`p-1 rounded ${originalIndex === 0 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
+                                  disabled={originalIndex === 0 || isReordering}
+                                  className={`p-1 rounded ${originalIndex === 0 || isReordering ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
                                 >
                                   <ChevronUp className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={() => moveCategory(originalIndex, 'down')}
-                                  disabled={originalIndex === categories.length - 1}
-                                  className={`p-1 rounded ${originalIndex === categories.length - 1 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
+                                  disabled={originalIndex === categories.length - 1 || isReordering}
+                                  className={`p-1 rounded ${originalIndex === categories.length - 1 || isReordering ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
                                 >
                                   <ChevronDown className="w-4 h-4" />
                                 </button>
