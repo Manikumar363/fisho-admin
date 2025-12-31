@@ -610,10 +610,11 @@ export default function InventoryManagement() {
   const handleAddCutType = (cutTypeId: string) => {
     if (!cutTypeId) return;
     setProductForm((prev) => {
-      if (prev.cutTypes.includes(cutTypeId)) return prev;
+      if (prev.cutTypes.includes(cutTypeId)) return { ...prev, currentCutType: '' };
       return {
         ...prev,
         cutTypes: [...prev.cutTypes, cutTypeId],
+        currentCutType: '' // Reset after add
       };
     });
   };
@@ -828,6 +829,7 @@ export default function InventoryManagement() {
     }
   };
 
+
   const handleDeleteProduct = async () => {
     if (!selectedItem || activeTab !== 'products') return;
 
@@ -853,6 +855,37 @@ export default function InventoryManagement() {
     } catch (e: any) {
       const msg = e?.message || 'Failed to delete product';
       console.error('Delete product error:', e);
+      toast.error(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Delete Product Variant
+  const handleDeleteVariant = async () => {
+    if (!selectedItem || activeTab !== 'variants') return;
+    setIsSubmitting(true);
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        variant?: {
+          _id: string;
+          isDeleted: boolean;
+        };
+        message?: string;
+      }>(`/api/variants/${selectedItem.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.success) throw new Error(res.message || 'Failed to delete variant');
+
+      setVariants(variants.filter(variant => variant.id !== selectedItem.id));
+      toast.success(res.message || 'Variant deleted successfully');
+      setShowDeleteDialog(false);
+      setSelectedItem(null);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to delete variant';
+      console.error('Delete variant error:', e);
       toast.error(msg);
     } finally {
       setIsSubmitting(false);
@@ -1374,6 +1407,7 @@ export default function InventoryManagement() {
 
   const renderProductModal = () => (
     <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto">
+      <h2 className="text-lg font-semibold mb-4">{editingProductId ? 'Edit Product' : 'Add New Products'}</h2>
       <div className="grid grid-cols-2 gap-4">
         <div>
           <Label htmlFor="category">Select Category *</Label>
@@ -1897,6 +1931,13 @@ export default function InventoryManagement() {
           .some((field) => String(field).toLowerCase().includes(normalizedQuery))
       );
 
+  // Reset cut type add dialog when switching tabs
+  useEffect(() => {
+    if (activeTab !== 'cuttypes' && openCutTypeAdd) {
+      setOpenCutTypeAdd(false);
+    }
+  }, [activeTab]);
+
   return (
     <div className="space-y-6">
       {/* Breadcrumbs */}
@@ -2272,7 +2313,7 @@ export default function InventoryManagement() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-4">Reorder</th>
+                      {/* <th className="text-left py-3 px-4">Reorder</th> */}
                       <th className="text-left py-3 px-4">Serial No</th>
                       <th className="text-left py-3 px-4">Image</th>
                       <th className="text-left py-3 px-4">Variant Name</th>
@@ -2294,13 +2335,13 @@ export default function InventoryManagement() {
                   <tbody>
                     {filteredVariants.length === 0 ? (
                       <tr>
-                        <td colSpan={17} className="py-8 text-center text-gray-500">Variants Loading</td>
+                        <td colSpan={16} className="py-8 text-center text-gray-500">Variants Loading</td>
                       </tr>
                     ) : filteredVariants.map((variant, index) => {
                       const originalIndex = variants.findIndex((v) => v.id === variant.id);
                       return (
                       <tr key={variant.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-3 px-4">
+                        {/* <td className="py-3 px-4">
                           <div className="flex flex-col gap-1">
                             <button
                               onClick={() => moveVariant(originalIndex, 'up')}
@@ -2317,7 +2358,7 @@ export default function InventoryManagement() {
                               <ChevronDown className="w-4 h-4" />
                             </button>
                           </div>
-                        </td>
+                        </td> */}
                         <td className="py-3 px-4">{originalIndex + 1}</td>
                         <td className="py-3 px-4">
                           {variant.image ? (
@@ -2375,7 +2416,14 @@ export default function InventoryManagement() {
                             >
                               <Edit className="w-4 h-4 text-blue-600" />
                             </button>
-                            <button className="p-1 hover:bg-gray-100 rounded" title="Delete variant">
+                            <button
+                              className="p-1 hover:bg-gray-100 rounded"
+                              title="Delete variant"
+                              onClick={() => {
+                                setSelectedItem(variant);
+                                setShowDeleteDialog(true);
+                              }}
+                            >
                               <Trash2 className="w-4 h-4 text-red-600" />
                             </button>
                           </div>
@@ -2391,7 +2439,7 @@ export default function InventoryManagement() {
 
         {/* Cut Types Tab */}
         <TabsContent value="cuttypes" className="space-y-4">
-          <CutTypeSection openAdd={openCutTypeAdd} onAddClose={() => setOpenCutTypeAdd(false)} />
+          <CutTypeSection openAdd={openCutTypeAdd} onAddClose={() => setOpenCutTypeAdd(false)} resetAdd={() => setOpenCutTypeAdd(false)} />
         </TabsContent>
       </Tabs>
 
@@ -2424,306 +2472,308 @@ export default function InventoryManagement() {
       {/* View Modal */}
       <Dialog open={showViewModal} onOpenChange={setShowViewModal}>
         <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>
-              View {activeTab === 'categories' ? 'Category' : activeTab === 'products' ? 'Product' : 'Product Variant'}
-            </DialogTitle>
-          </DialogHeader>
-          {activeTab === 'categories' && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="speciesName">Species Name</Label>
-                <Input
-                  id="speciesName"
-                  value={selectedItem?.name || ''}
-                  readOnly
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="speciesIcon">Species Icon</Label>
-                <Input
-                  id="speciesIcon"
-                  type="file"
-                  accept="image/*"
-                  readOnly
-                />
-                <p className="text-sm text-gray-500 mt-1">Upload an icon or image for this species</p>
-              </div>
-
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+          <div style={{ maxHeight: '80vh', overflowY: 'auto', padding: 24 }}>
+            <DialogHeader>
+              <DialogTitle>
+                View {activeTab === 'categories' ? 'Category' : activeTab === 'products' ? 'Product' : 'Product Variant'}
+              </DialogTitle>
+            </DialogHeader>
+            {activeTab === 'categories' && (
+              <div className="space-y-4">
                 <div>
-                  <Label htmlFor="availability">Availability</Label>
-                  <p className="text-sm text-gray-600">Make this category available to users</p>
-                </div>
-                <Switch
-                  id="availability"
-                  checked={selectedItem?.availability === 'Available'}
-                  onCheckedChange={(checked: boolean) => {
-                    const updatedCategories = categories.map(cat => 
-                      cat.id === selectedItem.id ? { ...cat, availability: (checked ? 'Available' : 'Unavailable') as 'Available' | 'Unavailable' } : cat
-                    );
-                    setCategories(updatedCategories);
-                  }}
-                />
-              </div>
-            </div>
-          )}
-          {activeTab === 'products' && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="species">Select Species</Label>
-                <Select value={selectedItem?.species || ''} onValueChange={(value: string) => {
-                  const updatedProducts = products.map(prod => 
-                    prod.id === selectedItem.id ? { ...prod, species: value } : prod
-                  );
-                  setProducts(updatedProducts);
-                }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose species" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="prawns">Prawns</SelectItem>
-                    <SelectItem value="fish">Fish</SelectItem>
-                    <SelectItem value="crab">Crab</SelectItem>
-                    <SelectItem value="squid">Squid</SelectItem>
-                    <SelectItem value="lobster">Lobster</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="productName">Product Name</Label>
-                <Input
-                  id="productName"
-                  value={selectedItem?.name || ''}
-                  readOnly
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="productImage">Product Image</Label>
-                <Input
-                  id="productImage"
-                  type="file"
-                  accept="image/*"
-                  readOnly
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={selectedItem?.description || ''}
-                  readOnly
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="nutritionFacts">Nutrition Facts</Label>
-                <Textarea
-                  id="nutritionFacts"
-                  value={selectedItem?.nutritionFacts || ''}
-                  readOnly
-                />
-              </div>
-
-              <div>
-                <Label>Available Cut Types</Label>
-                <div className="flex flex-wrap gap-2">
-                  {(selectedItem?.cutTypes || []).map((cutType: string, index: number) => {
-                    const cutTypeName = cutTypesData.find(ct => ct._id === cutType)?.name || cutType;
-                    return (
-                      <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                        {cutTypeName}
-                      </Badge>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="availableStock">Available Stock (KG)</Label>
+                  <Label htmlFor="speciesName">Species Name</Label>
                   <Input
-                    id="availableStock"
-                    type="number"
-                    value={selectedItem?.stock || ''}
+                    id="speciesName"
+                    value={selectedItem?.name || ''}
                     readOnly
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="costPricePerKg">Cost Price Per KG (₹)</Label>
+                  <Label htmlFor="speciesIcon">Species Icon</Label>
                   <Input
-                    id="costPricePerKg"
-                    type="number"
-                    value={selectedItem?.costPrice || ''}
+                    id="speciesIcon"
+                    type="file"
+                    accept="image/*"
                     readOnly
+                  />
+                  <p className="text-sm text-gray-500 mt-1">Upload an icon or image for this species</p>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div>
+                    <Label htmlFor="availability">Availability</Label>
+                    <p className="text-sm text-gray-600">Make this category available to users</p>
+                  </div>
+                  <Switch
+                    id="availability"
+                    checked={selectedItem?.availability === 'Available'}
+                    onCheckedChange={(checked: boolean) => {
+                      const updatedCategories = categories.map(cat => 
+                        cat.id === selectedItem.id ? { ...cat, availability: (checked ? 'Available' : 'Unavailable') as 'Available' | 'Unavailable' } : cat
+                      );
+                      setCategories(updatedCategories);
+                    }}
                   />
                 </div>
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
+            )}
+            {activeTab === 'products' && (
+              <div className="space-y-4">
                 <div>
-                  <Label htmlFor="defaultProfit">Default Profit %</Label>
-                  <Input
-                    id="defaultProfit"
-                    type="number"
-                    value={selectedItem?.profit || ''}
-                    readOnly
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="defaultDiscount">Default Discount %</Label>
-                  <Input
-                    id="defaultDiscount"
-                    type="number"
-                    value={selectedItem?.discount || ''}
-                    readOnly
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div>
-                  <Label htmlFor="productAvailability">Availability</Label>
-                  <p className="text-sm text-gray-600">Make this product available to users</p>
-                </div>
-                <Switch
-                  id="productAvailability"
-                  checked={selectedItem?.availability}
-                  onCheckedChange={(checked: boolean) => {
+                  <Label htmlFor="species">Select Species</Label>
+                  <Select value={selectedItem?.species || ''} onValueChange={(value: string) => {
                     const updatedProducts = products.map(prod => 
-                      prod.id === selectedItem.id ? { ...prod, availability: checked } : prod
+                      prod.id === selectedItem.id ? { ...prod, species: value } : prod
                     );
                     setProducts(updatedProducts);
-                  }}
-                />
-              </div>
-            </div>
-          )}
-          {activeTab === 'variants' && isLoadingVariantView && (
-            <div className="flex justify-center items-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            </div>
-          )}
-          {activeTab === 'variants' && !isLoadingVariantView && viewingVariant && (
-            <div className="space-y-6">
-              {/* Variant Image */}
-              {viewingVariant.image && (
-                <div className="flex justify-center">
-                  <ImageWithFallback
-                    src={viewingVariant.image}
-                    alt={viewingVariant.name}
-                    className="w-48 h-48 object-cover rounded-lg border"
+                  }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose species" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="prawns">Prawns</SelectItem>
+                      <SelectItem value="fish">Fish</SelectItem>
+                      <SelectItem value="crab">Crab</SelectItem>
+                      <SelectItem value="squid">Squid</SelectItem>
+                      <SelectItem value="lobster">Lobster</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="productName">Product Name</Label>
+                  <Input
+                    id="productName"
+                    value={selectedItem?.name || ''}
+                    readOnly
                   />
                 </div>
-              )}
 
-              {/* Basic Information */}
-              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-gray-600">Variant Name</Label>
-                  <p className="font-medium">{viewingVariant.name}</p>
+                  <Label htmlFor="productImage">Product Image</Label>
+                  <Input
+                    id="productImage"
+                    type="file"
+                    accept="image/*"
+                    readOnly
+                  />
                 </div>
+
                 <div>
-                  <Label className="text-gray-600">Status</Label>
-                  <Badge variant={viewingVariant.status === 'Active' ? 'default' : 'secondary'}>
-                    {viewingVariant.status}
-                  </Badge>
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={selectedItem?.description || ''}
+                    readOnly
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="nutritionFacts">Nutrition Facts</Label>
+                  <Textarea
+                    id="nutritionFacts"
+                    value={selectedItem?.nutritionFacts || ''}
+                    readOnly
+                  />
+                </div>
+
+                <div>
+                  <Label>Available Cut Types</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {(selectedItem?.cutTypes || []).map((cutType: string, index: number) => {
+                      const cutTypeName = cutTypesData.find(ct => ct._id === cutType)?.name || cutType;
+                      return (
+                        <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                          {cutTypeName}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="availableStock">Available Stock (KG)</Label>
+                    <Input
+                      id="availableStock"
+                      type="number"
+                      value={selectedItem?.stock || ''}
+                      readOnly
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="costPricePerKg">Cost Price Per KG (₹)</Label>
+                    <Input
+                      id="costPricePerKg"
+                      type="number"
+                      value={selectedItem?.costPrice || ''}
+                      readOnly
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="defaultProfit">Default Profit %</Label>
+                    <Input
+                      id="defaultProfit"
+                      type="number"
+                      value={selectedItem?.profit || ''}
+                      readOnly
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="defaultDiscount">Default Discount %</Label>
+                    <Input
+                      id="defaultDiscount"
+                      type="number"
+                      value={selectedItem?.discount || ''}
+                      readOnly
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div>
+                    <Label htmlFor="productAvailability">Availability</Label>
+                    <p className="text-sm text-gray-600">Make this product available to users</p>
+                  </div>
+                  <Switch
+                    id="productAvailability"
+                    checked={selectedItem?.availability}
+                    onCheckedChange={(checked: boolean) => {
+                      const updatedProducts = products.map(prod => 
+                        prod.id === selectedItem.id ? { ...prod, availability: checked } : prod
+                      );
+                      setProducts(updatedProducts);
+                    }}
+                  />
                 </div>
               </div>
-
-              {/* Product & Category */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-gray-600">Product</Label>
-                  <p className="font-medium">{viewingVariant.productName}</p>
-                </div>
-                <div>
-                  <Label className="text-gray-600">Category/Species</Label>
-                  <p className="font-medium">{viewingVariant.categoryName}</p>
-                </div>
+            )}
+            {activeTab === 'variants' && isLoadingVariantView && (
+              <div className="flex justify-center items-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
               </div>
+            )}
+            {activeTab === 'variants' && !isLoadingVariantView && viewingVariant && (
+              <div className="space-y-6">
+                {/* Variant Image */}
+                {viewingVariant.image && (
+                  <div className="flex justify-center">
+                    <ImageWithFallback
+                      src={viewingVariant.image}
+                      alt={viewingVariant.name}
+                      className="w-48 h-48 object-cover rounded-lg border"
+                    />
+                  </div>
+                )}
 
-              {/* Cut Type */}
-              <div>
-                <Label className="text-gray-600">Cut Type</Label>
-                <p className="font-medium">{viewingVariant.cutTypeName}</p>
-              </div>
-
-              {/* Badges */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-gray-600">Featured</Label>
-                  <div className="mt-1">
-                    <Badge variant={viewingVariant.featured ? 'default' : 'secondary'}>
-                      {viewingVariant.featured ? 'Yes' : 'No'}
+                {/* Basic Information */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-600">Variant Name</Label>
+                    <p className="font-medium">{viewingVariant.name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-600">Status</Label>
+                    <Badge variant={viewingVariant.status === 'Active' ? 'default' : 'secondary'}>
+                      {viewingVariant.status}
                     </Badge>
                   </div>
                 </div>
-                <div>
-                  <Label className="text-gray-600">Best Seller</Label>
-                  <div className="mt-1">
-                    <Badge variant={viewingVariant.bestSeller ? 'default' : 'secondary'}>
-                      {viewingVariant.bestSeller ? 'Yes' : 'No'}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
 
-              {/* Pricing Information */}
-              <div className="p-4 bg-blue-50 rounded-lg space-y-3">
-                <h4 className="font-semibold text-blue-900">Pricing Details</h4>
+                {/* Product & Category */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-gray-600">Display Price</Label>
-                    <p className="font-semibold text-lg">₹{viewingVariant.displayPrice}</p>
+                    <Label className="text-gray-600">Product</Label>
+                    <p className="font-medium">{viewingVariant.productName}</p>
                   </div>
                   <div>
-                    <Label className="text-gray-600">Selling Price</Label>
-                    <p className="font-semibold text-lg text-green-600">₹{viewingVariant.sellingPrice}</p>
+                    <Label className="text-gray-600">Category/Species</Label>
+                    <p className="font-medium">{viewingVariant.categoryName}</p>
                   </div>
                 </div>
+
+                {/* Cut Type */}
+                <div>
+                  <Label className="text-gray-600">Cut Type</Label>
+                  <p className="font-medium">{viewingVariant.cutTypeName}</p>
+                </div>
+
+                {/* Badges */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-gray-600">Profit Margin</Label>
-                    <p className="font-medium">{viewingVariant.profit}%</p>
+                    <Label className="text-gray-600">Featured</Label>
+                    <div className="mt-1">
+                      <Badge variant={viewingVariant.featured ? 'default' : 'secondary'}>
+                        {viewingVariant.featured ? 'Yes' : 'No'}
+                      </Badge>
+                    </div>
                   </div>
                   <div>
-                    <Label className="text-gray-600">Discount</Label>
-                    <p className="font-medium">{viewingVariant.discount}%</p>
+                    <Label className="text-gray-600">Best Seller</Label>
+                    <div className="mt-1">
+                      <Badge variant={viewingVariant.bestSeller ? 'default' : 'secondary'}>
+                        {viewingVariant.bestSeller ? 'Yes' : 'No'}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pricing Information */}
+                <div className="p-4 bg-blue-50 rounded-lg space-y-3">
+                  <h4 className="font-semibold text-blue-900">Pricing Details</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-gray-600">Display Price</Label>
+                      <p className="font-semibold text-lg">₹{viewingVariant.displayPrice}</p>
+                    </div>
+                    <div>
+                      <Label className="text-gray-600">Selling Price</Label>
+                      <p className="font-semibold text-lg text-green-600">₹{viewingVariant.sellingPrice}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-gray-600">Profit Margin</Label>
+                      <p className="font-medium">{viewingVariant.profit}%</p>
+                    </div>
+                    <div>
+                      <Label className="text-gray-600">Discount</Label>
+                      <p className="font-medium">{viewingVariant.discount}%</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <Label className="text-gray-600">Notes</Label>
+                  <p className="mt-1 text-gray-800">{viewingVariant.notes}</p>
+                </div>
+
+                {/* Timestamps */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-600">Date Created</Label>
+                    <p className="font-medium">{viewingVariant.dateCreated}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-600">Last Updated</Label>
+                    <p className="font-medium">{viewingVariant.lastUpdated}</p>
                   </div>
                 </div>
               </div>
-
-              {/* Notes */}
-              <div>
-                <Label className="text-gray-600">Notes</Label>
-                <p className="mt-1 text-gray-800">{viewingVariant.notes}</p>
-              </div>
-
-              {/* Timestamps */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-gray-600">Date Created</Label>
-                  <p className="font-medium">{viewingVariant.dateCreated}</p>
-                </div>
-                <div>
-                  <Label className="text-gray-600">Last Updated</Label>
-                  <p className="font-medium">{viewingVariant.lastUpdated}</p>
-                </div>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setShowViewModal(false)}>
-              Close
-            </Button>
-          </DialogFooter>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowViewModal(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -2831,8 +2881,7 @@ export default function InventoryManagement() {
                 } else if (activeTab === 'products') {
                   handleDeleteProduct();
                 } else if (activeTab === 'variants') {
-                  setVariants(variants.filter(variant => variant.id !== selectedItem.id));
-                  setShowDeleteDialog(false);
+                  handleDeleteVariant();
                 }
               }}
               disabled={isSubmitting}

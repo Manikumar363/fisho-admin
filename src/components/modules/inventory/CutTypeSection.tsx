@@ -34,9 +34,10 @@ const mapCutType = (ct: any): CutType => ({
 type CutTypeSectionProps = {
   openAdd?: boolean;
   onAddClose?: () => void;
+  resetAdd?: () => void;
 };
 
-export default function CutTypeSection({ openAdd, onAddClose }: CutTypeSectionProps) {
+export default function CutTypeSection({ openAdd, onAddClose, resetAdd }: CutTypeSectionProps) {
   const [cutTypes, setCutTypes] = useState<CutType[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +93,8 @@ export default function CutTypeSection({ openAdd, onAddClose }: CutTypeSectionPr
   useEffect(() => {
     if (openAdd) {
       setAddOpen(true);
+    } else {
+      setAddOpen(false);
     }
   }, [openAdd]);
 
@@ -406,7 +409,14 @@ export default function CutTypeSection({ openAdd, onAddClose }: CutTypeSectionPr
             >
               Cancel
             </Button>
-            <Button className="bg-blue-600 hover:bg-blue-700 w-fit px-3 text-sm" onClick={handleAdd} disabled={isSubmitting}>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700 w-fit px-3 text-sm"
+              onClick={async () => {
+                await handleAdd();
+                resetAdd?.();
+              }}
+              disabled={isSubmitting}
+            >
               {isSubmitting ? (
                 <span className="inline-flex items-center gap-2">
                   <Loader className="w-4 h-4 animate-spin" />

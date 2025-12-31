@@ -7,7 +7,7 @@ import { Button } from '../../ui/button';
 import { Switch } from '../../ui/switch';
 import { Badge } from '../../ui/badge';
 
-export default function AddCutTypes() {
+const AddCutTypes: React.FC = () => {
   const [cutTypes, setCutTypes] = useState([
     { id: 1, name: 'Whole Cleaned', category: 'All', status: 'Active' },
     { id: 2, name: 'Curry Cut', category: 'Fish', status: 'Active' },
@@ -16,6 +16,30 @@ export default function AddCutTypes() {
     { id: 5, name: 'Headless', category: 'Prawns', status: 'Active' },
     { id: 6, name: 'Half Cut', category: 'Crab', status: 'Inactive' }
   ]);
+
+  // State for new cut type form
+  const [newCutName, setNewCutName] = useState('');
+  const [newCategory, setNewCategory] = useState('all'); // Initialize to a valid category
+  const [newStatus, setNewStatus] = useState(true); // true = Active, false = Inactive
+
+  // Handle add cut type
+  const handleAddCutType = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCutName.trim() || !newCategory) return;
+    setCutTypes((prev) => [
+      ...prev,
+      {
+        id: prev.length ? Math.max(...prev.map(c => c.id)) + 1 : 1,
+        name: newCutName.trim(),
+        category: newCategory === 'all' ? 'All' :
+                  newCategory.charAt(0).toUpperCase() + newCategory.slice(1),
+        status: newStatus ? 'Active' : 'Inactive',
+      },
+    ]);
+    setNewCutName('');
+    setNewCategory('all'); // Reset to a valid category so select always works
+    setNewStatus(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -30,11 +54,17 @@ export default function AddCutTypes() {
           <CardTitle>Add New Cut Type</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4">
+          <form className="space-y-4" onSubmit={handleAddCutType}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="cutName">Cut Type Name</Label>
-                <Input id="cutName" placeholder="e.g., Whole Cleaned, Curry Cut" />
+                <Input
+                  id="cutName"
+                  placeholder="e.g., Whole Cleaned, Curry Cut"
+                  value={newCutName}
+                  onChange={e => setNewCutName(e.target.value)}
+                  required
+                />
               </div>
 
               <div>
@@ -42,8 +72,11 @@ export default function AddCutTypes() {
                 <select
                   id="category"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  value={newCategory}
+                  onChange={e => setNewCategory(e.target.value)}
+                  required
                 >
-                  <option value="">Select Category</option>
+                  <option value="" disabled>Select Category</option>
                   <option value="all">All Categories</option>
                   <option value="prawns">Prawns</option>
                   <option value="fish">Fish</option>
@@ -58,7 +91,11 @@ export default function AddCutTypes() {
                 <Label htmlFor="cutStatus">Status</Label>
                 <p className="text-sm text-gray-600">Make this cut type active</p>
               </div>
-              <Switch id="cutStatus" />
+              <Switch
+                id="cutStatus"
+                checked={newStatus}
+                onCheckedChange={setNewStatus}
+              />
             </div>
 
             <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
@@ -116,4 +153,6 @@ export default function AddCutTypes() {
       </Card>
     </div>
   );
-}
+};
+
+export default AddCutTypes;

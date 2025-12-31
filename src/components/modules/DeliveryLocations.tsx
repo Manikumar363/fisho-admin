@@ -165,13 +165,14 @@ export default function DeliveryLocations() {
     return types[0]?.replace(' Delivery', '') || '';
   };
 
-  const filteredLocations = useMemo(() =>
-    locations.filter(location =>
+  const filteredLocations = useMemo(() => {
+    const filtered = locations.filter(location =>
       location.locationName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       location.nearestStore.toLowerCase().includes(searchQuery.toLowerCase()) ||
       location.id.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  , [locations, searchQuery]);
+    );
+    return filtered.sort((a, b) => a.locationName.localeCompare(b.locationName, undefined, { sensitivity: 'base' }));
+  }, [locations, searchQuery]);
 
   const openView = async (code: string) => {
     setViewCode(code);
@@ -249,95 +250,97 @@ export default function DeliveryLocations() {
             {loading ? (
               <div className="py-8 text-center text-gray-500">Loading communities…</div>
             ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4">Location ID</th>
-                  <th className="text-left py-3 px-4">Location Name</th>
-                  <th className="text-left py-3 px-4">Delivery Type</th>
-                  <th className="text-left py-3 px-4">Nearest Store</th>
-                  <th className="text-left py-3 px-4">Orders Received</th>
-                  <th className="text-left py-3 px-4">Status</th>
-                  <th className="text-left py-3 px-4">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {error ? (
-                  <tr>
-                    <td colSpan={7} className="text-center py-8 text-red-600">{error}</td>
-                  </tr>
-                ) : filteredLocations.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="text-center py-8 text-gray-500">
-                      No locations found
-                    </td>
-                  </tr>
-                ) : (
-                  filteredLocations.map((location) => (
-                    <tr key={location.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-4">{location.id}</td>
-                      <td className="py-3 px-4">{location.locationName}</td>
-                      <td className="py-3 px-4">
-                        <Badge
-                          variant="outline"
-                          className={
-                            location.deliveryType.length === 2
-                              ? 'border-blue-600 text-blue-600'
-                              : location.deliveryType[0] === 'Express Delivery'
-                              ? 'border-orange-600 text-orange-600'
-                              : 'border-green-600 text-green-600'
-                          }
-                        >
-                          {getDeliveryTypeDisplay(location.deliveryType)}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-4">{location.nearestStore}</td>
-                      <td className="py-3 px-4">{location.ordersReceived}</td>
-                      <td className="py-3 px-4">
-                        <Badge
-                          variant={location.status === 'Active' ? 'default' : 'secondary'}
-                          className={
-                            location.status === 'Active'
-                              ? 'bg-green-100 text-green-700 hover:bg-green-100'
-                              : 'bg-gray-100 text-gray-700 hover:bg-gray-100'
-                          }
-                        >
-                          {location.status}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => location.code ? openView(location.code) : toast.error('No community id available')}
-                            disabled={!location.code}
-                            title="View"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setEditingLocation(location)}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteLocation(location)}
-                            disabled={deleteLoading}
-                          >
-                            <Trash2 className="w-4 h-4 text-red-600" />
-                          </Button>
-                        </div>
-                      </td>
+              <div style={{ maxHeight: 400, overflow: 'auto' }}>
+                <table className="w-full">
+                  <thead className="sticky top-0 z-20 bg-white">
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4">Location ID</th>
+                      <th className="text-left py-3 px-4">Location Name</th>
+                      <th className="text-left py-3 px-4">Delivery Type</th>
+                      <th className="text-left py-3 px-4">Nearest Store</th>
+                      <th className="text-left py-3 px-4">Orders Received</th>
+                      <th className="text-left py-3 px-4">Status</th>
+                      <th className="text-left py-3 px-4">Actions</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody>
+                    {error ? (
+                      <tr>
+                        <td colSpan={7} className="text-center py-8 text-red-600">{error}</td>
+                      </tr>
+                    ) : filteredLocations.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="text-center py-8 text-gray-500">
+                          No locations found
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredLocations.map((location) => (
+                        <tr key={location.id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-3 px-4">{location.id}</td>
+                          <td className="py-3 px-4">{location.locationName}</td>
+                          <td className="py-3 px-4">
+                            <Badge
+                              variant="outline"
+                              className={
+                                location.deliveryType.length === 2
+                                  ? 'border-blue-600 text-blue-600'
+                                  : location.deliveryType[0] === 'Express Delivery'
+                                  ? 'border-orange-600 text-orange-600'
+                                  : 'border-green-600 text-green-600'
+                              }
+                            >
+                              {getDeliveryTypeDisplay(location.deliveryType)}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4">{location.nearestStore}</td>
+                          <td className="py-3 px-4">{location.ordersReceived}</td>
+                          <td className="py-3 px-4">
+                            <Badge
+                              variant={location.status === 'Active' ? 'default' : 'secondary'}
+                              className={
+                                location.status === 'Active'
+                                  ? 'bg-green-100 text-green-700 hover:bg-green-100'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-100'
+                              }
+                            >
+                              {location.status}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => location.code ? openView(location.code) : toast.error('No community id available')}
+                                disabled={!location.code}
+                                title="View"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setEditingLocation(location)}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteLocation(location)}
+                                disabled={deleteLoading}
+                              >
+                                <Trash2 className="w-4 h-4 text-red-600" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </CardContent>

@@ -33,6 +33,7 @@ interface Enquiry {
   platform: 'Web' | 'Mobile';
   message: string;
   subject?: string;
+  imageUrl?: string; // Optional image field
 }
 
 export default function Enquiries() {
@@ -79,6 +80,7 @@ export default function Enquiries() {
           mobile: q.phone,
           platform: (q.platform || 'Web') as 'Web' | 'Mobile',
           message: q.message,
+          // imageUrl: q.imageUrl || undefined, // Removed because not present in API
         }));
 
       setEnquiries(mapped);
@@ -317,6 +319,30 @@ export default function Enquiries() {
                   <p className="text-gray-900">{viewingEnquiry.mobile}</p>
                 </div>
               </div>
+
+              {/* Image Preview and Download */}
+              {viewingEnquiry.imageUrl && (
+                <div>
+                  <label className="text-gray-600">Image</label>
+                  <div className="flex items-center gap-4 mt-1">
+                    <img
+                      src={viewingEnquiry.imageUrl}
+                      alt="Enquiry Attachment"
+                      className="max-h-40 rounded border border-gray-200"
+                      style={{ maxWidth: '200px' }}
+                    />
+                    <a
+                      href={viewingEnquiry.imageUrl}
+                      download
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline text-sm border px-3 py-1 rounded"
+                    >
+                      Download
+                    </a>
+                  </div>
+                </div>
+              )}
 
               {viewingEnquiry.subject && (
                 <div>
