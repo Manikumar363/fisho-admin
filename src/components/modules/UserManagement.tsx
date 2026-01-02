@@ -22,7 +22,9 @@ export default function UserManagement() {
   const [showViewModal, setShowViewModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showDeletedUsersModal, setShowDeletedUsersModal] = useState(false);
+  const [showEditVendorModal, setShowEditVendorModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [editingVendorId, setEditingVendorId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoadingView, setIsLoadingView] = useState(false);
   const [fromDate, setFromDate] = useState('');
@@ -34,6 +36,7 @@ export default function UserManagement() {
     email: '',
     contactNumber: ''
   });
+  const [searchTerm, setSearchTerm] = useState('');
   const [endUserForm, setEndUserForm] = useState({
     name: '',
     email: '',
@@ -60,6 +63,11 @@ export default function UserManagement() {
   const [deletedUsersError, setDeletedUsersError] = useState<string | null>(null);
   const [deletedUsersPage, setDeletedUsersPage] = useState(1);
   const [deletedUsersTotalPages, setDeletedUsersTotalPages] = useState(1);
+
+  // Vendors API integration
+  const [vendors, setVendors] = useState<any[]>([]);
+  const [vendorsLoading, setVendorsLoading] = useState(false);
+  const [vendorsError, setVendorsError] = useState<string | null>(null);
 
   useEffect(() => {
     const filterParam = searchParams.get('filter');
@@ -108,6 +116,21 @@ export default function UserManagement() {
     }
   };
 
+  useEffect(() => {
+    if (activeTab !== 'vendors') return;
+    setVendorsLoading(true);
+    setVendorsError(null);
+    apiFetch<{ success: boolean; vendors: any[]; message?: string }>(`/api/vendors`)
+      .then(res => {
+        if (!res.success) throw new Error(res.message || 'Failed to fetch vendors');
+        setVendors(res.vendors || []);
+      })
+      .catch(e => {
+        setVendorsError(e?.message || 'Failed to load vendors');
+      })
+      .finally(() => setVendorsLoading(false));
+  }, [activeTab]);
+
   const deliveryPartners = [
     { id: 'DP-001', name: 'Mohammed Ali', email: 'ali@fisho.com', phone: '+91 98765 11111', deliveries: 342, earnings: '₹68,400', rating: 4.8, status: 'Active' },
     { id: 'DP-002', name: 'Suresh Babu', email: 'suresh@fisho.com', phone: '+91 98765 11112', deliveries: 298, earnings: '₹59,600', rating: 4.7, status: 'Active' },
@@ -122,16 +145,101 @@ export default function UserManagement() {
     { id: 'SM-004', name: 'Anjali Desai', email: 'anjali.juhu@fisho.com', phone: '+91 98765 22224', store: 'Fisho Juhu', experience: '4 years', status: 'Active' }
   ];
 
-  const vendors = [
+  const vendorsStatic = [
     { id: 'VN-001', vendorName: 'Coastal Fisheries Ltd', companyName: 'Coastal Fisheries Private Limited', vatNumber: 'VAT123456789', email: 'info@coastalfisheries.com', phone: '+91 98765 33331', status: 'Active' },
     { id: 'VN-002', vendorName: 'Marine Supplies Co', companyName: 'Marine Supplies Company', vatNumber: 'VAT987654321', email: 'contact@marinesupplies.com', phone: '+91 98765 33332', status: 'Active' },
     { id: 'VN-003', vendorName: 'Ocean Fresh Traders', companyName: 'Ocean Fresh Traders LLP', vatNumber: 'VAT456789123', email: 'sales@oceanfresh.com', phone: '+91 98765 33333', status: 'Active' }
   ];
 
-  const handleAddVendor = (e: React.FormEvent) => {
+  const handleAddVendor = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Adding vendor:', vendorForm);
-    setShowAddVendorModal(false);
+    
+    // Validate required fields
+    if (!vendorForm.vendorName || !vendorForm.companyName || !vendorForm.vatNumber || !vendorForm.email || !vendorForm.contactNumber) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        vendor?: any;
+        message?: string;
+      }>('/api/vendors', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: vendorForm.vendorName,
+          companyName: vendorForm.companyName,
+          vatNumber: vendorForm.vatNumber,
+          email: vendorForm.email,
+          phone: vendorForm.contactNumber
+        }),
+      });
+
+      if (!res.success) throw new Error(res.message || 'Failed to add vendor');
+
+      // Show success message
+      toast.success(res.message || 'Vendor added successfully');
+
+      // Clear form and close modal
+      setShowAddVendorModal(false);
+      setVendorForm({
+        vendorName: '',
+        companyName: '',
+        vatNumber: '',
+        email: '',
+        contactNumber: ''
+      });
+
+      // Refresh vendors list
+      setVendorsLoading(true);
+      const refreshRes = await apiFetch<{ success: boolean; vendors: any[]; message?: string }>('/api/vendors');
+      if (refreshRes.success) {
+        setVendors(refreshRes.vendors || []);
+      }
+      setVendorsLoading(false);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to add vendor';
+      console.error('Add vendor error:', e);
+      toast.error(msg);
+    }
+  };
+
+  const handleEditVendor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!editingVendorId) return;
+
+    // Validate required fields
+    if (!vendorForm.vendorName || !vendorForm.companyName || !vendorForm.vatNumber || !vendorForm.email || !vendorForm.contactNumber) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        vendor?: any;
+        message?: string;
+      }>(`/api/vendors/${editingVendorId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: vendorForm.vendorName,
+          companyName: vendorForm.companyName,
+          vatNumber: vendorForm.vatNumber,
+          email: vendorForm.email,
+          phone: vendorForm.contactNumber
+        }),
+    });
+
+    if (!res.success) throw new Error(res.message || 'Failed to update vendor');
+
+    // Show success message
+    toast.success(res.message || 'Vendor updated successfully');
+
+    // Clear form and close modal
+    setShowEditVendorModal(false);
+    setEditingVendorId(null);
     setVendorForm({
       vendorName: '',
       companyName: '',
@@ -139,6 +247,19 @@ export default function UserManagement() {
       email: '',
       contactNumber: ''
     });
+
+    // Refresh vendors list
+    setVendorsLoading(true);
+    const refreshRes = await apiFetch<{ success: boolean; vendors: any[]; message?: string }>('/api/vendors');
+    if (refreshRes.success) {
+      setVendors(refreshRes.vendors || []);
+    }
+    setVendorsLoading(false);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to update vendor';
+      console.error('Edit vendor error:', e);
+      toast.error(msg);
+    }
   };
 
   const handleAddEndUser = (e: React.FormEvent) => {
@@ -198,6 +319,35 @@ export default function UserManagement() {
         setIsLoadingView(false);
       }
     }
+    
+    // Fetch full vendor details for vendors
+    if (type === 'vendor') {
+      setIsLoadingView(true);
+      try {
+        const res = await apiFetch<{
+          success: boolean;
+          vendor?: any;
+          message?: string;
+        }>(`/api/vendors/${item._id}`);
+
+        if (!res.success) throw new Error(res.message || 'Failed to fetch vendor details');
+
+        // Update selected item with full details
+        setSelectedItem({
+          ...res.vendor,
+          type: 'vendor',
+          id: res.vendor._id,
+          vendorName: res.vendor.name,
+          status: 'Active'
+        });
+      } catch (e: any) {
+        const msg = e?.message || 'Failed to load vendor details';
+        console.error('Fetch vendor details error:', e);
+        toast.error(msg);
+      } finally {
+        setIsLoadingView(false);
+      }
+    }
   };
 
   const handleDelete = (item: any, type: string) => {
@@ -208,38 +358,57 @@ export default function UserManagement() {
   const confirmDelete = async () => {
     if (!selectedItem) return;
 
-    // Only handle end-user deletion for now
-    if (selectedItem.type !== 'end-user') {
-      toast.info('Delete functionality not yet implemented for this type');
-      setShowDeleteDialog(false);
-      return;
-    }
-
     setIsDeleting(true);
     try {
-      const res = await apiFetch<{
-        success: boolean;
-        message?: string;
-      }>(`/api/user/delete-user/${selectedItem._id}`, {
-        method: 'DELETE',
-      });
+      if (selectedItem.type === 'end-user') {
+        // Delete end-user
+        const res = await apiFetch<{
+          success: boolean;
+          message?: string;
+        }>(`/api/user/delete-user/${selectedItem._id}`, {
+          method: 'DELETE',
+        });
 
-      if (!res.success) throw new Error(res.message || 'Failed to delete user');
+        if (!res.success) throw new Error(res.message || 'Failed to delete user');
 
-      toast.success(res.message || 'User deleted successfully');
-      setShowDeleteDialog(false);
-      setSelectedItem(null);
-      
-      // Refresh the users list
-      setEndUsersPage(1);
-      const refreshRes = await apiFetch<{ success: boolean; users: any[]; pagination?: any; message?: string }>(`/api/user/all-users?page=1&limit=15`);
-      if (refreshRes.success) {
-        setEndUsers(refreshRes.users || []);
-        setEndUsersTotalPages(refreshRes.pagination?.totalPages || 1);
+        toast.success(res.message || 'User deleted successfully');
+        setShowDeleteDialog(false);
+        setSelectedItem(null);
+        
+        // Refresh the users list
+        setEndUsersPage(1);
+        const refreshRes = await apiFetch<{ success: boolean; users: any[]; pagination?: any; message?: string }>(`/api/user/all-users?page=1&limit=15`);
+        if (refreshRes.success) {
+          setEndUsers(refreshRes.users || []);
+          setEndUsersTotalPages(refreshRes.pagination?.totalPages || 1);
+        }
+      } else if (selectedItem.type === 'vendor') {
+        // Delete vendor
+        const res = await apiFetch<{
+          success: boolean;
+          message?: string;
+        }>(`/api/vendors/${selectedItem._id}`, {
+          method: 'DELETE',
+        });
+
+        if (!res.success) throw new Error(res.message || 'Failed to delete vendor');
+
+        toast.success(res.message || 'Vendor deleted successfully');
+        setShowDeleteDialog(false);
+        setSelectedItem(null);
+        
+        // Refresh the vendors list
+        const refreshRes = await apiFetch<{ success: boolean; vendors: any[]; message?: string }>('/api/vendors');
+        if (refreshRes.success) {
+          setVendors(refreshRes.vendors || []);
+        }
+      } else {
+        toast.info('Delete functionality not yet implemented for this type');
+        setShowDeleteDialog(false);
       }
     } catch (e: any) {
-      const msg = e?.message || 'Failed to delete user';
-      console.error('Delete user error:', e);
+      const msg = e?.message || `Failed to delete ${selectedItem.type}`;
+      console.error(`Delete ${selectedItem.type} error:`, e);
       toast.error(msg);
     } finally {
       setIsDeleting(false);
@@ -249,6 +418,67 @@ export default function UserManagement() {
   const handleShowDeletedUsers = () => {
     setShowDeletedUsersModal(true);
     fetchDeletedUsers();
+  };
+
+  const handleOpenEditVendor = (vendor: any) => {
+    setEditingVendorId(vendor._id);
+    setVendorForm({
+      vendorName: vendor.name,
+      companyName: vendor.companyName,
+      vatNumber: vendor.vatNumber,
+      email: vendor.email,
+      contactNumber: vendor.phone
+    });
+    setShowEditVendorModal(true);
+  };
+    // Filter functions
+  const getFilteredEndUsers = () => {
+    if (!searchTerm) return endUsers;
+    const term = searchTerm.toLowerCase();
+    return endUsers.filter(user => 
+      user._id?.toLowerCase().includes(term) ||
+      user.firstName?.toLowerCase().includes(term) ||
+      user.lastName?.toLowerCase().includes(term) ||
+      user.email?.toLowerCase().includes(term) ||
+      user.phone?.toLowerCase().includes(term) ||
+      `${user.firstName} ${user.lastName}`.toLowerCase().includes(term)
+    );
+  };
+
+  const getFilteredDeliveryPartners = () => {
+    if (!searchTerm) return deliveryPartners;
+    const term = searchTerm.toLowerCase();
+    return deliveryPartners.filter(partner => 
+      partner.id?.toLowerCase().includes(term) ||
+      partner.name?.toLowerCase().includes(term) ||
+      partner.email?.toLowerCase().includes(term) ||
+      partner.phone?.toLowerCase().includes(term)
+    );
+  };
+
+  const getFilteredStoreManagers = () => {
+    if (!searchTerm) return storeManagers;
+    const term = searchTerm.toLowerCase();
+    return storeManagers.filter(manager => 
+      manager.id?.toLowerCase().includes(term) ||
+      manager.name?.toLowerCase().includes(term) ||
+      manager.email?.toLowerCase().includes(term) ||
+      manager.phone?.toLowerCase().includes(term) ||
+      manager.store?.toLowerCase().includes(term)
+    );
+  };
+
+  const getFilteredVendors = () => {
+    if (!searchTerm) return vendors;
+    const term = searchTerm.toLowerCase();
+    return vendors.filter(vendor => 
+      vendor._id?.toLowerCase().includes(term) ||
+      vendor.name?.toLowerCase().includes(term) ||
+      vendor.companyName?.toLowerCase().includes(term) ||
+      vendor.vatNumber?.toLowerCase().includes(term) ||
+      vendor.email?.toLowerCase().includes(term) ||
+      vendor.phone?.toLowerCase().includes(term)
+    );
   };
 
   return (
@@ -294,6 +524,8 @@ export default function UserManagement() {
               <Input
                 placeholder="Search by name, phone, email, or user ID..."
                 className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
             <Button variant="outline">
@@ -355,8 +587,10 @@ export default function UserManagement() {
                       <tr><td colSpan={8} className="py-8 text-center text-red-600">{endUsersError}</td></tr>
                     ) : endUsers.length === 0 ? (
                       <tr><td colSpan={8} className="py-8 text-center text-gray-500">No users found</td></tr>
+                    ) : getFilteredEndUsers().length === 0 ? (
+                      <tr><td colSpan={8} className="py-8 text-center text-gray-500">No users match your search</td></tr>
                     ) : (
-                      endUsers.map((user) => (
+                      getFilteredEndUsers().map((user) => (
                         <tr key={user._id} className="border-b border-gray-100 hover:bg-gray-50">
                           <td className="py-3 px-4 text-blue-600">{user._id}</td>
                           <td className="py-3 px-4">{user.firstName} {user.lastName}</td>
@@ -426,7 +660,7 @@ export default function UserManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {deliveryPartners.map((partner) => (
+                    {getFilteredDeliveryPartners().map((partner) => (
                       <tr key={partner.id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-3 px-4 text-blue-600">{partner.id}</td>
                         <td className="py-3 px-4">{partner.name}</td>
@@ -488,7 +722,7 @@ export default function UserManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {storeManagers.map((manager) => (
+                    {getFilteredStoreManagers().map((manager) => (
                       <tr key={manager.id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-3 px-4 text-blue-600">{manager.id}</td>
                         <td className="py-3 px-4">{manager.name}</td>
@@ -549,32 +783,54 @@ export default function UserManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {vendors.map((vendor) => (
-                      <tr key={vendor.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-3 px-4 text-blue-600">{vendor.id}</td>
-                        <td className="py-3 px-4">{vendor.vendorName}</td>
-                        <td className="py-3 px-4">{vendor.companyName}</td>
-                        <td className="py-3 px-4">{vendor.vatNumber}</td>
-                        <td className="py-3 px-4">{vendor.email}</td>
-                        <td className="py-3 px-4">{vendor.phone}</td>
-                        <td className="py-3 px-4">
-                          <Badge variant={vendor.status === 'Active' ? 'default' : 'secondary'}>
-                            {vendor.status}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex gap-2">
-                            <button 
-                              className="p-1 hover:bg-gray-100 rounded"
-                              onClick={() => handleView(vendor, 'vendor')}
-                              title="View"
-                            >
-                              <Eye className="w-4 h-4 text-gray-600" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {vendorsLoading ? (
+                      <tr><td colSpan={8} className="py-8 text-center text-gray-500">Loading vendors...</td></tr>
+                    ) : vendorsError ? (
+                      <tr><td colSpan={8} className="py-8 text-center text-red-600">{vendorsError}</td></tr>
+                    ) : vendors.length === 0 ? (
+                      <tr><td colSpan={8} className="py-8 text-center text-gray-500">No vendors found</td></tr>
+                    ) :  getFilteredVendors().length === 0 ? (
+                      <tr><td colSpan={8} className="py-8 text-center text-gray-500">No vendors match your search</td></tr>
+                   )  : (
+                      getFilteredVendors().map((vendor) => (
+                        <tr key={vendor._id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-3 px-4 text-blue-600">{vendor._id}</td>
+                          <td className="py-3 px-4">{vendor.name}</td>
+                          <td className="py-3 px-4">{vendor.companyName}</td>
+                          <td className="py-3 px-4">{vendor.vatNumber}</td>
+                          <td className="py-3 px-4">{vendor.email}</td>
+                          <td className="py-3 px-4">{vendor.phone}</td>
+                          <td className="py-3 px-4">
+                            <Badge variant="default">Active</Badge>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex gap-2">
+                              <button 
+                                className="p-1 hover:bg-gray-100 rounded"
+                                onClick={() => handleView(vendor, 'vendor')}
+                                title="View"
+                              >
+                                <Eye className="w-4 h-4 text-gray-600" />
+                              </button>
+                              <button 
+                                className="p-1 hover:bg-gray-100 rounded"
+                                onClick={() => handleOpenEditVendor(vendor)}
+                                title="Edit"
+                              >
+                                <Edit className="w-4 h-4 text-blue-600" />
+                              </button>
+                              <button 
+                                className="p-1 hover:bg-gray-100 rounded"
+                                onClick={() => handleDelete(vendor, 'vendor')}
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4 text-red-600" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -655,6 +911,84 @@ export default function UserManagement() {
               </Button>
               <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
                 Add Vendor
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Vendor Modal */}
+      <Dialog open={showEditVendorModal} onOpenChange={setShowEditVendorModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Vendor</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditVendor}>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="editVendorName">Vendor Name</Label>
+                <Input
+                  id="editVendorName"
+                  value={vendorForm.vendorName}
+                  onChange={(e) => setVendorForm({ ...vendorForm, vendorName: e.target.value })}
+                  placeholder="Enter vendor name"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="editCompanyName">Company Name</Label>
+                <Input
+                  id="editCompanyName"
+                  value={vendorForm.companyName}
+                  onChange={(e) => setVendorForm({ ...vendorForm, companyName: e.target.value })}
+                  placeholder="Enter company name"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="editVatNumber">VAT Number</Label>
+                <Input
+                  id="editVatNumber"
+                  value={vendorForm.vatNumber}
+                  onChange={(e) => setVendorForm({ ...vendorForm, vatNumber: e.target.value })}
+                  placeholder="Enter VAT number"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="editEmail">Email ID</Label>
+                <Input
+                  id="editEmail"
+                  type="email"
+                  value={vendorForm.email}
+                  onChange={(e) => setVendorForm({ ...vendorForm, email: e.target.value })}
+                  placeholder="Enter email address"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="editContactNumber">Contact Number</Label>
+                <Input
+                  id="editContactNumber"
+                  type="tel"
+                  value={vendorForm.contactNumber}
+                  onChange={(e) => setVendorForm({ ...vendorForm, contactNumber: e.target.value })}
+                  placeholder="Enter contact number"
+                  required
+                />
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowEditVendorModal(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
+                Update Vendor
               </Button>
             </DialogFooter>
           </form>
