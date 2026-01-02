@@ -10,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 import { Label } from '../ui/label';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function UserManagement() {
   const [searchParams] = useSearchParams();
@@ -19,7 +21,10 @@ export default function UserManagement() {
   const [showAddDeliveryPartnerModal, setShowAddDeliveryPartnerModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showDeletedUsersModal, setShowDeletedUsersModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoadingView, setIsLoadingView] = useState(false);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [vendorForm, setVendorForm] = useState({
@@ -42,20 +47,26 @@ export default function UserManagement() {
     email: ''
   });
 
-  useEffect(() => {
-    const filterParam = searchParams.get('filter');
-    if (filterParam === 'end-users') {
-      setActiveTab('end-users');
-    }
-  }, [searchParams]);
-
-
   // End Users API integration
   const [endUsers, setEndUsers] = useState<any[]>([]);
   const [endUsersLoading, setEndUsersLoading] = useState(false);
   const [endUsersError, setEndUsersError] = useState<string | null>(null);
   const [endUsersPage, setEndUsersPage] = useState(1);
   const [endUsersTotalPages, setEndUsersTotalPages] = useState(1);
+
+  // Deleted Users API integration
+  const [deletedUsers, setDeletedUsers] = useState<any[]>([]);
+  const [deletedUsersLoading, setDeletedUsersLoading] = useState(false);
+  const [deletedUsersError, setDeletedUsersError] = useState<string | null>(null);
+  const [deletedUsersPage, setDeletedUsersPage] = useState(1);
+  const [deletedUsersTotalPages, setDeletedUsersTotalPages] = useState(1);
+
+  useEffect(() => {
+    const filterParam = searchParams.get('filter');
+    if (filterParam === 'end-users') {
+      setActiveTab('end-users');
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (activeTab !== 'end-users') return;
@@ -72,6 +83,30 @@ export default function UserManagement() {
       })
       .finally(() => setEndUsersLoading(false));
   }, [activeTab, endUsersPage]);
+
+  const fetchDeletedUsers = async () => {
+    setDeletedUsersLoading(true);
+    setDeletedUsersError(null);
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        users: any[];
+        pagination?: any;
+        message?: string;
+      }>(`/api/user/deleted-users?page=${deletedUsersPage}&limit=10`);
+
+      if (!res.success) throw new Error(res.message || 'Failed to fetch deleted users');
+
+      setDeletedUsers(res.users || []);
+      setDeletedUsersTotalPages(res.pagination?.totalPages || 1);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to load deleted users';
+      setDeletedUsersError(msg);
+      toast.error(msg);
+    } finally {
+      setDeletedUsersLoading(false);
+    }
+  };
 
   const deliveryPartners = [
     { id: 'DP-001', name: 'Mohammed Ali', email: 'ali@fisho.com', phone: '+91 98765 11111', deliveries: 342, earnings: '₹68,400', rating: 4.8, status: 'Active' },
@@ -130,9 +165,39 @@ export default function UserManagement() {
     });
   };
 
-  const handleView = (item: any, type: string) => {
+  const handleView = async (item: any, type: string) => {
     setSelectedItem({ ...item, type });
     setShowViewModal(true);
+
+    // Fetch full user details for end-users
+    if (type === 'end-user') {
+      setIsLoadingView(true);
+      try {
+        const res = await apiFetch<{
+          success: boolean;
+          user?: any;
+          message?: string;
+        }>(`/api/user/user-by-id/${item._id}`);
+
+        if (!res.success) throw new Error(res.message || 'Failed to fetch user details');
+
+        // Update selected item with full details
+        setSelectedItem({
+          ...res.user,
+          type: 'end-user',
+          id: res.user._id,
+          name: `${res.user.firstName} ${res.user.lastName}`,
+          phone: `${res.user.countryCode} ${res.user.phone}`,
+          status: res.user.isActive ? 'Active' : 'Inactive'
+        });
+      } catch (e: any) {
+        const msg = e?.message || 'Failed to load user details';
+        console.error('Fetch user details error:', e);
+        toast.error(msg);
+      } finally {
+        setIsLoadingView(false);
+      }
+    }
   };
 
   const handleDelete = (item: any, type: string) => {
@@ -140,10 +205,50 @@ export default function UserManagement() {
     setShowDeleteDialog(true);
   };
 
-  const confirmDelete = () => {
-    console.log('Deleting:', selectedItem);
-    setShowDeleteDialog(false);
-    setSelectedItem(null);
+  const confirmDelete = async () => {
+    if (!selectedItem) return;
+
+    // Only handle end-user deletion for now
+    if (selectedItem.type !== 'end-user') {
+      toast.info('Delete functionality not yet implemented for this type');
+      setShowDeleteDialog(false);
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        message?: string;
+      }>(`/api/user/delete-user/${selectedItem._id}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.success) throw new Error(res.message || 'Failed to delete user');
+
+      toast.success(res.message || 'User deleted successfully');
+      setShowDeleteDialog(false);
+      setSelectedItem(null);
+      
+      // Refresh the users list
+      setEndUsersPage(1);
+      const refreshRes = await apiFetch<{ success: boolean; users: any[]; pagination?: any; message?: string }>(`/api/user/all-users?page=1&limit=15`);
+      if (refreshRes.success) {
+        setEndUsers(refreshRes.users || []);
+        setEndUsersTotalPages(refreshRes.pagination?.totalPages || 1);
+      }
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to delete user';
+      console.error('Delete user error:', e);
+      toast.error(msg);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleShowDeletedUsers = () => {
+    setShowDeletedUsersModal(true);
+    fetchDeletedUsers();
   };
 
   return (
@@ -211,13 +316,22 @@ export default function UserManagement() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>End Users</CardTitle>
-              <Button 
-                onClick={() => setShowAddEndUserModal(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add End User
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => setShowAddEndUserModal(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add End User
+                </Button>
+                <Button  
+                  onClick={handleShowDeletedUsers}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Deleted Users
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -691,7 +805,7 @@ export default function UserManagement() {
 
       {/* View Modal */}
       <Dialog open={showViewModal} onOpenChange={setShowViewModal}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {selectedItem?.type === 'end-user' && 'End User Details'}
@@ -700,148 +814,173 @@ export default function UserManagement() {
               {selectedItem?.type === 'vendor' && 'Vendor Details'}
             </DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 py-4">
-            {selectedItem && (
-              <>
-                {selectedItem.type === 'end-user' && (
-                  <>
-                    <div>
-                      <Label className="text-gray-600">User ID</Label>
-                      <p>{selectedItem.id}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Name</Label>
-                      <p>{selectedItem.name}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Email</Label>
-                      <p>{selectedItem.email}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Phone</Label>
-                      <p>{selectedItem.phone}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Revenue</Label>
-                      <p>{selectedItem.revenue}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Total Orders</Label>
-                      <p>{selectedItem.orders}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Join Date</Label>
-                      <p>{selectedItem.joinDate}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Status</Label>
-                      <p><Badge variant={selectedItem.status === 'Active' ? 'default' : 'secondary'}>{selectedItem.status}</Badge></p>
-                    </div>
-                  </>
-                )}
-                {selectedItem.type === 'delivery-partner' && (
-                  <>
-                    <div>
-                      <Label className="text-gray-600">DP ID</Label>
-                      <p>{selectedItem.id}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Name</Label>
-                      <p>{selectedItem.name}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Email</Label>
-                      <p>{selectedItem.email}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Phone</Label>
-                      <p>{selectedItem.phone}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Total Deliveries</Label>
-                      <p>{selectedItem.deliveries}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Earnings</Label>
-                      <p>{selectedItem.earnings}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Rating</Label>
-                      <p>⭐ {selectedItem.rating}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Status</Label>
-                      <p><Badge variant={selectedItem.status === 'Active' ? 'default' : 'secondary'}>{selectedItem.status}</Badge></p>
-                    </div>
-                  </>
-                )}
-                {selectedItem.type === 'store-manager' && (
-                  <>
-                    <div>
-                      <Label className="text-gray-600">Manager ID</Label>
-                      <p>{selectedItem.id}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Name</Label>
-                      <p>{selectedItem.name}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Email</Label>
-                      <p>{selectedItem.email}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Phone</Label>
-                      <p>{selectedItem.phone}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Store</Label>
-                      <p>{selectedItem.store}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Experience</Label>
-                      <p>{selectedItem.experience}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Status</Label>
-                      <p><Badge variant={selectedItem.status === 'Active' ? 'default' : 'secondary'}>{selectedItem.status}</Badge></p>
-                    </div>
-                  </>
-                )}
-                {selectedItem.type === 'vendor' && (
-                  <>
-                    <div>
-                      <Label className="text-gray-600">Vendor ID</Label>
-                      <p>{selectedItem.id}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Vendor Name</Label>
-                      <p>{selectedItem.vendorName}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Company Name</Label>
-                      <p>{selectedItem.companyName}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">VAT Number</Label>
-                      <p>{selectedItem.vatNumber}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Email</Label>
-                      <p>{selectedItem.email}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Contact Number</Label>
-                      <p>{selectedItem.phone}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Status</Label>
-                      <p><Badge variant={selectedItem.status === 'Active' ? 'default' : 'secondary'}>{selectedItem.status}</Badge></p>
-                    </div>
-                  </>
-                )}
-              </>
-            )}
-          </div>
+          {isLoadingView ? (
+            <div className="flex justify-center items-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 py-4">
+              {selectedItem && (
+                <>
+                  {selectedItem.type === 'end-user' && (
+                    <>
+                      <div>
+                        <Label className="text-gray-600">User ID</Label>
+                        <p className="font-medium">{selectedItem._id || selectedItem.id}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Name</Label>
+                        <p className="font-medium">{selectedItem.name || `${selectedItem.firstName} ${selectedItem.lastName}`}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Email</Label>
+                        <p className="font-medium">{selectedItem.email}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Phone</Label>
+                        <p className="font-medium">{selectedItem.phone}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Role</Label>
+                        <p className="font-medium capitalize">{selectedItem.role || '—'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Verified</Label>
+                        <p><Badge variant={selectedItem.isVerified ? 'default' : 'secondary'}>{selectedItem.isVerified ? 'Yes' : 'No'}</Badge></p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Blocked</Label>
+                        <p><Badge variant={selectedItem.isBlocked ? 'destructive' : 'default'}>{selectedItem.isBlocked ? 'Yes' : 'No'}</Badge></p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Status</Label>
+                        <p><Badge variant={selectedItem.status === 'Active' ? 'default' : 'secondary'}>{selectedItem.status}</Badge></p>
+                      </div>
+                      {selectedItem.addresses && selectedItem.addresses.length > 0 && (
+                        <div className="col-span-2">
+                          <Label className="text-gray-600">Addresses</Label>
+                          <div className="mt-2 space-y-2">
+                            {selectedItem.addresses.map((addr: any, idx: number) => (
+                              <div key={addr._id || idx} className="p-3 bg-gray-50 rounded-lg">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Badge variant="outline">{addr.label}</Badge>
+                                  {addr.isDefault && <Badge variant="default" className="text-xs">Default</Badge>}
+                                </div>
+                                <p className="text-sm">{addr.fullAddress}</p>
+                                {addr.building && <p className="text-sm text-gray-600">Building: {addr.building}</p>}
+                                {addr.floor && <p className="text-sm text-gray-600">Floor: {addr.floor}</p>}
+                                {addr.flat && <p className="text-sm text-gray-600">Flat: {addr.flat}</p>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {selectedItem.type === 'delivery-partner' && (
+                    <>
+                      <div>
+                        <Label className="text-gray-600">DP ID</Label>
+                        <p>{selectedItem.id}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Name</Label>
+                        <p>{selectedItem.name}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Email</Label>
+                        <p>{selectedItem.email}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Phone</Label>
+                        <p>{selectedItem.phone}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Total Deliveries</Label>
+                        <p>{selectedItem.deliveries}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Earnings</Label>
+                        <p>{selectedItem.earnings}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Rating</Label>
+                        <p>⭐ {selectedItem.rating}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Status</Label>
+                        <p><Badge variant={selectedItem.status === 'Active' ? 'default' : 'secondary'}>{selectedItem.status}</Badge></p>
+                      </div>
+                    </>
+                  )}
+                  {selectedItem.type === 'store-manager' && (
+                    <>
+                      <div>
+                        <Label className="text-gray-600">Manager ID</Label>
+                        <p>{selectedItem.id}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Name</Label>
+                        <p>{selectedItem.name}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Email</Label>
+                        <p>{selectedItem.email}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Phone</Label>
+                        <p>{selectedItem.phone}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Store</Label>
+                        <p>{selectedItem.store}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Experience</Label>
+                        <p>{selectedItem.experience}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Status</Label>
+                        <p><Badge variant={selectedItem.status === 'Active' ? 'default' : 'secondary'}>{selectedItem.status}</Badge></p>
+                      </div>
+                    </>
+                  )}
+                  {selectedItem.type === 'vendor' && (
+                    <>
+                      <div>
+                        <Label className="text-gray-600">Vendor ID</Label>
+                        <p>{selectedItem.id}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Vendor Name</Label>
+                        <p>{selectedItem.vendorName}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Company Name</Label>
+                        <p>{selectedItem.companyName}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">VAT Number</Label>
+                        <p>{selectedItem.vatNumber}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Email</Label>
+                        <p>{selectedItem.email}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Contact Number</Label>
+                        <p>{selectedItem.phone}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Status</Label>
+                        <p><Badge variant={selectedItem.status === 'Active' ? 'default' : 'secondary'}>{selectedItem.status}</Badge></p>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          )}
           <DialogFooter>
             <Button onClick={() => setShowViewModal(false)}>Close</Button>
           </DialogFooter>
@@ -858,13 +997,114 @@ export default function UserManagement() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete} 
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Deleted Users Modal */}
+      <Dialog open={showDeletedUsersModal} onOpenChange={setShowDeletedUsersModal}>
+        <DialogContent className="max-w-5xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Deleted Users</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto">
+            {deletedUsersLoading ? (
+              <div className="flex justify-center items-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : deletedUsersError ? (
+              <div className="py-8 text-center text-red-600">{deletedUsersError}</div>
+            ) : deletedUsers.length === 0 ? (
+              <div className="py-8 text-center text-gray-500">No deleted users found</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4">User ID</th>
+                      <th className="text-left py-3 px-4">Name</th>
+                      <th className="text-left py-3 px-4">Email</th>
+                      <th className="text-left py-3 px-4">Phone</th>
+                      <th className="text-left py-3 px-4">Delete Reason</th>
+                      <th className="text-left py-3 px-4">Deleted At</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deletedUsers.map((user) => (
+                      <tr key={user._id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-3 px-4 text-blue-600">{user._id}</td>
+                        <td className="py-3 px-4">{user.firstName} {user.lastName}</td>
+                        <td className="py-3 px-4">{user.email}</td>
+                        <td className="py-3 px-4">{user.countryCode} {user.phone}</td>
+                        <td className="py-3 px-4">{user.deleteReason || '—'}</td>
+                        <td className="py-3 px-4">
+                          {user.updatedAt ? new Date(user.updatedAt).toLocaleString() : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="border-t pt-4">
+            <div className="flex items-center justify-between w-full">
+              <div className="text-sm text-gray-600">
+                Page {deletedUsersPage} of {deletedUsersTotalPages}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (deletedUsersPage > 1) {
+                      setDeletedUsersPage(deletedUsersPage - 1);
+                    }
+                  }}
+                  disabled={deletedUsersPage === 1 || deletedUsersLoading}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (deletedUsersPage < deletedUsersTotalPages) {
+                      setDeletedUsersPage(deletedUsersPage + 1);
+                    }
+                  }}
+                  disabled={deletedUsersPage >= deletedUsersTotalPages || deletedUsersLoading}
+                >
+                  Next
+                </Button>
+                <Button onClick={() => setShowDeletedUsersModal(false)}>Close</Button>
+              </div>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Toast Notifications */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </div>
   );
 }
