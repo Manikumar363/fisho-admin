@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiFetch } from '../../lib/api';
 import { useSearchParams } from 'react-router-dom';
 import { Search, Filter, Download, Edit, Eye, Plus, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -48,13 +49,29 @@ export default function UserManagement() {
     }
   }, [searchParams]);
 
-  const endUsers = [
-    { id: 1, name: 'John Doe', email: 'john@example.com', phone: '+91 98765 43210', revenue: '₹45,200', orders: 24, status: 'Active', joinDate: '2024-01-15' },
-    { id: 2, name: 'Jane Smith', email: 'jane@example.com', phone: '+91 98765 43211', revenue: '₹32,800', orders: 18, status: 'Active', joinDate: '2024-02-20' },
-    { id: 3, name: 'Mike Johnson', email: 'mike@example.com', phone: '+91 98765 43212', revenue: '₹58,900', orders: 31, status: 'Active', joinDate: '2024-03-10' },
-    { id: 4, name: 'Sarah Wilson', email: 'sarah@example.com', phone: '+91 98765 43213', revenue: '₹21,500', orders: 12, status: 'Inactive', joinDate: '2024-04-05' },
-    { id: 5, name: 'Tom Brown', email: 'tom@example.com', phone: '+91 98765 43214', revenue: '₹49,300', orders: 27, status: 'Active', joinDate: '2024-05-12' }
-  ];
+
+  // End Users API integration
+  const [endUsers, setEndUsers] = useState<any[]>([]);
+  const [endUsersLoading, setEndUsersLoading] = useState(false);
+  const [endUsersError, setEndUsersError] = useState<string | null>(null);
+  const [endUsersPage, setEndUsersPage] = useState(1);
+  const [endUsersTotalPages, setEndUsersTotalPages] = useState(1);
+
+  useEffect(() => {
+    if (activeTab !== 'end-users') return;
+    setEndUsersLoading(true);
+    setEndUsersError(null);
+    apiFetch<{ success: boolean; users: any[]; pagination?: any; message?: string }>(`/api/user/all-users?page=${endUsersPage}&limit=15`)
+      .then(res => {
+        if (!res.success) throw new Error(res.message || 'Failed to fetch users');
+        setEndUsers(res.users || []);
+        setEndUsersTotalPages(res.pagination?.totalPages || 1);
+      })
+      .catch(e => {
+        setEndUsersError(e?.message || 'Failed to load users');
+      })
+      .finally(() => setEndUsersLoading(false));
+  }, [activeTab, endUsersPage]);
 
   const deliveryPartners = [
     { id: 'DP-001', name: 'Mohammed Ali', email: 'ali@fisho.com', phone: '+91 98765 11111', deliveries: 342, earnings: '₹68,400', rating: 4.8, status: 'Active' },
@@ -218,39 +235,47 @@ export default function UserManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {endUsers.map((user) => (
-                      <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-3 px-4 text-blue-600">{user.id}</td>
-                        <td className="py-3 px-4">{user.name}</td>
-                        <td className="py-3 px-4">{user.phone}</td>
-                        <td className="py-3 px-4">{user.email}</td>
-                        <td className="py-3 px-4">{user.revenue}</td>
-                        <td className="py-3 px-4">{user.orders}</td>
-                        <td className="py-3 px-4">
-                          <Badge variant={user.status === 'Active' ? 'default' : 'secondary'}>
-                            {user.status}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex gap-2">
-                            <button 
-                              className="p-1 hover:bg-gray-100 rounded"
-                              onClick={() => handleView(user, 'end-user')}
-                              title="View"
-                            >
-                              <Eye className="w-4 h-4 text-gray-600" />
-                            </button>
-                            <button 
-                              className="p-1 hover:bg-gray-100 rounded"
-                              onClick={() => handleDelete(user, 'end-user')}
-                              title="Delete"
-                            >
-                              <Trash2 className="w-4 h-4 text-red-600" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {endUsersLoading ? (
+                      <tr><td colSpan={8} className="py-8 text-center text-gray-500">Loading users...</td></tr>
+                    ) : endUsersError ? (
+                      <tr><td colSpan={8} className="py-8 text-center text-red-600">{endUsersError}</td></tr>
+                    ) : endUsers.length === 0 ? (
+                      <tr><td colSpan={8} className="py-8 text-center text-gray-500">No users found</td></tr>
+                    ) : (
+                      endUsers.map((user) => (
+                        <tr key={user._id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-3 px-4 text-blue-600">{user._id}</td>
+                          <td className="py-3 px-4">{user.firstName} {user.lastName}</td>
+                          <td className="py-3 px-4">{user.countryCode} {user.phone}</td>
+                          <td className="py-3 px-4">{user.email}</td>
+                          <td className="py-3 px-4">—</td>
+                          <td className="py-3 px-4">—</td>
+                          <td className="py-3 px-4">
+                            <Badge variant={user.isActive ? 'default' : 'secondary'}>
+                              {user.isActive ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex gap-2">
+                              <button 
+                                className="p-1 hover:bg-gray-100 rounded"
+                                onClick={() => handleView(user, 'end-user')}
+                                title="View"
+                              >
+                                <Eye className="w-4 h-4 text-gray-600" />
+                              </button>
+                              <button 
+                                className="p-1 hover:bg-gray-100 rounded"
+                                onClick={() => handleDelete(user, 'end-user')}
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4 text-red-600" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>

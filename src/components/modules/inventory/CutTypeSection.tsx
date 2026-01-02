@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../../ui/alert-dialog';
 import { Label } from '../../ui/label';
 import { apiFetch } from '../../../lib/api';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 
 interface CutType {
   id: string;

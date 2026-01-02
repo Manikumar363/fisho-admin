@@ -833,6 +833,13 @@ export default function InventoryManagement() {
   const handleDeleteProduct = async () => {
     if (!selectedItem || activeTab !== 'products') return;
 
+    // Check if product has any variants
+    const productVariants = variants.filter(v => v.product === selectedItem.name);
+    if (productVariants.length > 0) {
+      toast.error(`Cannot delete this product. It has ${productVariants.length} variant(s). Please delete all variants first.`);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const res = await apiFetch<{
@@ -2395,9 +2402,11 @@ export default function InventoryManagement() {
                         <td className="py-3 px-4">{variant.profit}%</td>
                         <td className="py-3 px-4">₹{variant.displayPrice}</td>
                         <td className="py-3 px-4">{variant.discount}%</td>
-                        <td className="py-3 px-4">₹{variant.sellingPrice}</td>
+                        <td className="py-3 px-4">₹{Number(variant.sellingPrice).toFixed(2)}</td>
                         <td className="py-3 px-4">
-                          <Badge variant="default">{variant.status}</Badge>
+                          <Badge variant={variant.status === 'Active' ? 'default' : 'destructive'}>
+                            {variant.status}
+                          </Badge>
                         </td>
                         <td className="py-3 px-4">{variant.lastUpdated}</td>
                         <td className="py-3 px-4">
