@@ -45,6 +45,7 @@ export default function InventoryManagement() {
     speciesIcon: null as File | null,
     existingIcon: '',
     existingIconUrl: '',
+    description: '',
     availability: true
   });
 
@@ -672,6 +673,7 @@ export default function InventoryManagement() {
       speciesIcon: null,
       existingIcon: category.iconPath || '',
       existingIconUrl: typeof category.icon === 'string' && category.icon !== '🗂️' ? category.icon : '',
+      description: category.description || '',
       availability: category.availability === 'Available'
     });
     setShowAddModal(true);
@@ -705,12 +707,9 @@ export default function InventoryManagement() {
         id: res.category._id,
         icon: IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${res.category.image}` : res.category.image,
         name: res.category.name,
-        description: res.category.description || 'N/A',
+        description: res.category.description || '',
         status: res.category.isActive ? 'Active' : 'Inactive',
-        isDeleted: res.category.isDeleted,
         dateCreated: new Date(res.category.createdAt).toISOString().split('T')[0],
-        lastUpdated: new Date(res.category.updatedAt).toISOString().split('T')[0],
-        slug: res.category.slug || 'N/A',
         order: res.category.order || 0,
       };
 
@@ -1005,7 +1004,7 @@ export default function InventoryManagement() {
     setEditingCategoryId(null);
     setEditingProductId(null);
     setEditingVariantId(null);
-    setCategoryForm({ speciesName: '', speciesIcon: null, existingIcon: '', existingIconUrl: '', availability: true });
+    setCategoryForm({ speciesName: '', speciesIcon: null, existingIcon: '', existingIconUrl: '', description: '', availability: true });
     setProductForm({
       category: '',
       productName: '',
@@ -1064,6 +1063,7 @@ export default function InventoryManagement() {
       try {
         const formData = new FormData();
         formData.append('name', categoryForm.speciesName.trim());
+        formData.append('description', categoryForm.description.trim());
         if (categoryForm.speciesIcon) {
           formData.append('image', categoryForm.speciesIcon);
         } else if (categoryForm.existingIcon) {
@@ -1082,6 +1082,7 @@ export default function InventoryManagement() {
             _id: string;
             name: string;
             image: string;
+            description?: string;
             isActive: boolean;
             createdAt: string;
             updatedAt: string;
@@ -1100,6 +1101,7 @@ export default function InventoryManagement() {
           icon: IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${res.category.image}` : res.category.image,
           iconPath: res.category.image,
           name: res.category.name,
+          description: res.category.description || '',
           availability: (res.category.isActive ? 'Available' : 'Unavailable') as 'Available' | 'Unavailable',
           dateCreated: new Date(res.category.createdAt).toISOString().split('T')[0],
           lastUpdated: new Date(res.category.updatedAt).toISOString().split('T')[0],
@@ -1114,7 +1116,7 @@ export default function InventoryManagement() {
           toast.success('Category added successfully');
         }
 
-        setCategoryForm({ speciesName: '', speciesIcon: null, existingIcon: '', existingIconUrl: '', availability: true });
+        setCategoryForm({ speciesName: '', speciesIcon: null, existingIcon: '', existingIconUrl: '', description: '', availability: true });
         setEditingCategoryId(null);
         setShowAddModal(false);
       } catch (e: any) {
@@ -1369,6 +1371,23 @@ export default function InventoryManagement() {
             onChange={(e) => setCategoryForm({ ...categoryForm, speciesName: e.target.value })}
             placeholder="e.g., Prawns, Fish, Crab"
             required
+            disabled={isSubmitting}
+          />
+        </div>
+
+        <div>
+          <Label
+            htmlFor="description"
+            className="block text-sm font-medium text-gray-900 mb-2"
+          >
+            Description
+          </Label>
+          <Textarea
+            id="description"
+            value={categoryForm.description}
+            onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
+            placeholder="e.g., Test category for testing"
+            rows={3}
             disabled={isSubmitting}
           />
         </div>
@@ -2051,6 +2070,7 @@ export default function InventoryManagement() {
         </span>
       </div>
 
+     
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -2820,7 +2840,7 @@ export default function InventoryManagement() {
                   </div>
                   <div>
                     <Label className="text-gray-600">Status</Label>
-                    <Badge variant={viewingVariant.status === 'Active' ? 'default' : 'secondary'}>
+                    <Badge variant={viewingVariant.status === 'Active' ? 'default' : 'secondary'} className="text-xs">
                       {viewingVariant.status}
                     </Badge>
                   </div>
@@ -2941,7 +2961,8 @@ export default function InventoryManagement() {
             </div>
           ) : viewingCategory ? (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              {/* Category Icon and Name */}
+              <div className="flex gap-4">
                 <div>
                   <Label className="text-sm font-semibold text-gray-600">Category Icon</Label>
                   <div className="mt-2">
@@ -2949,58 +2970,46 @@ export default function InventoryManagement() {
                       <ImageWithFallback 
                         src={viewingCategory.icon} 
                         alt={viewingCategory.name}
-                        className="w-20 h-20 rounded object-cover"
+                        className="w-16 h-16 rounded object-cover"
                       />
                     ) : (
-                      <span className="text-4xl">{viewingCategory.icon}</span>
+                      <span className="text-3xl">{viewingCategory.icon}</span>
                     )}
                   </div>
                 </div>
-                <div>
+                <div className="flex-1">
                   <Label className="text-sm font-semibold text-gray-600">Category Name</Label>
                   <p className="mt-2 text-base font-medium">{viewingCategory.name}</p>
                 </div>
               </div>
 
-              <div>
-                <Label className="text-sm font-semibold text-gray-600">Description</Label>
-                <p className="mt-2 text-base text-gray-700">{viewingCategory.description}</p>
-              </div>
+              {/* Description */}
+              {viewingCategory.description && (
+                <div>
+                  <Label className="text-sm font-semibold text-gray-600">Description</Label>
+                  <p className="mt-1 text-sm text-gray-700">{viewingCategory.description}</p>
+                </div>
+              )}
 
-              <div className="grid grid-cols-2 gap-4">
+              {/* Status, Order, Date Created - in grid */}
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <Label className="text-sm font-semibold text-gray-600">Status</Label>
-                  <div className="mt-2">
-                    <Badge variant={viewingCategory.status === 'Active' ? 'default' : 'secondary'}>
+                  <div className="mt-1">
+                    <Badge variant={viewingCategory.status === 'Active' ? 'default' : 'secondary'} className="text-xs">
                       {viewingCategory.status}
                     </Badge>
                   </div>
                 </div>
-                <div>
-                  <Label className="text-sm font-semibold text-gray-600">Slug</Label>
-                  <p className="mt-2 text-base text-gray-700">{viewingCategory.slug}</p>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-semibold text-gray-600">Order</Label>
-                  <p className="mt-2 text-base text-gray-700">{viewingCategory.order}</p>
+                  <p className="mt-1 text-sm text-gray-700">{viewingCategory.order}</p>
                 </div>
-                <div>
-                  <Label className="text-sm font-semibold text-gray-600">Is Deleted</Label>
-                  <p className="mt-2 text-base text-gray-700">{viewingCategory.isDeleted ? 'Yes' : 'No'}</p>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-semibold text-gray-600">Date Created</Label>
-                  <p className="mt-2 text-base text-gray-700">{viewingCategory.dateCreated}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-semibold text-gray-600">Last Updated</Label>
-                  <p className="mt-2 text-base text-gray-700">{viewingCategory.lastUpdated}</p>
+                  <p className="mt-1 text-sm text-gray-700">{viewingCategory.dateCreated}</p>
                 </div>
               </div>
             </div>

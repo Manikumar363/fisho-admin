@@ -85,10 +85,6 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
       newErrors.deliveryType = 'Please select at least one delivery type';
     }
 
-    if (!formData.nearestStore) {
-      newErrors.nearestStore = 'Please select a nearest store';
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -110,8 +106,7 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
       // Prepare the payload for the API
       const payload = {
         name: formData.locationName.trim(),
-        expressDelivery: deliveryTypes.express,
-        isActive: formData.status
+        expressDelivery: deliveryTypes.express
       };
 
       console.log('Sending payload:', payload);
@@ -228,7 +223,7 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-3 border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                {/* <div className="flex items-center space-x-3 border border-gray-200 rounded-lg p-4 hover:bg-gray-50"> 
                   <Checkbox
                     id="nextDay"
                     checked={deliveryTypes.nextDay}
@@ -244,14 +239,14 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
                       <p className="text-xs text-gray-500">Delivery within 24 hours</p>
                     </label>
                   </div>
-                </div>
+                </div>*/}
               </div>
               {errors.deliveryType && (
                 <p className="text-sm text-red-500">{errors.deliveryType}</p>
               )}
             </div>
 
-            {/* Nearest Store */}
+            {/* Nearest Store
             <div className="space-y-2">
               <Label htmlFor="nearestStore">
                 Select Nearest Store <span className="text-red-500">*</span>
@@ -275,9 +270,9 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
               {errors.nearestStore && (
                 <p className="text-sm text-red-500">{errors.nearestStore}</p>
               )}
-            </div>
+            </div>  */}
 
-            {/* Status Toggle */}
+            {/* Status Toggle 
             <div className="flex items-center justify-between border border-gray-200 rounded-lg p-4">
               <div className="space-y-0.5">
                 <Label htmlFor="status">Status</Label>
@@ -291,7 +286,7 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
                 onCheckedChange={(checked) => setFormData(prev => ({ ...prev, status: checked }))}
                 disabled={loading}
               />
-            </div>
+            </div>*/}
 
             {/* Action Buttons */}
             <div className="flex justify-end gap-3 pt-4">
