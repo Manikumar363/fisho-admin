@@ -26,6 +26,7 @@ export default function UserManagement() {
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [editingVendorId, setEditingVendorId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isAddingEndUser, setIsAddingEndUser] = useState(false);
   const [isLoadingView, setIsLoadingView] = useState(false);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -38,7 +39,8 @@ export default function UserManagement() {
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [endUserForm, setEndUserForm] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
     contactNumber: ''
   });
@@ -262,15 +264,52 @@ export default function UserManagement() {
     }
   };
 
-  const handleAddEndUser = (e: React.FormEvent) => {
+  const handleAddEndUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Adding end user:', endUserForm);
-    setShowAddEndUserModal(false);
-    setEndUserForm({
-      name: '',
-      email: '',
-      contactNumber: ''
-    });
+    if (!endUserForm.firstName || !endUserForm.email || !endUserForm.contactNumber) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setIsAddingEndUser(true);
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        user?: any;
+        message?: string;
+      }>('/api/user/create-user', {
+        method: 'POST',
+        body: JSON.stringify({
+          firstName: endUserForm.firstName,
+          lastName: endUserForm.lastName,
+          phone: endUserForm.contactNumber,
+          email: endUserForm.email
+        }),
+      });
+
+      if (!res.success) throw new Error(res.message || 'Failed to create user');
+
+      toast.success(res.message || 'User created successfully');
+      setShowAddEndUserModal(false);
+      setEndUserForm({
+        firstName: '',
+        lastName: '',
+        email: '',
+        contactNumber: ''
+      });
+      setEndUsersPage(1);
+      const refreshRes = await apiFetch<{ success: boolean; users: any[]; pagination?: any; message?: string }>(`/api/user/all-users?page=1&limit=15`);
+      if (refreshRes.success) {
+        setEndUsers(refreshRes.users || []);
+        setEndUsersTotalPages(refreshRes.pagination?.totalPages || 1);
+      }
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to create user';
+      console.error('Create user error:', e);
+      toast.error(msg);
+    } finally {
+      setIsAddingEndUser(false);
+    }
   };
 
   const handleAddDeliveryPartner = (e: React.FormEvent) => {
@@ -1003,15 +1042,27 @@ export default function UserManagement() {
           </DialogHeader>
           <form onSubmit={handleAddEndUser}>
             <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="userName">Name</Label>
-                <Input
-                  id="userName"
-                  value={endUserForm.name}
-                  onChange={(e) => setEndUserForm({ ...endUserForm, name: e.target.value })}
-                  placeholder="Enter name"
-                  required
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input
+                    id="firstName"
+                    value={endUserForm.firstName}
+                    onChange={(e) => setEndUserForm({ ...endUserForm, firstName: e.target.value })}
+                    placeholder="Enter first name"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    value={endUserForm.lastName}
+                    onChange={(e) => setEndUserForm({ ...endUserForm, lastName: e.target.value })}
+                    placeholder="Enter last name"
+                    required
+                  />
+                </div>
               </div>
               
               <div className="space-y-2">
@@ -1043,8 +1094,12 @@ export default function UserManagement() {
               <Button type="button" variant="outline" onClick={() => setShowAddEndUserModal(false)}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
-                Add User
+              <Button 
+                type="submit" 
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={isAddingEndUser}
+              >
+                {isAddingEndUser ? 'Adding...' : 'Add User'}
               </Button>
             </DialogFooter>
           </form>

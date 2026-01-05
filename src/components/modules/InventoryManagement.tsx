@@ -36,6 +36,8 @@ export default function InventoryManagement() {
   const [viewingVariant, setViewingVariant] = useState<any>(null);
   const [isLoadingVariantView, setIsLoadingVariantView] = useState(false);
   const [openCutTypeAdd, setOpenCutTypeAdd] = useState(false);
+  const [productSortOption, setProductSortOption] = useState('recent');
+  const [variantSortOption, setVariantSortOption] = useState('recent');
 
   // Category state
   const [categoryForm, setCategoryForm] = useState({
@@ -63,7 +65,10 @@ export default function InventoryManagement() {
     defaultProfit: '',
     defaultDiscount: '',
     costPricePerKg: '',
-    availability: true
+    availability: true,
+    featured: false,
+    bestseller: false,
+    isExpressDelivery: false
   });
 
   // Fetch cut types for product form
@@ -329,6 +334,9 @@ export default function InventoryManagement() {
     availability?: boolean;
     weightUnit?: string;
     availableWeights?: number[];
+    featured?: boolean;
+    bestseller?: boolean;
+    isExpressDelivery?: boolean;
   }>>([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [productsError, setProductsError] = useState<string | null>(null);
@@ -358,6 +366,9 @@ export default function InventoryManagement() {
           weightUnit?: string;
           image?: string;
           isActive: boolean;
+          featured?: boolean;
+          bestSeller?: boolean;
+          isExpressDelivery?: boolean;
           createdAt: string;
           updatedAt: string;
           slug?: string;
@@ -426,6 +437,9 @@ export default function InventoryManagement() {
           availability: p.isActive,
           weightUnit: p.weightUnit,
           availableWeights: p.availableWeights || [],
+          featured: p.featured || false,
+          bestseller: p.bestSeller || false,
+          isExpressDelivery: p.isExpressDelivery || false,
         };
       });
       setProducts(mapped);
@@ -1008,7 +1022,10 @@ export default function InventoryManagement() {
       defaultProfit: '',
       defaultDiscount: '',
       costPricePerKg: '',
-      availability: true
+      availability: true,
+      featured: false,
+      bestseller: false,
+      isExpressDelivery: false
     });
     setVariantForm({
       species: '',
@@ -1171,6 +1188,9 @@ export default function InventoryManagement() {
         formData.append('defaultProfit', productForm.defaultProfit);
         formData.append('defaultDiscount', productForm.defaultDiscount);
         formData.append('isActive', String(productForm.availability));
+        formData.append('featured', String(productForm.featured));
+        formData.append('bestSeller', String(productForm.bestseller));
+        formData.append('isExpressDelivery', String(productForm.isExpressDelivery));
         if (productForm.productImage) {
           formData.append('image', productForm.productImage);
         } else if (productForm.existingImage) {
@@ -1210,7 +1230,10 @@ export default function InventoryManagement() {
           defaultProfit: '',
           defaultDiscount: '',
           costPricePerKg: '',
-          availability: true
+          availability: true,
+          featured: false,
+          bestseller: false,
+          isExpressDelivery: false
         });
         setEditingProductId(null);
         
@@ -1469,6 +1492,36 @@ export default function InventoryManagement() {
             <span>Current image will be kept unless you upload a new one.</span>
           </div>
         )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div className="flex items-center justify-between p-3 border rounded-lg">
+          <Label htmlFor="featured" className="cursor-pointer">Featured</Label>
+          <Switch
+            id="featured"
+            checked={productForm.featured}
+            onCheckedChange={(checked) => setProductForm({ ...productForm, featured: checked })}
+            disabled={isSubmitting}
+          />
+        </div>
+        <div className="flex items-center justify-between p-3 border rounded-lg">
+          <Label htmlFor="bestseller" className="cursor-pointer">Best Seller</Label>
+          <Switch
+            id="bestseller"
+            checked={productForm.bestseller}
+            onCheckedChange={(checked) => setProductForm({ ...productForm, bestseller: checked })}
+            disabled={isSubmitting}
+          />
+        </div>
+        <div className="flex items-center justify-between p-3 border rounded-lg">
+          <Label htmlFor="isExpressDelivery" className="cursor-pointer">Express Delivery</Label>
+          <Switch
+            id="isExpressDelivery"
+            checked={productForm.isExpressDelivery}
+            onCheckedChange={(checked) => setProductForm({ ...productForm, isExpressDelivery: checked })}
+            disabled={isSubmitting}
+          />
+        </div>
       </div>
 
       <div>
@@ -1938,6 +1991,48 @@ export default function InventoryManagement() {
           .some((field) => String(field).toLowerCase().includes(normalizedQuery))
       );
 
+  // Sort products based on selected option
+  const getSortedProducts = (products: typeof filteredProducts) => {
+    const sorted = [...products];
+    
+    switch (productSortOption) {
+      case 'name-asc':
+        return sorted.sort((a, b) => a.name.localeCompare(b.name));
+      case 'name-desc':
+        return sorted.sort((a, b) => b.name.localeCompare(a.name));
+      case 'stock-asc':
+        return sorted.sort((a, b) => a.stock - b.stock);
+      case 'stock-desc':
+        return sorted.sort((a, b) => b.stock - a.stock);
+      case 'recent':
+      default:
+        return sorted.sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime());
+    }
+  };
+
+  // Sort variants based on selected option
+  const getSortedVariants = (variants: typeof filteredVariants) => {
+    const sorted = [...variants];
+    
+    switch (variantSortOption) {
+      case 'name-asc':
+        return sorted.sort((a, b) => a.variantName.localeCompare(b.variantName));
+      case 'name-desc':
+        return sorted.sort((a, b) => b.variantName.localeCompare(a.variantName));
+      case 'price-asc':
+        return sorted.sort((a, b) => a.sellingPrice - b.sellingPrice);
+      case 'price-desc':
+        return sorted.sort((a, b) => b.sellingPrice - a.sellingPrice);
+      case 'recent':
+      default:
+        return sorted.sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime());
+    }
+  };
+
+  // Apply sorting to filtered data
+  const sortedProducts = getSortedProducts(filteredProducts);
+  const sortedVariants = getSortedVariants(filteredVariants);
+
   // Reset cut type add dialog when switching tabs
   useEffect(() => {
     if (activeTab !== 'cuttypes' && openCutTypeAdd) {
@@ -2144,7 +2239,7 @@ export default function InventoryManagement() {
 
           <Card>
             <CardHeader>
-              <CardTitle>All Products ({filteredProducts.length} of {products.length})</CardTitle>
+              <CardTitle>All Products ({sortedProducts.length} of {products.length})</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -2161,6 +2256,9 @@ export default function InventoryManagement() {
                       <th className="text-left py-3 px-4">Cost Price (₹/KG)</th>
                       <th className="text-left py-3 px-4">Default Profit %</th>
                       <th className="text-left py-3 px-4">Default Discount %</th>
+                      <th className="text-left py-3 px-4">Featured</th>
+                      <th className="text-left py-3 px-4">Best Seller</th>
+                      <th className="text-left py-3 px-4">Express Delivery</th>
                       <th className="text-left py-3 px-4">Status</th>
                       <th className="text-left py-3 px-4">Last Updated</th>
                       <th className="text-left py-3 px-4">Actions</th>
@@ -2169,7 +2267,7 @@ export default function InventoryManagement() {
                   <tbody>
                     {productsLoading ? (
                       <tr>
-                        <td colSpan={13} className="py-8 text-center text-gray-500">
+                        <td colSpan={16} className="py-8 text-center text-gray-500">
                           <div className="inline-flex items-center gap-2">
                             <Loader className="w-4 h-4 animate-spin" />
                             Loading products...
@@ -2178,13 +2276,13 @@ export default function InventoryManagement() {
                       </tr>
                     ) : productsError ? (
                       <tr>
-                        <td colSpan={13} className="py-8 text-center text-red-600">{productsError}</td>
+                        <td colSpan={16} className="py-8 text-center text-red-600">{productsError}</td>
                       </tr>
                     ) : filteredProducts.length === 0 ? (
                       <tr>
-                        <td colSpan={13} className="py-8 text-center text-gray-500">No products found</td>
+                        <td colSpan={16} className="py-8 text-center text-gray-500">No products found</td>
                       </tr>
-                    ) : filteredProducts.map((product, index) => {
+                    ) : sortedProducts.map((product, index) => {
                       const originalIndex = products.findIndex((p) => p.id === product.id);
                       return (
                       <tr key={product.id} className="border-b border-gray-100 hover:bg-gray-50">
@@ -2235,6 +2333,21 @@ export default function InventoryManagement() {
                         <td className="py-3 px-4">{product.profit}%</td>
                         <td className="py-3 px-4">{product.discount}%</td>
                         <td className="py-3 px-4">
+                          <Badge variant={product.featured ? 'default' : 'outline'} className={product.featured ? 'bg-yellow-100 text-yellow-800 text-xs' : 'bg-red-100 text-red-600'}>
+                            {product.featured ? 'Yes' : 'No'}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4">
+                          <Badge variant={product.bestseller ? 'default' : 'outline'} className={product.bestseller ? 'bg-green-100 text-green-800 hover:bg-green-700' : ' bg-red-100 text-red-800'}>
+                            {product.bestseller ? 'Yes' : 'No'}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4">
+                          <Badge variant={product.isExpressDelivery ? 'default' : 'outline'} className={product.isExpressDelivery ? 'bg-yellow-100 text-yellow-800 text-xs' : ' bg-red-100 text-red-600'}>
+                            {product.isExpressDelivery ? 'Yes' : 'No'}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4">
                           <Badge variant={product.status === 'Active' ? 'default' : 'destructive'}>
                             {product.status}
                           </Badge>
@@ -2265,7 +2378,10 @@ export default function InventoryManagement() {
                                   defaultProfit: String(product.profit ?? ''),
                                   defaultDiscount: String(product.discount ?? ''),
                                   costPricePerKg: String(product.costPrice ?? ''),
-                                  availability: product.availability ?? (product.status === 'Active')
+                                  availability: product.availability ?? (product.status === 'Active'),
+                                  featured: product.featured ?? false,
+                                  bestseller: product.bestseller ?? false,
+                                  isExpressDelivery: product.isExpressDelivery ?? false
                                 });
                                 setShowAddModal(true);
                               }}
@@ -2307,13 +2423,26 @@ export default function InventoryManagement() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
+                <Select value={variantSortOption} onValueChange={setVariantSortOption}>
+                  <SelectTrigger className="w-[220px]">
+                    <Filter className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="recent">Recently Added</SelectItem>
+                    <SelectItem value="name-asc">Name (A to Z)</SelectItem>
+                    <SelectItem value="name-desc">Name (Z to A)</SelectItem>
+                    <SelectItem value="price-asc">Price (Low to High)</SelectItem>
+                    <SelectItem value="price-desc">Price (High to Low)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>All Product Variants ({filteredVariants.length} of {variants.length})</CardTitle>
+              <CardTitle>All Product Variants ({sortedVariants.length} of {variants.length})</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -2631,6 +2760,7 @@ export default function InventoryManagement() {
                       type="number"
                       value={selectedItem?.profit || ''}
                       readOnly
+                      className="bg-gray-100"
                     />
                   </div>
 
@@ -2641,6 +2771,7 @@ export default function InventoryManagement() {
                       type="number"
                       value={selectedItem?.discount || ''}
                       readOnly
+                      className="bg-gray-100"
                     />
                   </div>
                 </div>
@@ -2748,12 +2879,24 @@ export default function InventoryManagement() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-gray-600">Profit Margin</Label>
-                      <p className="font-medium">{viewingVariant.profit}%</p>
+                      <Label htmlFor="variantProfit">Profit Margin</Label>
+                      <Input
+                        id="variantProfit"
+                        type="number"
+                        value={viewingVariant.profit}
+                        readOnly
+                        className="bg-gray-100"
+                      />
                     </div>
                     <div>
-                      <Label className="text-gray-600">Discount</Label>
-                      <p className="font-medium">{viewingVariant.discount}%</p>
+                      <Label htmlFor="variantDiscount">Discount</Label>
+                      <Input
+                        id="variantDiscount"
+                        type="number"
+                        value={viewingVariant.discount}
+                        readOnly
+                        className="bg-gray-100"
+                      />
                     </div>
                   </div>
                 </div>
