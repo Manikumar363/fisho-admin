@@ -38,6 +38,11 @@ export default function UserManagement() {
     contactNumber: ''
   });
   const [searchTerm, setSearchTerm] = useState('');
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [filters, setFilters] = useState({
+    status: '',
+    sortBy: 'recently-added'
+  });
   const [endUserForm, setEndUserForm] = useState({
     firstName: '',
     lastName: '',
@@ -470,23 +475,81 @@ export default function UserManagement() {
     });
     setShowEditVendorModal(true);
   };
-    // Filter functions
+
+  const clearFilters = () => {
+    setFilters({
+      status: '',
+      sortBy: 'recently-added'
+    });
+  };
+
+  const hasActiveFilters = () => {
+    return filters.status !== '';
+  };
+
+  // Filter functions
   const getFilteredEndUsers = () => {
-    if (!searchTerm) return endUsers;
-    const term = searchTerm.toLowerCase();
-    return endUsers.filter(user => 
-      user._id?.toLowerCase().includes(term) ||
-      user.firstName?.toLowerCase().includes(term) ||
-      user.lastName?.toLowerCase().includes(term) ||
-      user.email?.toLowerCase().includes(term) ||
-      user.phone?.toLowerCase().includes(term) ||
-      `${user.firstName} ${user.lastName}`.toLowerCase().includes(term)
-    );
+    let filtered = endUsers;
+
+    // Apply search term filter
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter(user => {
+        const userId = user._id?.toLowerCase() || '';
+        const firstName = user.firstName?.toLowerCase() || '';
+        const lastName = user.lastName?.toLowerCase() || '';
+        const email = user.email?.toLowerCase() || '';
+        const phone = user.phone?.toLowerCase() || '';
+        const countryCode = user.countryCode?.toLowerCase() || '';
+        const fullName = `${firstName} ${lastName}`;
+        const fullPhone = `${countryCode} ${phone}`;
+        
+        return userId.includes(term) ||
+               firstName.includes(term) ||
+               lastName.includes(term) ||
+               email.includes(term) ||
+               phone.includes(term) ||
+               fullName.includes(term) ||
+               fullPhone.includes(term);
+      });
+    }
+
+    // Apply status filter
+    if (filters.status) {
+      filtered = filtered.filter(user => {
+        const userStatus = user.isActive ? 'active' : 'inactive';
+        return userStatus === filters.status;
+      });
+    }
+
+    // Apply sorting
+    const sorted = [...filtered];
+    if (filters.sortBy === 'name-asc') {
+      sorted.sort((a, b) => {
+        const nameA = `${a.firstName} ${a.lastName}`.toLowerCase();
+        const nameB = `${b.firstName} ${b.lastName}`.toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+    } else if (filters.sortBy === 'name-desc') {
+      sorted.sort((a, b) => {
+        const nameA = `${a.firstName} ${a.lastName}`.toLowerCase();
+        const nameB = `${b.firstName} ${b.lastName}`.toLowerCase();
+        return nameB.localeCompare(nameA);
+      });
+    } else if (filters.sortBy === 'recently-added') {
+      sorted.sort((a, b) => {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return dateB - dateA;
+      });
+    }
+
+    return sorted;
   };
 
   const getFilteredDeliveryPartners = () => {
-    if (!searchTerm) return deliveryPartners;
-    const term = searchTerm.toLowerCase();
+    if (!searchTerm.trim()) return deliveryPartners;
+    const term = searchTerm.toLowerCase().trim();
     return deliveryPartners.filter(partner => 
       partner.id?.toLowerCase().includes(term) ||
       partner.name?.toLowerCase().includes(term) ||
@@ -496,8 +559,8 @@ export default function UserManagement() {
   };
 
   const getFilteredStoreManagers = () => {
-    if (!searchTerm) return storeManagers;
-    const term = searchTerm.toLowerCase();
+    if (!searchTerm.trim()) return storeManagers;
+    const term = searchTerm.toLowerCase().trim();
     return storeManagers.filter(manager => 
       manager.id?.toLowerCase().includes(term) ||
       manager.name?.toLowerCase().includes(term) ||
@@ -508,16 +571,29 @@ export default function UserManagement() {
   };
 
   const getFilteredVendors = () => {
-    if (!searchTerm) return vendors;
-    const term = searchTerm.toLowerCase();
-    return vendors.filter(vendor => 
-      vendor._id?.toLowerCase().includes(term) ||
-      vendor.name?.toLowerCase().includes(term) ||
-      vendor.companyName?.toLowerCase().includes(term) ||
-      vendor.vatNumber?.toLowerCase().includes(term) ||
-      vendor.email?.toLowerCase().includes(term) ||
-      vendor.phone?.toLowerCase().includes(term)
-    );
+    let filtered = vendors;
+
+    // Apply search term filter
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter(vendor => {
+        const vendorId = vendor._id?.toLowerCase() || '';
+        const name = vendor.name?.toLowerCase() || '';
+        const companyName = vendor.companyName?.toLowerCase() || '';
+        const vatNumber = vendor.vatNumber?.toLowerCase() || '';
+        const email = vendor.email?.toLowerCase() || '';
+        const phone = vendor.phone?.toLowerCase() || '';
+        
+        return vendorId.includes(term) ||
+               name.includes(term) ||
+               companyName.includes(term) ||
+               vatNumber.includes(term) ||
+               email.includes(term) ||
+               phone.includes(term);
+      });
+    }
+
+    return filtered;
   };
 
   return (
@@ -567,15 +643,22 @@ export default function UserManagement() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Button variant="outline">
+            <Button 
+              variant="outline"
+              onClick={() => setShowFilterModal(true)}
+              className={hasActiveFilters() ? 'border-blue-600 text-blue-600' : ''}
+            >
               <Filter className="w-4 h-4 mr-2" />
-              Filters
+              Filters {hasActiveFilters() && <span className="ml-1 text-xs bg-blue-600 text-white px-2 py-0.5 rounded">Active</span>}
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={(tab) => {
+        setActiveTab(tab);
+        setSearchTerm(''); // Clear search when switching tabs
+      }} className="w-full">
         <TabsList className="w-full justify-start border-b">
           <TabsTrigger value="end-users">End Users</TabsTrigger>
           <TabsTrigger value="delivery-partners">Delivery Partners</TabsTrigger>
@@ -1477,6 +1560,113 @@ export default function UserManagement() {
                 <Button onClick={() => setShowDeletedUsersModal(false)}>Close</Button>
               </div>
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Filter Modal */}
+      <Dialog open={showFilterModal} onOpenChange={setShowFilterModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Filters</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {activeTab === 'end-users' && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="statusFilter">Status</Label>
+                  <select
+                    id="statusFilter"
+                    value={filters.status}
+                    onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+
+                <div className="space-y-3">
+                  <Label>Sort By</Label>
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <input
+                        type="radio"
+                        id="recently-added"
+                        name="sortBy"
+                        value="recently-added"
+                        checked={filters.sortBy === 'recently-added'}
+                        onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                        className="mr-3"
+                      />
+                      <label htmlFor="recently-added" className="cursor-pointer">Recently Added</label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="radio"
+                        id="name-asc"
+                        name="sortBy"
+                        value="name-asc"
+                        checked={filters.sortBy === 'name-asc'}
+                        onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                        className="mr-3"
+                      />
+                      <label htmlFor="name-asc" className="cursor-pointer">Name (A to Z)</label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="radio"
+                        id="name-desc"
+                        name="sortBy"
+                        value="name-desc"
+                        checked={filters.sortBy === 'name-desc'}
+                        onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                        className="mr-3"
+                      />
+                      <label htmlFor="name-desc" className="cursor-pointer">Name (Z to A)</label>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {activeTab === 'vendors' && (
+              <div className="text-center text-gray-500 py-4">
+                No additional filters available for vendors
+              </div>
+            )}
+
+            {activeTab === 'delivery-partners' && (
+              <div className="text-center text-gray-500 py-4">
+                No additional filters available for delivery partners
+              </div>
+            )}
+
+            {activeTab === 'store-managers' && (
+              <div className="text-center text-gray-500 py-4">
+                No additional filters available for store managers
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <Button 
+              type="button" 
+              variant="outline"
+              onClick={clearFilters}
+              disabled={!hasActiveFilters()}
+            >
+              Clear Filters
+            </Button>
+            <Button 
+              type="button"
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={() => setShowFilterModal(false)}
+            >
+              Apply
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

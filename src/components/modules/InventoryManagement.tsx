@@ -2253,6 +2253,19 @@ export default function InventoryManagement() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
+                <Select value={productSortOption} onValueChange={setProductSortOption}>
+                  <SelectTrigger className="w-[220px]">
+                    <Filter className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="recent">Recently Added</SelectItem>
+                    <SelectItem value="name-asc">Name (A to Z)</SelectItem>
+                    <SelectItem value="name-desc">Name (Z to A)</SelectItem>
+                    <SelectItem value="stock-asc">Stock (Low to High)</SelectItem>
+                    <SelectItem value="stock-desc">Stock (High to Low)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>
@@ -2489,11 +2502,11 @@ export default function InventoryManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredVariants.length === 0 ? (
+                    {sortedVariants.length === 0 ? (
                       <tr>
                         <td colSpan={16} className="py-8 text-center text-gray-500">Variants Loading</td>
                       </tr>
-                    ) : filteredVariants.map((variant, index) => {
+                    ) : sortedVariants.map((variant, index) => {
                       const originalIndex = variants.findIndex((v) => v.id === variant.id);
                       return (
                       <tr key={variant.id} className="border-b border-gray-100 hover:bg-gray-50">
