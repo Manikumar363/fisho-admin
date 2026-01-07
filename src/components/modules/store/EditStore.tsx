@@ -229,7 +229,7 @@ export default function EditStore() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <p className="text-sm text-gray-600 mb-1">Today's Revenue</p>
-                  <p>₹45,230</p>
+                  <p><span className="dirham-symbol">&#xea;</span>45,230</p>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <p className="text-sm text-gray-600 mb-1">Current Stock Quantity</p>

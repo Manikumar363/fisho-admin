@@ -1,9 +1,9 @@
 /* Font Face Declarations */
 @font-face {
   font-family: "UAESymbol";
-  src: url("/fonts/font.woff2") format("woff2"),
-    url("/fonts/font.woff") format("woff"),
-    url("/fonts/font.ttf") format("truetype");
+  src: url("/fonts/font1.woff2") format("woff2"),
+    url("/fonts/font1.woff") format("woff"),
+    url("/fonts/font1.ttf") format("truetype");
 }
 
 /* Dirham Symbol Class */
@@ -11,6 +11,8 @@
   font-family: "UAESymbol", sans-serif;
   font-size: inherit;
   color: inherit;
+  line-height: 1;
+  display: inline-block;
 }
 
 @custom-variant dark (&:is(.dark *));

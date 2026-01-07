@@ -36,7 +36,7 @@ const generateMockUsers = (count: number) => {
       name: names[i % names.length],
       orderId: `ORD-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
       date: date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-      amount: `₹${Math.floor(Math.random() * 5000) + 500}`
+      amount: `<span className="dirham-symbol">&#xea;</span>${Math.floor(Math.random() * 5000) + 500}`
     });
   }
   
@@ -117,7 +117,7 @@ export default function ViewOffer({ offer, onBack }: ViewOfferProps) {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-600 mb-1">Minimum Order Value</p>
-                  <p>₹{offer.minOrderValue}</p>
+                  <p><span className="dirham-symbol">&#xea;</span>{offer.minOrderValue}</p>
                 </div>
               </div>
             </div>

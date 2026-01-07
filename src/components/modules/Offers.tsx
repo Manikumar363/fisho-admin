@@ -247,7 +247,7 @@ export default function Offers() {
                       <td className="py-3 px-4">{offer.id}</td>
                       <td className="py-3 px-4">{offer.couponName}</td>
                       <td className="py-3 px-4">{offer.discountPercentage}%</td>
-                      <td className="py-3 px-4"><span className="dirham-symbol">د.إ</span>{offer.minOrderValue}</td>
+                      <td className="py-3 px-4"><span className="dirham-symbol mr-2">&#xea;</span>{offer.minOrderValue}</td>
                       <td className="py-3 px-4">
                         {new Date(offer.expiryDate).toLocaleDateString('en-IN', {
                           day: '2-digit',

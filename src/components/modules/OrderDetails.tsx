@@ -148,8 +148,8 @@ export default function OrderDetails() {
                       <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
                     </div>
                     <div className="text-right">
-                      <p>₹{item.price} × {item.quantity}</p>
-                      <p>₹{item.total}</p>
+                      <p><span className="dirham-symbol mr-2">&#xea;</span>{item.price} × {item.quantity}</p>
+                      <p><span className="dirham-symbol mr-2">&#xea;</span>{item.total}</p>
                     </div>
                   </div>
                 ))}
@@ -158,19 +158,19 @@ export default function OrderDetails() {
               <div className="mt-4 pt-4 border-t border-gray-200 space-y-2">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Subtotal</span>
-                  <span>₹{orderData.subtotal}</span>
+                  <span><span className="dirham-symbol mr-2">&#xea;</span>{orderData.subtotal}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Delivery Charges</span>
-                  <span>₹{orderData.deliveryCharges}</span>
+                  <span><span className="dirham-symbol mr-2">&#xea;</span>{orderData.deliveryCharges}</span>
                 </div>
                 <div className="flex justify-between text-green-600">
                   <span>Discount</span>
-                  <span>-₹{orderData.discount}</span>
+                  <span>-<span className="dirham-symbol mr-2">&#xea;</span>{orderData.discount}</span>
                 </div>
                 <div className="flex justify-between pt-2 border-t border-gray-200">
                   <span>Total Amount</span>
-                  <span>₹{orderData.total}</span>
+                  <span><span className="dirham-symbol mr-2">&#xea;</span>{orderData.total}</span>
                 </div>
               </div>
             </CardContent>

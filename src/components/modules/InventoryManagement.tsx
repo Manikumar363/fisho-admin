@@ -1681,7 +1681,7 @@ export default function InventoryManagement() {
         </div>
 
         <div>
-          <Label htmlFor="costPricePerKg">Cost Price Per KG (₹) *</Label>
+          <Label htmlFor="costPricePerKg">Cost Price Per KG (<span className="dirham-symbol">&#xea;</span>) *</Label>
           <Input
             id="costPricePerKg"
             type="number"
@@ -1882,7 +1882,7 @@ export default function InventoryManagement() {
           
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <Label className="text-xs text-gray-600">Cost Price (₹/KG)</Label>
+              <Label className="text-xs text-gray-600">Cost Price (<span className="dirham-symbol">&#xea;</span>/KG)</Label>
               <Input value={costPrice} disabled className="bg-white" />
             </div>
             <div>
@@ -1905,7 +1905,7 @@ export default function InventoryManagement() {
               />
             </div>
             <div>
-              <Label className="text-xs text-gray-600">Display Price (₹) *</Label>
+              <Label className="text-xs text-gray-600">Display Price (<span className="dirham-symbol">&#xea;</span>) *</Label>
               <Input
                 type="number"
                 value={variantForm.displayPrice}
@@ -1929,7 +1929,7 @@ export default function InventoryManagement() {
               />
             </div>
             <div>
-              <Label className="text-xs text-gray-600">Selling Price (₹)</Label>
+              <Label className="text-xs text-gray-600">Selling Price (<span className="dirham-symbol">&#xea;</span>)</Label>
               <Input 
                 value={(variantForm.displayPrice && variantForm.discount)
                   ? (parseFloat(variantForm.displayPrice) - (parseFloat(variantForm.displayPrice) * (parseFloat(variantForm.discount) || 0) / 100)).toFixed(2)
@@ -2286,7 +2286,7 @@ export default function InventoryManagement() {
                       <th className="text-left py-3 px-4">Species</th>
                       <th className="text-left py-3 px-4">Cut Types</th>
                       <th className="text-left py-3 px-4">Available Stock</th>
-                      <th className="text-left py-3 px-4">Cost Price (₹/KG)</th>
+                      <th className="text-left py-3 px-4">Cost Price (<span className="dirham-symbol">&#xea;</span>/KG)</th>
                       <th className="text-left py-3 px-4">Default Profit %</th>
                       <th className="text-left py-3 px-4">Default Discount %</th>
                       <th className="text-left py-3 px-4">Featured</th>
@@ -2362,7 +2362,7 @@ export default function InventoryManagement() {
                           </div>
                         </td>
                         <td className="py-3 px-4">{product.stock} KG</td>
-                        <td className="py-3 px-4">₹{product.costPrice}</td>
+                        <td className="py-3 px-4"><div className="flex items-center"><span className="dirham-symbol mr-2">&#xea;</span>{product.costPrice}</div></td>
                         <td className="py-3 px-4">{product.profit}%</td>
                         <td className="py-3 px-4">{product.discount}%</td>
                         <td className="py-3 px-4">
@@ -2491,11 +2491,11 @@ export default function InventoryManagement() {
                       <th className="text-left py-3 px-4">Cut Type</th>
                       <th className="text-left py-3 px-4">Featured</th>
                       <th className="text-left py-3 px-4">Best Seller</th>
-                      <th className="text-left py-3 px-4">Cost Price (₹/KG)</th>
+                      <th className="text-left py-3 px-4">Cost Price (<span className="dirham-symbol">&#xea;</span>/KG)</th>
                       <th className="text-left py-3 px-4">Profit %</th>
-                      <th className="text-left py-3 px-4">Display Price (₹)</th>
+                      <th className="text-left py-3 px-4">Display Price (<span className="dirham-symbol">&#xea;</span>)</th>
                       <th className="text-left py-3 px-4">Discount %</th>
-                      <th className="text-left py-3 px-4">Selling Price (₹)</th>
+                      <th className="text-left py-3 px-4">Selling Price (<span className="dirham-symbol">&#xea;</span>)</th>
                       <th className="text-left py-3 px-4">Status</th>
                       <th className="text-left py-3 px-4">Last Updated</th>
                       <th className="text-left py-3 px-4">Actions</th>
@@ -2560,11 +2560,11 @@ export default function InventoryManagement() {
                             <span className="text-gray-400">No</span>
                           )}
                         </td>
-                        <td className="py-3 px-4">₹{variant.costPrice}</td>
+                        <td className="py-3 px-4"><div className="flex items-center"><span className="dirham-symbol mr-2">&#xea;</span>{variant.costPrice}</div></td>
                         <td className="py-3 px-4">{variant.profit}%</td>
-                        <td className="py-3 px-4">₹{variant.displayPrice}</td>
+                        <td className="py-3 px-4"><div className="flex items-center"><span className="dirham-symbol mr-2">&#xea;</span>{variant.displayPrice}</div></td>
                         <td className="py-3 px-4">{variant.discount}%</td>
-                        <td className="py-3 px-4">₹{Number(variant.sellingPrice).toFixed(2)}</td>
+                        <td className="py-3 px-4"><div className="flex items-center"><span className="dirham-symbol mr-2">&#xea;</span>{Number(variant.sellingPrice).toFixed(2)}</div></td>
                         <td className="py-3 px-4">
                           <Badge variant={variant.status === 'Active' ? 'default' : 'destructive'}>
                             {variant.status}
@@ -2775,7 +2775,7 @@ export default function InventoryManagement() {
                   </div>
 
                   <div>
-                    <Label htmlFor="costPricePerKg">Cost Price Per KG (₹)</Label>
+                    <Label htmlFor="costPricePerKg">Cost Price Per KG (<span className="dirham-symbol mr-2">&#xea;</span>)</Label>
                     <Input
                       id="costPricePerKg"
                       type="number"
@@ -2903,11 +2903,11 @@ export default function InventoryManagement() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label className="text-gray-600">Display Price</Label>
-                      <p className="font-semibold text-lg">₹{viewingVariant.displayPrice}</p>
+                      <p className="font-semibold text-lg"><div className="flex items-center"><span className="dirham-symbol mr-2">&#xea;</span>{viewingVariant.displayPrice}</div></p>
                     </div>
                     <div>
                       <Label className="text-gray-600">Selling Price</Label>
-                      <p className="font-semibold text-lg text-green-600">₹{viewingVariant.sellingPrice}</p>
+                      <p className="font-semibold text-lg text-green-600"><div className="flex items-center"><span className="dirham-symbol mr-2">&#xea;</span>{viewingVariant.sellingPrice}</div></p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">

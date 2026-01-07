@@ -480,11 +480,11 @@ export default function PrePurchaseOrders() {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="text-left py-3 px-4 text-sm font-semibold">Product *</th>
-                        <th className="text-left py-3 px-4 text-sm font-semibold">Cost Price (₹) *</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold">Cost Price (<span className="dirham-symbol">&#xea;</span>) *</th>
                         <th className="text-left py-3 px-4 text-sm font-semibold">Quantity *</th>
-                        <th className="text-left py-3 px-4 text-sm font-semibold">Amount (₹)</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold">Amount (<span className="dirham-symbol">&#xea;</span>)</th>
                         <th className="text-left py-3 px-4 text-sm font-semibold">VAT % *</th>
-                        <th className="text-left py-3 px-4 text-sm font-semibold">Total Amount (₹)</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold">Total Amount (<span className="dirham-symbol">&#xea;</span>)</th>
                         <th className="text-left py-3 px-4 text-sm font-semibold">Action</th>
                       </tr>
                     </thead>
@@ -578,7 +578,7 @@ export default function PrePurchaseOrders() {
                     <div className="flex items-center gap-4">
                       <span className="text-gray-700">Total PPO Value:</span>
                       <span className="text-2xl font-bold text-blue-600">
-                        ₹{calculatePPOTotal().toFixed(2)}
+                        <span className="dirham-symbol">&#xea;</span>{calculatePPOTotal().toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -658,7 +658,7 @@ export default function PrePurchaseOrders() {
                       <td className="py-3 px-4">{ppo.vendor?.name || '—'}</td>
                       <td className="py-3 px-4">{new Date(ppo.date).toLocaleDateString()}</td>
                       <td className="py-3 px-4">{ppo.particulars?.length || 0}</td>
-                      <td className="py-3 px-4 font-semibold">₹{ppo.ppoValue.toLocaleString()}</td>
+                      <td className="py-3 px-4 font-light"><span className="dirham-symbol mr-2">&#xea;</span>{ppo.ppoValue.toLocaleString()}</td>
                     <td className="py-3 px-4">
                       <div className="flex gap-2">
                         <button 
@@ -759,22 +759,22 @@ export default function PrePurchaseOrders() {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="text-left py-2 px-3 text-xs font-semibold">Product</th>
-                        <th className="text-left py-2 px-3 text-xs font-semibold">Cost Price (₹)</th>
+                        <th className="text-left py-2 px-3 text-xs font-semibold">Cost Price (<span className="dirham-symbol">&#xea;</span>)</th>
                         <th className="text-left py-2 px-3 text-xs font-semibold">Quantity</th>
-                        <th className="text-left py-2 px-3 text-xs font-semibold">Amount (₹)</th>
+                        <th className="text-left py-2 px-3 text-xs font-semibold">Amount (<span className="dirham-symbol">&#xea;</span>)</th>
                         <th className="text-left py-2 px-3 text-xs font-semibold">VAT %</th>
-                        <th className="text-left py-2 px-3 text-xs font-semibold">Total Amount (₹)</th>
+                        <th className="text-left py-2 px-3 text-xs font-semibold">Total Amount (<span className="dirham-symbol">&#xea;</span>)</th>
                       </tr>
                     </thead>
                     <tbody>
                       {selectedPpo.particulars?.map((particular: any, index: number) => (
                         <tr key={particular._id || index} className="border-t">
                           <td className="py-2 px-3">{particular.product?.name || '—'}</td>
-                          <td className="py-2 px-3">₹{particular.costPrice.toFixed(2)}</td>
+                          <td className="py-2 px-3"><span className="dirham-symbol">&#xea;</span>{particular.costPrice.toFixed(2)}</td>
                           <td className="py-2 px-3">{particular.quantity}</td>
-                          <td className="py-2 px-3">₹{particular.amount.toFixed(2)}</td>
+                          <td className="py-2 px-3"><span className="dirham-symbol">&#xea;</span>{particular.amount.toFixed(2)}</td>
                           <td className="py-2 px-3">{particular.vat}%</td>
-                          <td className="py-2 px-3 font-semibold">₹{particular.totalAmount.toFixed(2)}</td>
+                          <td className="py-2 px-3 font-semibold"><span className="dirham-symbol">&#xea;</span>{particular.totalAmount.toFixed(2)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -788,7 +788,7 @@ export default function PrePurchaseOrders() {
                   <div className="flex items-center gap-4">
                     <span className="text-gray-700">Total PPO Value:</span>
                     <span className="text-2xl font-bold text-blue-600">
-                      ₹{selectedPpo.ppoValue.toLocaleString()}
+                      <span className="dirham-symbol">&#xea;</span>{selectedPpo.ppoValue.toLocaleString()}
                     </span>
                   </div>
                 </div>

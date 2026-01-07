@@ -243,7 +243,7 @@ export default function AddInventoryItem() {
       {/* Pricing */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <Label htmlFor="actualPrice">Actual Price (₹)</Label>
+          <Label htmlFor="actualPrice">Actual Price (<span className="dirham-symbol">&#xea;</span>)</Label>
           <Input
             id="actualPrice"
             type="number"
@@ -265,7 +265,7 @@ export default function AddInventoryItem() {
         </div>
 
         <div>
-          <Label htmlFor="discountedPrice">Discounted Price (₹)</Label>
+          <Label htmlFor="discountedPrice">Discounted Price ()</Label>
           <Input
             id="discountedPrice"
             value={calculateDiscountedPrice()}

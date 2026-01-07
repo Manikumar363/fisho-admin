@@ -47,6 +47,22 @@
     }
   }
 }
+/* Font Face Declarations */
+@font-face {
+  font-family: "UAESymbol";
+  src: url("/fonts/font1.woff2") format("woff2"),
+    url("/fonts/font1.woff") format("woff"),
+    url("/fonts/font1.ttf") format("truetype");
+}
+
+/* Dirham Symbol Class */
+.dirham-symbol {
+  font-family: "UAESymbol", sans-serif;
+  font-size: inherit;
+  color: inherit;
+  line-height: 1;
+  display: inline-block;
+}
 
 @layer theme {
   :root, :host {
