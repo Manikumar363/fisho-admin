@@ -19,6 +19,8 @@ export default function UserManagement() {
   const [showAddVendorModal, setShowAddVendorModal] = useState(false);
   const [showAddEndUserModal, setShowAddEndUserModal] = useState(false);
   const [showAddDeliveryPartnerModal, setShowAddDeliveryPartnerModal] = useState(false);
+  const [showAddSubadminModal, setShowAddSubadminModal] = useState(false);
+  const [showEditSubadminModal, setShowEditSubadminModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showDeletedUsersModal, setShowDeletedUsersModal] = useState(false);
@@ -27,6 +29,8 @@ export default function UserManagement() {
   const [editingVendorId, setEditingVendorId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isAddingEndUser, setIsAddingEndUser] = useState(false);
+  const [isAddingSubadmin, setIsAddingSubadmin] = useState(false);
+  const [editingSubadminId, setEditingSubadminId] = useState<string | null>(null);
   const [isLoadingView, setIsLoadingView] = useState(false);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -57,6 +61,12 @@ export default function UserManagement() {
     email: ''
   });
 
+  const [subadminForm, setSubadminForm] = useState({
+    name: '',
+    email: '',
+    phone: ''
+  });
+
   // End Users API integration
   const [endUsers, setEndUsers] = useState<any[]>([]);
   const [endUsersLoading, setEndUsersLoading] = useState(false);
@@ -75,6 +85,13 @@ export default function UserManagement() {
   const [vendors, setVendors] = useState<any[]>([]);
   const [vendorsLoading, setVendorsLoading] = useState(false);
   const [vendorsError, setVendorsError] = useState<string | null>(null);
+
+  // Store Managers API integration
+  const [storeManagers, setStoreManagers] = useState<any[]>([]);
+  const [storeManagersLoading, setStoreManagersLoading] = useState(false);
+  const [storeManagersError, setStoreManagersError] = useState<string | null>(null);
+  const [storeManagersPage, setStoreManagersPage] = useState(1);
+  const [storeManagersTotalPages, setStoreManagersTotalPages] = useState(1);
 
   useEffect(() => {
     const filterParam = searchParams.get('filter');
@@ -138,18 +155,27 @@ export default function UserManagement() {
       .finally(() => setVendorsLoading(false));
   }, [activeTab]);
 
+  useEffect(() => {
+    if (activeTab !== 'store-managers') return;
+    setStoreManagersLoading(true);
+    setStoreManagersError(null);
+    apiFetch<{ success: boolean; subadmins: any[]; pagination?: any; message?: string }>(`/api/subadmin/all-subadmins?page=${storeManagersPage}&limit=15`)
+      .then(res => {
+        if (!res.success) throw new Error(res.message || 'Failed to fetch store managers');
+        setStoreManagers(res.subadmins || []);
+        setStoreManagersTotalPages(res.pagination?.totalPages || 1);
+      })
+      .catch(e => {
+        setStoreManagersError(e?.message || 'Failed to load store managers');
+      })
+      .finally(() => setStoreManagersLoading(false));
+  }, [activeTab, storeManagersPage]);
+
   const deliveryPartners = [
     { id: 'DP-001', name: 'Mohammed Ali', email: 'ali@fisho.com', phone: '+91 98765 11111', deliveries: 342, earnings: '₹68,400', rating: 4.8, status: 'Active' },
     { id: 'DP-002', name: 'Suresh Babu', email: 'suresh@fisho.com', phone: '+91 98765 11112', deliveries: 298, earnings: '₹59,600', rating: 4.7, status: 'Active' },
     { id: 'DP-003', name: 'Ramesh Kumar', email: 'ramesh@fisho.com', phone: '+91 98765 11113', deliveries: 456, earnings: '₹91,200', rating: 4.9, status: 'Active' },
     { id: 'DP-004', name: 'Vikram Singh', email: 'vikram@fisho.com', phone: '+91 98765 11114', deliveries: 189, earnings: '₹37,800', rating: 4.6, status: 'Inactive' }
-  ];
-
-  const storeManagers = [
-    { id: 'SM-001', name: 'Rajesh Kumar', email: 'rajesh.marine@fisho.com', phone: '+91 98765 22221', store: 'Fisho Marine Drive', experience: '5 years', status: 'Active' },
-    { id: 'SM-002', name: 'Priya Sharma', email: 'priya.bandra@fisho.com', phone: '+91 98765 22222', store: 'Fisho Bandra West', experience: '3 years', status: 'Active' },
-    { id: 'SM-003', name: 'Mohammed Syed', email: 'mohammed.andheri@fisho.com', phone: '+91 98765 22223', store: 'Fisho Andheri', experience: '7 years', status: 'Active' },
-    { id: 'SM-004', name: 'Anjali Desai', email: 'anjali.juhu@fisho.com', phone: '+91 98765 22224', store: 'Fisho Juhu', experience: '4 years', status: 'Active' }
   ];
 
   const vendorsStatic = [
@@ -317,6 +343,105 @@ export default function UserManagement() {
     }
   };
 
+  const handleAddSubadmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subadminForm.name || !subadminForm.email || !subadminForm.phone) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setIsAddingSubadmin(true);
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        message?: string;
+        user?: any;
+      }>(`/api/subadmin/create-subadmin`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: subadminForm.name,
+          phone: subadminForm.phone,
+          email: subadminForm.email,
+        }),
+      });
+
+      if (!res.success) throw new Error(res.message || 'Failed to create subadmin');
+
+      toast.success(res.message || 'Subadmin created successfully');
+      setShowAddSubadminModal(false);
+      setSubadminForm({ name: '', email: '', phone: '' });
+
+      // Refresh store managers list
+      setStoreManagersPage(1);
+      const refreshRes = await apiFetch<{ success: boolean; subadmins: any[]; pagination?: any; message?: string }>(`/api/subadmin/all-subadmins?page=1&limit=15`);
+      if (refreshRes.success) {
+        setStoreManagers(refreshRes.subadmins || []);
+        setStoreManagersTotalPages(refreshRes.pagination?.totalPages || 1);
+      }
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to create subadmin';
+      console.error('Create subadmin error:', e);
+      toast.error(msg);
+    } finally {
+      setIsAddingSubadmin(false);
+    }
+  };
+
+  const handleOpenEditSubadmin = (manager: any) => {
+    setEditingSubadminId(manager._id);
+    setSubadminForm({
+      name: manager.name || '',
+      email: manager.email || '',
+      phone: manager.phone || ''
+    });
+    setShowEditSubadminModal(true);
+  };
+
+  const handleEditSubadmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSubadminId) return;
+
+    if (!subadminForm.name || !subadminForm.email || !subadminForm.phone) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        message?: string;
+      }>(`/api/subadmin/subadmin-by-id/${editingSubadminId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: subadminForm.name,
+          email: subadminForm.email,
+          phone: subadminForm.phone,
+        }),
+      });
+
+      if (!res.success) throw new Error(res.message || 'Failed to update subadmin');
+
+      toast.success(res.message || 'Subadmin updated successfully');
+
+      // Close modal and reset
+      setShowEditSubadminModal(false);
+      setEditingSubadminId(null);
+
+      // Refresh store managers list
+      setStoreManagersLoading(true);
+      const refreshRes = await apiFetch<{ success: boolean; subadmins: any[]; pagination?: any; message?: string }>(`/api/subadmin/all-subadmins?page=${storeManagersPage}&limit=15`);
+      if (refreshRes.success) {
+        setStoreManagers(refreshRes.subadmins || []);
+        setStoreManagersTotalPages(refreshRes.pagination?.totalPages || 1);
+      }
+      setStoreManagersLoading(false);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to update subadmin';
+      console.error('Edit subadmin error:', e);
+      toast.error(msg);
+    }
+  };
+
   const handleAddDeliveryPartner = (e: React.FormEvent) => {
     e.preventDefault();
     console.log('Adding delivery partner:', deliveryPartnerForm);
@@ -392,6 +517,32 @@ export default function UserManagement() {
         setIsLoadingView(false);
       }
     }
+
+    // Fetch full subadmin details for store-managers
+    if (type === 'store-manager') {
+      setIsLoadingView(true);
+      try {
+        const res = await apiFetch<{
+          success: boolean;
+          subadmin?: any;
+          message?: string;
+        }>(`/api/subadmin/subadmin-by-id/${item._id}`);
+
+        if (!res.success) throw new Error(res.message || 'Failed to fetch subadmin details');
+
+        // Update selected item with full details
+        setSelectedItem({
+          ...res.subadmin,
+          type: 'store-manager',
+        });
+      } catch (e: any) {
+        const msg = e?.message || 'Failed to load subadmin details';
+        console.error('Fetch subadmin details error:', e);
+        toast.error(msg);
+      } finally {
+        setIsLoadingView(false);
+      }
+    }
   };
 
   const handleDelete = (item: any, type: string) => {
@@ -446,6 +597,29 @@ export default function UserManagement() {
         if (refreshRes.success) {
           setVendors(refreshRes.vendors || []);
         }
+      } else if (selectedItem.type === 'store-manager') {
+        // Delete subadmin (store manager)
+        const res = await apiFetch<{
+          success: boolean;
+          message?: string;
+        }>(`/api/subadmin/subadmin-by-id/${selectedItem._id}`, {
+          method: 'DELETE',
+        });
+
+        if (!res.success) throw new Error(res.message || 'Failed to delete subadmin');
+
+        toast.success(res.message || 'Subadmin deleted successfully');
+        setShowDeleteDialog(false);
+        setSelectedItem(null);
+
+        // Refresh the store managers list
+        setStoreManagersLoading(true);
+        const refreshRes = await apiFetch<{ success: boolean; subadmins: any[]; pagination?: any; message?: string }>(`/api/subadmin/all-subadmins?page=${storeManagersPage}&limit=15`);
+        if (refreshRes.success) {
+          setStoreManagers(refreshRes.subadmins || []);
+          setStoreManagersTotalPages(refreshRes.pagination?.totalPages || 1);
+        }
+        setStoreManagersLoading(false);
       } else {
         toast.info('Delete functionality not yet implemented for this type');
         setShowDeleteDialog(false);
@@ -559,15 +733,25 @@ export default function UserManagement() {
   };
 
   const getFilteredStoreManagers = () => {
-    if (!searchTerm.trim()) return storeManagers;
-    const term = searchTerm.toLowerCase().trim();
-    return storeManagers.filter(manager => 
-      manager.id?.toLowerCase().includes(term) ||
-      manager.name?.toLowerCase().includes(term) ||
-      manager.email?.toLowerCase().includes(term) ||
-      manager.phone?.toLowerCase().includes(term) ||
-      manager.store?.toLowerCase().includes(term)
-    );
+    let filtered = storeManagers;
+
+    // Apply search term filter
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter(manager => {
+        const managerId = manager._id?.toLowerCase() || '';
+        const name = manager.name?.toLowerCase() || '';
+        const email = manager.email?.toLowerCase() || '';
+        const phone = manager.phone?.toLowerCase() || '';
+        
+        return managerId.includes(term) ||
+               name.includes(term) ||
+               email.includes(term) ||
+               phone.includes(term);
+      });
+    }
+
+    return filtered;
   };
 
   const getFilteredVendors = () => {
@@ -825,8 +1009,15 @@ export default function UserManagement() {
 
         <TabsContent value="store-managers">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Store Managers</CardTitle>
+              <Button 
+                onClick={() => setShowAddSubadminModal(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Subadmin
+              </Button>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -837,39 +1028,61 @@ export default function UserManagement() {
                       <th className="text-left py-3 px-4">Name</th>
                       <th className="text-left py-3 px-4">Phone</th>
                       <th className="text-left py-3 px-4">Email</th>
-                      <th className="text-left py-3 px-4">Store</th>
-                      <th className="text-left py-3 px-4">Experience</th>
+                      <th className="text-left py-3 px-4">Role</th>
                       <th className="text-left py-3 px-4">Status</th>
                       <th className="text-left py-3 px-4">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {getFilteredStoreManagers().map((manager) => (
-                      <tr key={manager.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-3 px-4 text-blue-600">{manager.id}</td>
-                        <td className="py-3 px-4">{manager.name}</td>
-                        <td className="py-3 px-4">{manager.phone}</td>
-                        <td className="py-3 px-4">{manager.email}</td>
-                        <td className="py-3 px-4">{manager.store}</td>
-                        <td className="py-3 px-4">{manager.experience}</td>
-                        <td className="py-3 px-4">
-                          <Badge variant={manager.status === 'Active' ? 'default' : 'secondary'}>
-                            {manager.status}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex gap-2">
-                            <button 
-                              className="p-1 hover:bg-gray-100 rounded"
-                              onClick={() => handleView(manager, 'store-manager')}
-                              title="View"
-                            >
-                              <Eye className="w-4 h-4 text-gray-600" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {storeManagersLoading ? (
+                      <tr><td colSpan={7} className="py-8 text-center text-gray-500">Loading store managers...</td></tr>
+                    ) : storeManagersError ? (
+                      <tr><td colSpan={7} className="py-8 text-center text-red-600">{storeManagersError}</td></tr>
+                    ) : storeManagers.length === 0 ? (
+                      <tr><td colSpan={7} className="py-8 text-center text-gray-500">No store managers found</td></tr>
+                    ) : getFilteredStoreManagers().length === 0 ? (
+                      <tr><td colSpan={7} className="py-8 text-center text-gray-500">No store managers match your search</td></tr>
+                    ) : (
+                      getFilteredStoreManagers().map((manager) => (
+                        <tr key={manager._id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-3 px-4 text-blue-600">{manager._id}</td>
+                          <td className="py-3 px-4">{manager.name}</td>
+                          <td className="py-3 px-4">{manager.phone}</td>
+                          <td className="py-3 px-4">{manager.email}</td>
+                          <td className="py-3 px-4 capitalize">{manager.role}</td>
+                          <td className="py-3 px-4">
+                            <Badge variant={manager.isActive ? 'default' : 'secondary'}>
+                              {manager.isActive ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex gap-2">
+                              <button 
+                                className="p-1 hover:bg-gray-100 rounded"
+                                onClick={() => handleView(manager, 'store-manager')}
+                                title="View"
+                              >
+                                <Eye className="w-4 h-4 text-gray-600" />
+                              </button>
+                              <button 
+                                className="p-1 hover:bg-gray-100 rounded"
+                                onClick={() => handleOpenEditSubadmin(manager)}
+                                title="Edit"
+                              >
+                                <Edit className="w-4 h-4 text-gray-600" />
+                              </button>
+                              <button 
+                                className="p-1 hover:bg-gray-100 rounded"
+                                onClick={() => handleDelete(manager, 'store-manager')}
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4 text-red-600" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -1275,6 +1488,122 @@ export default function UserManagement() {
         </DialogContent>
       </Dialog>
 
+      {/* Add Subadmin Modal */}
+      <Dialog open={showAddSubadminModal} onOpenChange={setShowAddSubadminModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add New Subadmin</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleAddSubadmin}>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="subadminName">Name</Label>
+                <Input
+                  id="subadminName"
+                  value={subadminForm.name}
+                  onChange={(e) => setSubadminForm({ ...subadminForm, name: e.target.value })}
+                  placeholder="Enter name"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="subadminEmail">Email ID</Label>
+                <Input
+                  id="subadminEmail"
+                  type="email"
+                  value={subadminForm.email}
+                  onChange={(e) => setSubadminForm({ ...subadminForm, email: e.target.value })}
+                  placeholder="Enter email address"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="subadminPhone">Contact Number</Label>
+                <Input
+                  id="subadminPhone"
+                  type="tel"
+                  value={subadminForm.phone}
+                  onChange={(e) => setSubadminForm({ ...subadminForm, phone: e.target.value })}
+                  placeholder="Enter contact number"
+                  required
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowAddSubadminModal(false)}>
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={isAddingSubadmin}
+              >
+                {isAddingSubadmin ? 'Adding...' : 'Add Subadmin'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Subadmin Modal */}
+      <Dialog open={showEditSubadminModal} onOpenChange={setShowEditSubadminModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Subadmin</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditSubadmin}>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="editSubadminName">Name</Label>
+                <Input
+                  id="editSubadminName"
+                  value={subadminForm.name}
+                  onChange={(e) => setSubadminForm({ ...subadminForm, name: e.target.value })}
+                  placeholder="Enter name"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="editSubadminEmail">Email ID</Label>
+                <Input
+                  id="editSubadminEmail"
+                  type="email"
+                  value={subadminForm.email}
+                  onChange={(e) => setSubadminForm({ ...subadminForm, email: e.target.value })}
+                  placeholder="Enter email address"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="editSubadminPhone">Contact Number</Label>
+                <Input
+                  id="editSubadminPhone"
+                  type="tel"
+                  value={subadminForm.phone}
+                  onChange={(e) => setSubadminForm({ ...subadminForm, phone: e.target.value })}
+                  placeholder="Enter contact number"
+                  required
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowEditSubadminModal(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
+                Update Subadmin
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* View Modal */}
       <Dialog open={showViewModal} onOpenChange={setShowViewModal}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -1389,31 +1718,35 @@ export default function UserManagement() {
                     <>
                       <div>
                         <Label className="text-gray-600">Manager ID</Label>
-                        <p>{selectedItem.id}</p>
+                        <p className="font-medium">{selectedItem._id || selectedItem.id}</p>
                       </div>
                       <div>
                         <Label className="text-gray-600">Name</Label>
-                        <p>{selectedItem.name}</p>
+                        <p className="font-medium">{selectedItem.name}</p>
                       </div>
                       <div>
                         <Label className="text-gray-600">Email</Label>
-                        <p>{selectedItem.email}</p>
+                        <p className="font-medium">{selectedItem.email}</p>
                       </div>
                       <div>
                         <Label className="text-gray-600">Phone</Label>
-                        <p>{selectedItem.phone}</p>
+                        <p className="font-medium">{selectedItem.phone}</p>
                       </div>
                       <div>
-                        <Label className="text-gray-600">Store</Label>
-                        <p>{selectedItem.store}</p>
-                      </div>
-                      <div>
-                        <Label className="text-gray-600">Experience</Label>
-                        <p>{selectedItem.experience}</p>
+                        <Label className="text-gray-600">Role</Label>
+                        <p className="font-medium capitalize">{selectedItem.role}</p>
                       </div>
                       <div>
                         <Label className="text-gray-600">Status</Label>
-                        <p><Badge variant={selectedItem.status === 'Active' ? 'default' : 'secondary'}>{selectedItem.status}</Badge></p>
+                        <p><Badge variant={selectedItem.isActive ? 'default' : 'secondary'}>{selectedItem.isActive ? 'Active' : 'Inactive'}</Badge></p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Created At</Label>
+                        <p className="font-medium">{selectedItem.createdAt ? new Date(selectedItem.createdAt).toLocaleDateString() : '—'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Last Updated</Label>
+                        <p className="font-medium">{selectedItem.updatedAt ? new Date(selectedItem.updatedAt).toLocaleDateString() : '—'}</p>
                       </div>
                     </>
                   )}
