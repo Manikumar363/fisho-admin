@@ -24,6 +24,8 @@ import DeliveryLocations from './components/modules/DeliveryLocations';
 import CMS from './components/modules/CMS';
 import Enquiries from './components/modules/Enquiries';
 import { getToken } from './lib/api';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -57,6 +59,19 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      {/* Toast Notifications */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
       <Routes>
         {/* Auth Routes */}
         <Route path="/login" element={<Login onLogin={handleLogin} />} />

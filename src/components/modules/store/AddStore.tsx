@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
@@ -7,38 +7,179 @@ import { Label } from '../../ui/label';
 import { Textarea } from '../../ui/textarea';
 import { Button } from '../../ui/button';
 import { Switch } from '../../ui/switch';
+import { apiFetch } from '../../../lib/api';
+import { toast } from 'react-toastify';
+import MapSection from './MapSection';
 
 interface AddStoreProps {
   onBack: () => void;
+  onStoreCreated?: (store: any) => void;
 }
 
-export default function AddStore({ onBack }: AddStoreProps) {
+type DayKey = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+
+const defaultHours: Record<DayKey, { open: string; close: string; isClosed: boolean }> = {
+  monday: { open: '10:00', close: '21:00', isClosed: false },
+  tuesday: { open: '10:00', close: '21:00', isClosed: false },
+  wednesday: { open: '10:00', close: '21:00', isClosed: false },
+  thursday: { open: '10:00', close: '22:00', isClosed: false },
+  friday: { open: '10:00', close: '22:00', isClosed: false },
+  saturday: { open: '09:00', close: '22:00', isClosed: false },
+  sunday: { open: '11:00', close: '19:00', isClosed: false },
+};
+
+export default function AddStore({ onBack, onStoreCreated }: AddStoreProps) {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    storeName: '',
-    storeId: '',
-    storeLocation: '',
-    storeAddress: '',
-    managerName: '',
-    managerContact: '',
-    managerEmail: '',
-    operatingHours: '',
-    isActive: true
+    name: '',
+    address: '',
+    lat: '',
+    lng: '',
+    description: '',
+    managerId: '',
+    isActive: true,
+    operatingHours: defaultHours,
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [managers, setManagers] = useState<any[]>([]);
+  const [managersLoading, setManagersLoading] = useState(false);
+  
+  const dayEntries = useMemo(() => Object.entries(formData.operatingHours) as [DayKey, { open: string; close: string; isClosed: boolean }][], [formData.operatingHours]);
+
+  useEffect(() => {
+    let active = true;
+    const fetchManagers = async () => {
+      setManagersLoading(true);
+      try {
+        // primary: fetch subadmins (store managers)
+        const res = await apiFetch<{ success: boolean; subadmins?: any[]; pagination?: any }>(`/api/subadmin/all-subadmins?page=1&limit=100`);
+        let list: any[] = [];
+        if (res && res.success && Array.isArray(res.subadmins)) {
+          list = res.subadmins;
+        } else {
+          // fallback: try generic users endpoint
+          const fallback = await apiFetch<{ success: boolean; users?: any[] }>(`/api/users/`);
+          if (fallback && fallback.success && Array.isArray(fallback.users)) list = fallback.users;
+        }
+        if (!active) return;
+        setManagers(list || []);
+      } catch (err) {
+        console.error('Failed to load managers', err);
+        if (!active) return;
+        setManagers([]);
+      } finally {
+        if (active) setManagersLoading(false);
+      }
+    };
+    fetchManagers();
+    return () => { active = false; };
+  }, []);
+
+  // Helpers to convert hours between object and simple text
+  function formatHoursToText(hours: Record<DayKey, { open: string; close: string; isClosed: boolean }>) {
+    return (Object.keys(hours) as DayKey[]).map(d => {
+      const h = hours[d];
+      const dayLabel = capitalize(d);
+      if (h.isClosed) return `${dayLabel}: Closed`;
+      return `${dayLabel}: ${h.open}-${h.close}`;
+    }).join('\n');
+  }
+
+  function capitalize(s: string){ return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  function makeClosedHours() {
+    const obj = {} as Record<DayKey, { open: string; close: string; isClosed: boolean }>;
+    (Object.keys(defaultHours) as DayKey[]).forEach(d => {
+      obj[d] = { open: '', close: '', isClosed: true };
+    });
+    return obj;
+  }
+
+  const handleTimeChange = (day: DayKey, field: 'open' | 'close', value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      operatingHours: {
+        ...prev.operatingHours,
+        [day]: { ...prev.operatingHours[day], [field]: value, isClosed: false },
+      },
+    }));
+  };
+
+  const toggleClosed = (day: DayKey) => {
+    setFormData(prev => {
+      const next = { ...prev.operatingHours } as Record<DayKey, { open: string; close: string; isClosed: boolean }>;
+      const curr = next[day];
+      const isNow = !curr.isClosed;
+      next[day] = { open: isNow ? '' : defaultHours[day].open, close: isNow ? '' : defaultHours[day].close, isClosed: isNow };
+      return { ...prev, operatingHours: next };
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Store data:', formData);
-    // Add store logic here
-    navigate('/store-mapping');
+
+    if (!formData.name || !formData.address || !formData.managerId) {
+      toast.error('Please fill required fields: name, address, manager');
+      return;
+    }
+
+    if (!formData.lat || !formData.lng) {
+      toast.error('Please select a location so latitude and longitude are set');
+      return;
+    }
+
+    const latNum = Number(formData.lat);
+    const lngNum = Number(formData.lng);
+    if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
+      toast.error('Selected coordinates are invalid');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // use operatingHours from form state
+      const parsedHours = formData.operatingHours;
+      const res = await apiFetch<{
+        success: boolean;
+        store?: any;
+        message?: string;
+      }>('/api/stores/', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: formData.name,
+          address: formData.address,
+          lat: latNum,
+          lng: lngNum,
+          description: formData.description,
+          manager: formData.managerId,
+          operatingHours: parsedHours,
+        }),
+      });
+
+      if (!res.success) throw new Error(res.message || 'Failed to create store');
+
+      toast.success(res.message || 'Store created successfully');
+      if (res.store && onStoreCreated) {
+        onStoreCreated(res.store);
+      }
+      onBack();
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to create store';
+      console.error('Create store error:', err);
+      toast.error(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleBack = () => {
     navigate('/store-mapping');
+    onBack();
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-h-[calc(100vh-6rem)] overflow-auto">
       <div className="flex items-center gap-4">
         <button 
           onClick={handleBack}
@@ -63,96 +204,105 @@ export default function AddStore({ onBack }: AddStoreProps) {
                 <Label htmlFor="storeName">Store Name</Label>
                 <Input
                   id="storeName"
-                  value={formData.storeName}
-                  onChange={(e) => setFormData({ ...formData, storeName: e.target.value })}
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Enter store name"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="storeId">Store ID</Label>
-                <Input
-                  id="storeId"
-                  value={formData.storeId}
-                  onChange={(e) => setFormData({ ...formData, storeId: e.target.value })}
-                  placeholder="Auto-generated or enter custom ID"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="storeLocation">Store Location</Label>
-                <Input
-                  id="storeLocation"
-                  value={formData.storeLocation}
-                  onChange={(e) => setFormData({ ...formData, storeLocation: e.target.value })}
-                  placeholder="Enter location (e.g., Bandra West, Mumbai)"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="operatingHours">Store Operating Hours</Label>
-                <Input
-                  id="operatingHours"
-                  value={formData.operatingHours}
-                  onChange={(e) => setFormData({ ...formData, operatingHours: e.target.value })}
-                  placeholder="e.g., 9:00 AM - 9:00 PM"
-                  required
+                <Label htmlFor="storeDescription">Description</Label>
+                <Textarea
+                  id="storeDescription"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Describe the store"
+                  rows={3}
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="storeAddress">Store Address</Label>
-              <Textarea
-                id="storeAddress"
-                value={formData.storeAddress}
-                onChange={(e) => setFormData({ ...formData, storeAddress: e.target.value })}
-                placeholder="Enter complete store address"
-                rows={3}
-                required
+              <Label>Store Location</Label>
+              <MapSection
+                isEditing={true}
+                address={formData.address}
+                onAddressChange={(addr) => setFormData({ ...formData, address: addr })}
+                marker={{
+                  lat: formData.lat ? Number(formData.lat) : 25.2048,
+                  lng: formData.lng ? Number(formData.lng) : 55.2708,
+                }}
+                onMarkerChange={(lat, lng) =>
+                  setFormData(prev => ({ ...prev, lat: lat.toString(), lng: lng.toString() }))
+                }
               />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 mt-2">
+                <div>Latitude: {formData.lat || '—'}</div>
+                <div>Longitude: {formData.lng || '—'}</div>
+              </div>
             </div>
 
             <div className="border-t pt-6">
               <h3 className="mb-4">Manager Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="managerName">Store Manager Name</Label>
-                  <Input
-                    id="managerName"
-                    value={formData.managerName}
-                    onChange={(e) => setFormData({ ...formData, managerName: e.target.value })}
-                    placeholder="Enter manager name"
+                  <Label htmlFor="managerId">Store Manager</Label>
+                  <select
+                    id="managerId"
+                    value={formData.managerId}
+                    onChange={(e) => setFormData({ ...formData, managerId: e.target.value })}
+                    className="w-full border rounded px-3 py-2 text-sm"
                     required
-                  />
+                  >
+                    <option value="">Select manager (ID)</option>
+                    {managersLoading && <option disabled>Loading...</option>}
+                    {managers.map((m) => (
+                      <option key={m._id || m.id} value={m._id || m.id}>{m.name ? `${m.name} — ${m.email || m._id || m.id}` : (m.email || m._id || m.id)}</option>
+                    ))}
+                  </select>
                 </div>
+              </div>
+            </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="managerContact">Manager Contact Number</Label>
-                  <Input
-                    id="managerContact"
-                    type="tel"
-                    value={formData.managerContact}
-                    onChange={(e) => setFormData({ ...formData, managerContact: e.target.value })}
-                    placeholder="Enter contact number"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="managerEmail">Manager Email</Label>
-                  <Input
-                    id="managerEmail"
-                    type="email"
-                    value={formData.managerEmail}
-                    onChange={(e) => setFormData({ ...formData, managerEmail: e.target.value })}
-                    placeholder="Enter email address"
-                    required
-                  />
-                </div>
+            <div className="border-t pt-6">
+              <h3 className="mb-2">Operating Hours</h3>
+              <p className="text-sm text-gray-500">Set open/close times per day. Toggle Closed when the store is closed that day.</p>
+              <div className="overflow-x-auto mt-3">
+                <table className="w-full text-sm table-auto">
+                  <thead>
+                    <tr className="text-left">
+                      <th className="py-2 px-3">Day</th>
+                      <th className="py-2 px-3">Open</th>
+                      <th className="py-2 px-3">Close</th>
+                      <th className="py-2 px-3">Closed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(Object.keys(formData.operatingHours) as DayKey[]).map((d) => {
+                      const h = formData.operatingHours[d];
+                      const dayLabel = capitalize(d);
+                      return (
+                        <tr key={d} className="border-t">
+                          <td className="py-2 px-3 align-middle">{dayLabel}</td>
+                          <td className="py-2 px-3">
+                            <input type="time" value={h.open} disabled={h.isClosed} onChange={(e) => handleTimeChange(d, 'open', e.target.value)} className="w-full border rounded px-2 py-1 text-sm" />
+                          </td>
+                          <td className="py-2 px-3">
+                            <input type="time" value={h.close} disabled={h.isClosed} onChange={(e) => handleTimeChange(d, 'close', e.target.value)} className="w-full border rounded px-2 py-1 text-sm" />
+                          </td>
+                          <td className="py-2 px-3">
+                            <input type="checkbox" checked={h.isClosed} onChange={() => toggleClosed(d)} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex gap-2 mt-3">
+                <button type="button" className="text-sm px-3 py-1 border rounded" onClick={() => setFormData(prev => ({ ...prev, operatingHours: defaultHours }))}>Auto-fill defaults</button>
+                <button type="button" className="text-sm px-3 py-1 border rounded" onClick={() => setFormData(prev => ({ ...prev, operatingHours: makeClosedHours() }))}>Clear</button>
               </div>
             </div>
 
@@ -182,8 +332,9 @@ export default function AddStore({ onBack }: AddStoreProps) {
               <Button
                 type="submit"
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={isSubmitting}
               >
-                Save Store
+                {isSubmitting ? 'Saving...' : 'Save Store'}
               </Button>
             </div>
           </form>

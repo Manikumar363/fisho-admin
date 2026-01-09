@@ -38,6 +38,12 @@ export default function InventoryManagement() {
   const [openCutTypeAdd, setOpenCutTypeAdd] = useState(false);
   const [productSortOption, setProductSortOption] = useState('recent');
   const [variantSortOption, setVariantSortOption] = useState('recent');
+  const [insertedProductId, setInsertedProductId] = useState<string | null>(null);
+  const [insertedVariantId, setInsertedVariantId] = useState<string | null>(null);
+  const [productsPage, setProductsPage] = useState(1);
+  const [variantsPage, setVariantsPage] = useState(1);
+  const PRODUCTS_PAGE_SIZE = 20;
+  const VARIANTS_PAGE_SIZE = 10;
 
   // Category state
   const [categoryForm, setCategoryForm] = useState({
@@ -603,13 +609,39 @@ export default function InventoryManagement() {
   };
 
   const moveProduct = (index: number, direction: 'up' | 'down') => {
-    const newProducts = [...products];
+    if (isReordering) return;
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    
-    if (targetIndex < 0 || targetIndex >= newProducts.length) return;
-    
-    [newProducts[index], newProducts[targetIndex]] = [newProducts[targetIndex], newProducts[index]];
-    setProducts(newProducts);
+    if (targetIndex < 0 || targetIndex >= products.length) return;
+
+    const previous = [...products];
+    const optimistic = [...products];
+    const [moved] = optimistic.splice(index, 1);
+    optimistic.splice(targetIndex, 0, moved);
+    setProducts(optimistic);
+
+    setIsReordering(true);
+    (async () => {
+      try {
+        const body = {
+          id: String(moved.id),
+          from: index + 1,
+          to: targetIndex + 1,
+        };
+        const res = await apiFetch<{ success: boolean; message?: string }>(
+          '/api/products/reorder',
+          { method: 'PUT', body: JSON.stringify(body) }
+        );
+        if (!res?.success) throw new Error(res?.message || 'Failed to reorder product');
+        toast.success(res.message || 'Product reordered successfully');
+      } catch (e: any) {
+        setProducts(previous);
+        const msg = e?.message || 'Failed to reorder product';
+        console.error('Reorder product error:', e);
+        toast.error(msg);
+      } finally {
+        setIsReordering(false);
+      }
+    })();
   };
 
   const moveVariant = (index: number, direction: 'up' | 'down') => {
@@ -1127,51 +1159,24 @@ export default function InventoryManagement() {
         setIsSubmitting(false);
       }
     } else if (activeTab === 'products') {
-      // Validate product form
-      if (!productForm.category) {
-        toast.error('Please select a category');
-        return;
-      }
-      if (!productForm.productName.trim()) {
-        toast.error('Product name is required');
-        return;
-      }
-      if (!editingProductId && !productForm.productImage) {
-        toast.error('Product image is required');
-        return;
-      }
-      if (!productForm.description.trim()) {
-        toast.error('Description is required');
-        return;
-      }
-      if (!productForm.nutritionFacts.trim()) {
-        toast.error('Nutrition facts are required');
-        return;
-      }
-      if (productForm.cutTypes.length === 0) {
-        toast.error('At least one cut type is required');
-        return;
-      }
-      if (productForm.availableWeights.length === 0) {
-        toast.error('At least one weight is required');
-        return;
-      }
-      if (!productForm.availableStock || parseFloat(productForm.availableStock) <= 0) {
-        toast.error('Valid stock amount is required');
-        return;
-      }
-      if (!productForm.costPricePerKg || parseFloat(productForm.costPricePerKg) <= 0) {
-        toast.error('Valid cost price is required');
-        return;
-      }
-      if (!productForm.defaultProfit || parseFloat(productForm.defaultProfit) < 0) {
-        toast.error('Valid default profit is required');
-        return;
-      }
-      if (!productForm.defaultDiscount || parseFloat(productForm.defaultDiscount) < 0) {
-        toast.error('Valid default discount is required');
-        return;
-      }
+        // Validate product form - collect all errors and show toasts for each
+        const validationErrors: string[] = [];
+        if (!productForm.category) validationErrors.push('Please select a category');
+        if (!productForm.productName.trim()) validationErrors.push('Please enter a product name');
+        if (!editingProductId && !productForm.productImage) validationErrors.push('Product image is required');
+        if (!productForm.description.trim()) validationErrors.push('Description is required');
+        if (!productForm.nutritionFacts.trim()) validationErrors.push('Nutrition facts are required');
+        if (productForm.cutTypes.length === 0) validationErrors.push('At least one cut type is required');
+        if (productForm.availableWeights.length === 0) validationErrors.push('At least one weight is required');
+        if (!productForm.availableStock || parseFloat(productForm.availableStock) <= 0) validationErrors.push('Valid stock amount is required');
+        if (!productForm.costPricePerKg || parseFloat(productForm.costPricePerKg) <= 0) validationErrors.push('Valid cost price is required');
+        if (!productForm.defaultProfit || parseFloat(productForm.defaultProfit) < 0) validationErrors.push('Valid default profit is required');
+        if (!productForm.defaultDiscount || parseFloat(productForm.defaultDiscount) < 0) validationErrors.push('Valid default discount is required');
+
+        if (validationErrors.length > 0) {
+          validationErrors.forEach(err => toast.error(err));
+          return;
+        }
 
       setIsSubmitting(true);
       try {
@@ -1214,7 +1219,7 @@ export default function InventoryManagement() {
 
         toast.success(res.message || (editingProductId ? 'Product updated successfully' : 'Product added successfully'));
         setShowAddModal(false);
-        
+
         // Reset form
         setProductForm({
           category: '',
@@ -1239,8 +1244,68 @@ export default function InventoryManagement() {
         });
         setEditingProductId(null);
         
-        // Refresh products list
-        fetchProducts();
+        // Update local products list: append new product to end on create,
+        // replace existing item on edit. This preserves the UI order so
+        // newly added items appear at the last (highest serial no).
+        try {
+          const p = res.product;
+          if (p) {
+            const raw = p.image || '';
+            const image = raw ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${raw}` : raw) : '';
+            const cutTypes = (p.availableCutTypes || []).map((ct: any) => ct.name);
+            const cutTypeIds = (p.availableCutTypes || []).map((ct: any) => ct._id);
+            const mapped = {
+              id: p._id || p.id || cryptoRandomId(),
+              image,
+              imagePath: raw,
+              name: p.name,
+              species: (() => {
+                const catAny = p.category;
+                if (catAny && typeof catAny === 'object') return catAny.name || '—';
+                if (typeof catAny === 'string') {
+                  const match = categories.find((c) => c.id === catAny || c.name === catAny);
+                  return match ? match.name : '—';
+                }
+                return '—';
+              })(),
+              categoryId: (p.category && typeof p.category === 'object' && p.category._id) ? p.category._id : (p.category || undefined),
+              cutTypes,
+              cutTypeIds,
+              stock: typeof p.stock === 'number' ? p.stock : parseFloat(productForm.availableStock || '0'),
+              costPrice: p.cost || parseFloat(productForm.costPricePerKg || '0'),
+              profit: p.defaultProfit || parseFloat(productForm.defaultProfit || '0'),
+              discount: p.defaultDiscount || parseFloat(productForm.defaultDiscount || '0'),
+              status: p.isActive ? 'Active' : 'Inactive',
+              lastUpdated: new Date(p.updatedAt || p.createdAt || Date.now()).toISOString().split('T')[0],
+              description: p.description,
+              nutritionFacts: p.nutritionFacts,
+              availability: p.isActive,
+              weightUnit: p.weightUnit,
+              availableWeights: p.availableWeights || [],
+              featured: p.featured || false,
+              bestseller: p.bestSeller || false,
+              isExpressDelivery: p.isExpressDelivery || false,
+            };
+
+            setProducts((prev) => {
+              if (editingProductId) {
+                return prev.map((pp) => (pp.id === mapped.id ? mapped : pp));
+              }
+              // append new product to end and mark inserted id; push to last page
+              const next = [...prev, mapped];
+              setInsertedProductId(mapped.id);
+              const nextPage = Math.ceil(next.length / PRODUCTS_PAGE_SIZE) || 1;
+              setProductsPage(nextPage);
+              return next;
+            });
+          } else {
+            // Fallback: refresh from server if response lacks product payload
+            fetchProducts();
+          }
+        } catch (e) {
+          // If mapping fails, fallback to fetching fresh list
+          fetchProducts();
+        }
       } catch (e: any) {
         const msg = e?.message || (editingProductId ? 'Failed to update product' : 'Failed to add product');
         console.error('Add product error:', e);
@@ -1342,8 +1407,46 @@ export default function InventoryManagement() {
         });
         setEditingVariantId(null);
 
-        // Refresh variants list
-        fetchVariants();
+        // Update local variants list: append new variant to end on create,
+        // replace existing on edit. Falls back to fetching if response missing.
+        try {
+          const v = res.variant;
+          if (v) {
+            const mapped = {
+              id: v._id || v.id || cryptoRandomId(),
+              variantName: v.name,
+              product: v.product?.name || '—',
+              species: (v.product && v.product.category && typeof v.product.category === 'object') ? v.product.category.name || '—' : '—',
+              cutType: v.cutType?.name || '—',
+              featured: v.featured || false,
+              bestSeller: v.bestSeller || false,
+              costPrice: v.product?.cost || 0,
+              profit: v.profit || 0,
+              discount: v.discount || 0,
+              displayPrice: v.displayPrice || 0,
+              sellingPrice: v.sellingPrice || 0,
+              notes: v.notes,
+              image: v.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${v.image}` : v.image) : undefined,
+              status: v.isActive ? 'Active' : 'Inactive',
+              lastUpdated: new Date(v.updatedAt || v.createdAt || Date.now()).toISOString().split('T')[0],
+            };
+
+            setVariants((prev) => {
+              if (editingVariantId) {
+                return prev.map((pv) => (pv.id === mapped.id ? mapped : pv));
+              }
+              const next = [...prev, mapped];
+              setInsertedVariantId(mapped.id);
+              const nextPage = Math.ceil(next.length / VARIANTS_PAGE_SIZE) || 1;
+              setVariantsPage(nextPage);
+              return next;
+            });
+          } else {
+            fetchVariants();
+          }
+        } catch (e) {
+          fetchVariants();
+        }
       } catch (e: any) {
         const msg = e?.message || (editingVariantId ? 'Failed to update variant' : 'Failed to create variant');
         console.error(editingVariantId ? 'Update variant error:' : 'Create variant error:', e);
@@ -2052,12 +2155,62 @@ export default function InventoryManagement() {
   const sortedProducts = getSortedProducts(filteredProducts);
   const sortedVariants = getSortedVariants(filteredVariants);
 
+  // Move any recently inserted item to the end of the displayed list so
+  // newly created items appear as the last row regardless of current sort.
+  const displayProducts = (() => {
+    if (!insertedProductId) return sortedProducts;
+    const arr = [...sortedProducts];
+    const idx = arr.findIndex((p) => p.id === insertedProductId);
+    if (idx >= 0) {
+      const [it] = arr.splice(idx, 1);
+      arr.push(it);
+    }
+    return arr;
+  })();
+
+  const displayVariants = (() => {
+    if (!insertedVariantId) return sortedVariants;
+    const arr = [...sortedVariants];
+    const idx = arr.findIndex((v) => v.id === insertedVariantId);
+    if (idx >= 0) {
+      const [it] = arr.splice(idx, 1);
+      arr.push(it);
+    }
+    return arr;
+  })();
+
+  // pagination: compute paginated slices and totals
+  const productsTotal = displayProducts.length;
+  const variantsTotal = displayVariants.length;
+  const productsTotalPages = Math.max(1, Math.ceil(productsTotal / PRODUCTS_PAGE_SIZE));
+  const variantsTotalPages = Math.max(1, Math.ceil(variantsTotal / VARIANTS_PAGE_SIZE));
+
+  // Clamp current page
+  useEffect(() => {
+    if (productsPage > productsTotalPages) setProductsPage(productsTotalPages);
+  }, [productsTotalPages]);
+  useEffect(() => {
+    if (variantsPage > variantsTotalPages) setVariantsPage(variantsTotalPages);
+  }, [variantsTotalPages]);
+
+  const displayProductsPage = displayProducts.slice((productsPage - 1) * PRODUCTS_PAGE_SIZE, productsPage * PRODUCTS_PAGE_SIZE);
+  const displayVariantsPage = displayVariants.slice((variantsPage - 1) * VARIANTS_PAGE_SIZE, variantsPage * VARIANTS_PAGE_SIZE);
+
   // Reset cut type add dialog when switching tabs
   useEffect(() => {
     if (activeTab !== 'cuttypes' && openCutTypeAdd) {
       setOpenCutTypeAdd(false);
     }
   }, [activeTab]);
+
+  // Clear inserted-item markers when user changes sort, search, or tab
+  useEffect(() => {
+    setInsertedProductId(null);
+  }, [productSortOption, searchQuery, activeTab]);
+
+  useEffect(() => {
+    setInsertedVariantId(null);
+  }, [variantSortOption, searchQuery, activeTab]);
 
   return (
     <div className="space-y-6">
@@ -2118,6 +2271,14 @@ export default function InventoryManagement() {
               <CardTitle>All Categories ({filteredCategories.length} of {categories.length})</CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-sm text-gray-600">Showing {(productsPage - 1) * PRODUCTS_PAGE_SIZE + 1} - {Math.min(productsPage * PRODUCTS_PAGE_SIZE, displayProducts.length)} of {displayProducts.length}</div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" className="px-3 py-1" onClick={() => setProductsPage(p => Math.max(1, p - 1))} disabled={productsPage === 1}>Prev</Button>
+                  <div className="text-sm">Page {productsPage} of {productsTotalPages}</div>
+                  <Button variant="outline" className="px-3 py-1" onClick={() => setProductsPage(p => Math.min(productsTotalPages, p + 1))} disabled={productsPage === productsTotalPages}>Next</Button>
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -2275,6 +2436,14 @@ export default function InventoryManagement() {
               <CardTitle>All Products ({sortedProducts.length} of {products.length})</CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-sm text-gray-600">Showing {(productsPage - 1) * PRODUCTS_PAGE_SIZE + 1} - {Math.min(productsPage * PRODUCTS_PAGE_SIZE, displayProducts.length)} of {displayProducts.length}</div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" className="px-3 py-1" onClick={() => setProductsPage(p => Math.max(1, p - 1))} disabled={productsPage === 1}>Prev</Button>
+                  <div className="text-sm">Page {productsPage} of {productsTotalPages}</div>
+                  <Button variant="outline" className="px-3 py-1" onClick={() => setProductsPage(p => Math.min(productsTotalPages, p + 1))} disabled={productsPage === productsTotalPages}>Next</Button>
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -2315,8 +2484,9 @@ export default function InventoryManagement() {
                       <tr>
                         <td colSpan={16} className="py-8 text-center text-gray-500">No products found</td>
                       </tr>
-                    ) : sortedProducts.map((product, index) => {
+                    ) : displayProductsPage.map((product, pageIndex) => {
                       const originalIndex = products.findIndex((p) => p.id === product.id);
+                      const index = (productsPage - 1) * PRODUCTS_PAGE_SIZE + pageIndex;
                       return (
                       <tr key={product.id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-3 px-4">
@@ -2337,7 +2507,7 @@ export default function InventoryManagement() {
                             </button>
                           </div>
                         </td>
-                        <td className="py-3 px-4">{originalIndex + 1}</td>
+                        <td className="py-3 px-4">{index + 1}</td>
                         <td className="py-3 px-4">
                           <ImageWithFallback
                             src={product.image || 'https://via.placeholder.com/50'}
@@ -2506,8 +2676,9 @@ export default function InventoryManagement() {
                       <tr>
                         <td colSpan={16} className="py-8 text-center text-gray-500">Variants Loading</td>
                       </tr>
-                    ) : sortedVariants.map((variant, index) => {
+                    ) : displayVariantsPage.map((variant, pageIndex) => {
                       const originalIndex = variants.findIndex((v) => v.id === variant.id);
+                      const index = (variantsPage - 1) * VARIANTS_PAGE_SIZE + pageIndex;
                       return (
                       <tr key={variant.id} className="border-b border-gray-100 hover:bg-gray-50">
                         {/* <td className="py-3 px-4">
@@ -2528,7 +2699,7 @@ export default function InventoryManagement() {
                             </button>
                           </div>
                         </td> */}
-                        <td className="py-3 px-4">{originalIndex + 1}</td>
+                        <td className="py-3 px-4">{index + 1}</td>
                         <td className="py-3 px-4">
                           {variant.image ? (
                             <ImageWithFallback
@@ -2550,14 +2721,14 @@ export default function InventoryManagement() {
                           {variant.featured ? (
                             <Badge className="bg-yellow-100 text-yellow-800 text-xs">Yes</Badge>
                           ) : (
-                            <span className="text-gray-400">No</span>
+                            <Badge className="text-white bg-red-600 font-medium">No</Badge>
                           )}
                         </td>
                         <td className="py-3 px-4">
                           {variant.bestSeller ? (
                             <Badge className="bg-green-100 text-green-800 text-xs">Yes</Badge>
                           ) : (
-                            <span className="text-gray-400">No</span>
+                            <Badge className="text-white bg-red-600 font-medium">No</Badge>
                           )}
                         </td>
                         <td className="py-3 px-4"><div className="flex items-center"><span className="dirham-symbol mr-2">&#xea;</span>{variant.costPrice}</div></td>
@@ -2622,7 +2793,7 @@ export default function InventoryManagement() {
         }
         setShowAddModal(open);
       }}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px]" onInteractOutside={(e: any) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>
               {activeTab === 'categories'

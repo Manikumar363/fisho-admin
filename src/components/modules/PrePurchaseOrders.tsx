@@ -605,6 +605,19 @@ export default function PrePurchaseOrders() {
             </CardContent>
           </Card>
         </form>
+        {/* Toast Notifications (ensure toasts show while add form is open) */}
+        <ToastContainer
+          position="top-right"
+          autoClose={3000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="light"
+        />
       </div>
     );
   }

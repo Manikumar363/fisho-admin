@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Download, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
+import { apiFetch } from '../../../lib/api';
 
 interface ViewStoreProps {
   storeId: string;
@@ -12,16 +13,50 @@ interface ViewStoreProps {
 
 export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
   const [selectedMonth, setSelectedMonth] = useState('december-2024');
+  const [store, setStore] = useState<any | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock store data
-  const storeInfo = {
-    id: storeId,
-    name: 'Fisho Marine Drive',
-    location: 'Marine Drive, Mumbai',
-    manager: 'Rajesh Kumar',
-    contact: '+91 98765 43210',
-    email: 'rajesh.marine@fisho.com'
-  };
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+    setStore(null);
+
+    apiFetch<{ success: boolean; store: any; message?: string }>(`/api/stores/${storeId}`)
+      .then((res) => {
+        if (!active) return;
+        if (!res.success) throw new Error(res.message || 'Failed to fetch store');
+        setStore(res.store);
+      })
+      .catch((err) => {
+        if (!active) return;
+        const msg = err?.message || 'Failed to fetch store';
+        console.error('Fetch store error:', err);
+        setError(msg);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [storeId]);
+
+  const headerTitle = useMemo(() => {
+    if (loading) return 'Loading store...';
+    if (error) return 'Store unavailable';
+    return store?.name || 'Store details';
+  }, [loading, error, store?.name]);
+
+  const headerSubtitle = useMemo(() => {
+    if (loading) return 'Fetching store details';
+    if (error) return error;
+    const address = store?.address ? store.address : '—';
+    const manager = store?.manager?.name ? `Managed by ${store.manager.name}` : 'Manager not assigned';
+    return `${address} • ${manager}`;
+  }, [loading, error, store?.address, store?.manager?.name]);
 
   // Mock inventory data
   const inventory = [
@@ -94,10 +129,22 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>
-          <h1 className="mb-2">{storeInfo.name}</h1>
-          <p className="text-gray-600">{storeInfo.location} • Managed by {storeInfo.manager}</p>
+          <h1 className="mb-2">{headerTitle}</h1>
+          <p className="text-gray-600">{headerSubtitle}</p>
         </div>
       </div>
+
+      {loading && (
+        <Card>
+          <CardContent className="py-6 text-gray-600">Loading store details...</CardContent>
+        </Card>
+      )}
+
+      {error && !loading && (
+        <Card>
+          <CardContent className="py-6 text-red-600">{error}</CardContent>
+        </Card>
+      )}
 
       {/* Store Inventory Section */}
       <Card>
