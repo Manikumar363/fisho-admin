@@ -43,7 +43,8 @@ export default function InventoryManagement() {
   const [productsPage, setProductsPage] = useState(1);
   const [variantsPage, setVariantsPage] = useState(1);
   const PRODUCTS_PAGE_SIZE = 20;
-  const VARIANTS_PAGE_SIZE = 10;
+  const VARIANTS_PAGE_SIZE = 20;
+  
 
   // Category state
   const [categoryForm, setCategoryForm] = useState({
@@ -2648,6 +2649,14 @@ export default function InventoryManagement() {
               <CardTitle>All Product Variants ({sortedVariants.length} of {variants.length})</CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-sm text-gray-600">Showing {(variantsPage - 1) * VARIANTS_PAGE_SIZE + 1} - {Math.min(variantsPage * VARIANTS_PAGE_SIZE, displayVariants.length)} of {displayVariants.length}</div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" className="px-3 py-1" onClick={() => setVariantsPage(p => Math.max(1, p - 1))} disabled={variantsPage === 1}>Prev</Button>
+                  <div className="text-sm">Page {variantsPage} of {variantsTotalPages}</div>
+                  <Button variant="outline" className="px-3 py-1" onClick={() => setVariantsPage(p => Math.min(variantsTotalPages, p + 1))} disabled={variantsPage === variantsTotalPages}>Next</Button>
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>

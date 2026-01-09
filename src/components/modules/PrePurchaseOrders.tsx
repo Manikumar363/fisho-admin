@@ -718,7 +718,7 @@ export default function PrePurchaseOrders() {
 
       {/* View PPO Modal */}
       <Dialog open={showViewModal} onOpenChange={setShowViewModal}>
-        <DialogContent className="max-w-[95vw] w-full max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[1400px] w-full max-h-[75vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Pre-Purchase Order Details</DialogTitle>
           </DialogHeader>
@@ -771,7 +771,7 @@ export default function PrePurchaseOrders() {
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="text-left py-2 px-3 text-xs font-semibold">Product</th>
+                        <th className="text-left py-3 px-4 text-xs font-semibold">Product</th>
                         <th className="text-left py-2 px-3 text-xs font-semibold">Cost Price (<span className="dirham-symbol">&#xea;</span>)</th>
                         <th className="text-left py-2 px-3 text-xs font-semibold">Quantity</th>
                         <th className="text-left py-2 px-3 text-xs font-semibold">Amount (<span className="dirham-symbol">&#xea;</span>)</th>
@@ -782,12 +782,12 @@ export default function PrePurchaseOrders() {
                     <tbody>
                       {selectedPpo.particulars?.map((particular: any, index: number) => (
                         <tr key={particular._id || index} className="border-t">
-                          <td className="py-2 px-3">{particular.product?.name || '—'}</td>
-                          <td className="py-2 px-3"><span className="dirham-symbol">&#xea;</span>{particular.costPrice.toFixed(2)}</td>
-                          <td className="py-2 px-3">{particular.quantity}</td>
-                          <td className="py-2 px-3"><span className="dirham-symbol">&#xea;</span>{particular.amount.toFixed(2)}</td>
-                          <td className="py-2 px-3">{particular.vat}%</td>
-                          <td className="py-2 px-3 font-semibold"><span className="dirham-symbol">&#xea;</span>{particular.totalAmount.toFixed(2)}</td>
+                          <td className="py-3 px-6">{particular.product?.name || '—'}</td>
+                          <td className="py-3 px-6"><span className="dirham-symbol mr-2" >&#xea;</span>{particular.costPrice.toFixed(2)}</td>
+                          <td className="py-3 px-6">{particular.quantity}</td>
+                          <td className="py-3 px-6"><span className="dirham-symbol mr-2">&#xea;</span>{particular.amount.toFixed(2)}</td>
+                          <td className="py-3 px-6">{particular.vat}%</td>
+                          <td className="py-3 px-6 font-semibold"><span className="dirham-symbol mr-2">&#xea;</span>{particular.totalAmount.toFixed(2)}</td>
                         </tr>
                       ))}
                     </tbody>
