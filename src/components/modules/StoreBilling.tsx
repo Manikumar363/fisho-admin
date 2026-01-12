@@ -1,12 +1,134 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Plus, Minus, Trash2, Printer } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { apiFetch } from '../../lib/api';
+import { toast } from 'react-toastify';
 
 export default function StoreBilling() {
   const [cart, setCart] = useState<any[]>([]);
   const [discount, setDiscount] = useState(0);
+  
+  // Store selection
+  const [stores, setStores] = useState<Array<{ id: string; name: string }>>([]);
+  const [storesLoading, setStoresLoading] = useState(false);
+  const [storesError, setStoresError] = useState<string | null>(null);
+  const [selectedStoreId, setSelectedStoreId] = useState<string>('');
+  
+  // Category selection
+  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [categoriesError, setCategoriesError] = useState<string | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+  
+  // Product selection
+  const [productsOptions, setProductsOptions] = useState<Array<{ id: string; name: string; price: number; categoryId?: string }>>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productsError, setProductsError] = useState<string | null>(null);
+
+  // Fetch stores on mount
+  useEffect(() => {
+    let active = true;
+    setStoresLoading(true);
+    setStoresError(null);
+    apiFetch<{ success: boolean; stores?: any[]; message?: string }>(`/api/stores/`)
+      .then((res) => {
+        if (!active) return;
+        if (!res.success) throw new Error(res.message || 'Failed to fetch stores');
+        const mapped = (res.stores || []).map((s) => ({ 
+          id: String(s._id || s.id || ''), 
+          name: s.name || 'Unnamed Store' 
+        })).filter(s => s.id);
+        setStores(mapped);
+      })
+      .catch((err) => {
+        if (!active) return;
+        const msg = err?.message || 'Failed to fetch stores';
+        console.error('Fetch stores error:', err);
+        setStoresError(msg);
+        toast.error(msg);
+      })
+      .finally(() => {
+        setStoresLoading(false);
+      });
+    return () => { active = false; };
+  }, []);
+
+  // Fetch categories when store is selected
+  useEffect(() => {
+    if (!selectedStoreId) {
+      setCategories([]);
+      setSelectedCategoryId('');
+      return;
+    }
+    let active = true;
+    setCategoriesLoading(true);
+    setCategoriesError(null);
+    apiFetch<{ success: boolean; categories?: any[]; message?: string }>(`/api/categories`)
+      .then((res) => {
+        if (!active) return;
+        if (!res.success) throw new Error(res.message || 'Failed to fetch categories');
+        const mapped = (res.categories || []).map((c) => ({ 
+          id: String(c._id || c.id || ''), 
+          name: c.name || 'Unnamed' 
+        })).filter(c => c.id);
+        setCategories(mapped);
+      })
+      .catch((err) => {
+        if (!active) return;
+        const msg = err?.message || 'Failed to fetch categories';
+        console.error('Fetch categories error:', err);
+        setCategoriesError(msg);
+        toast.error(msg);
+      })
+      .finally(() => {
+        setCategoriesLoading(false);
+      });
+    return () => { active = false; };
+  }, [selectedStoreId]);
+
+  // Fetch products when category is selected
+  useEffect(() => {
+    if (!selectedStoreId || !selectedCategoryId) {
+      setProductsOptions([]);
+      return;
+    }
+    let active = true;
+    setProductsLoading(true);
+    setProductsError(null);
+    apiFetch<{ success: boolean; products?: any[]; message?: string }>(`/api/products`)
+      .then((res) => {
+        if (!active) return;
+        if (!res.success) throw new Error(res.message || 'Failed to fetch products');
+        const mapped = (res.products || [])
+          .filter((p) => {
+            const cat = p.category;
+            const catId = typeof cat === 'object' ? cat?._id || cat?.id : cat;
+            return String(catId || '') === selectedCategoryId;
+          })
+          .map((p) => ({ 
+            id: String(p._id || p.id || ''), 
+            name: p.name || 'Unnamed', 
+            price: Number(p.price || 0),
+            categoryId: String((typeof p.category === 'object' ? p.category?._id || p.category?.id : p.category) || '') 
+          }))
+          .filter(p => p.id);
+        setProductsOptions(mapped);
+      })
+      .catch((err) => {
+        if (!active) return;
+        const msg = err?.message || 'Failed to fetch products';
+        console.error('Fetch products error:', err);
+        setProductsError(msg);
+        toast.error(msg);
+      })
+      .finally(() => {
+        setProductsLoading(false);
+      });
+    return () => { active = false; };
+  }, [selectedStoreId, selectedCategoryId]);
 
   const products = [
     { id: 1, name: 'Tiger Prawns', weight: '500g', price: 380 },
@@ -57,6 +179,79 @@ export default function StoreBilling() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Product Search & List */}
         <div className="lg:col-span-2 space-y-4">
+          {/* Store, Category, Product Selection */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Select Store & Category</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Store Dropdown */}
+                <div className="space-y-2">
+                  <label className="text-sm text-gray-600">Store</label>
+                  <Select
+                    value={selectedStoreId}
+                    onValueChange={(val) => {
+                      setSelectedStoreId(val);
+                      setSelectedCategoryId('');
+                      setCart([]);
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder={storesLoading ? 'Loading stores...' : 'Select store'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {storesLoading && <SelectItem value="__loading" disabled>Loading...</SelectItem>}
+                      {storesError && <SelectItem value="__error" disabled>{storesError}</SelectItem>}
+                      {!storesLoading && !storesError && stores.length === 0 && (
+                        <SelectItem value="__none" disabled>No stores</SelectItem>
+                      )}
+                      {stores.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Category Dropdown */}
+                <div className="space-y-2">
+                  <label className="text-sm text-gray-600">Category</label>
+                  <Select
+                    value={selectedCategoryId}
+                    onValueChange={(val) => {
+                      setSelectedCategoryId(val);
+                    }}
+                    disabled={!selectedStoreId || categoriesLoading || !!categoriesError}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder={categoriesLoading ? 'Loading categories...' : (!selectedStoreId ? 'Select store first' : 'Select category')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categoriesLoading && <SelectItem value="__loading" disabled>Loading...</SelectItem>}
+                      {categoriesError && <SelectItem value="__error" disabled>{categoriesError}</SelectItem>}
+                      {!categoriesLoading && !categoriesError && categories.length === 0 && selectedStoreId && (
+                        <SelectItem value="__none" disabled>No categories</SelectItem>
+                      )}
+                      {categories.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Product Filter Info */}
+                <div className="space-y-2">
+                  <label className="text-sm text-gray-600">Products</label>
+                  <div className="flex items-center h-10 px-3 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600">
+                    {productsLoading ? 'Loading...' : 
+                     !selectedStoreId || !selectedCategoryId ? 'Select category' :
+                     `${productsOptions.length} available`}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Product Search</CardTitle>
@@ -77,19 +272,28 @@ export default function StoreBilling() {
               <CardTitle>Available Products</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {products.map((product) => (
-                  <button
-                    key={product.id}
-                    onClick={() => addToCart(product)}
-                    className="p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-left"
-                  >
-                    <h4 className="mb-1">{product.name}</h4>
-                    <p className="text-sm text-gray-600 mb-2">{product.weight}</p>
-                    <p className="text-blue-600">₹{product.price}</p>
-                  </button>
-                ))}
-              </div>
+              {!selectedStoreId || !selectedCategoryId ? (
+                <p className="text-center text-gray-500 py-8">Please select a store and category to view products</p>
+              ) : productsLoading ? (
+                <p className="text-center text-gray-500 py-8">Loading products...</p>
+              ) : productsError ? (
+                <p className="text-center text-red-500 py-8">{productsError}</p>
+              ) : productsOptions.length === 0 ? (
+                <p className="text-center text-gray-500 py-8">No products found for this category</p>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {productsOptions.map((product) => (
+                    <button
+                      key={product.id}
+                      onClick={() => addToCart(product)}
+                      className="p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-left"
+                    >
+                      <h4 className="mb-1">{product.name}</h4>
+                      <p className="text-blue-600">₹{product.price}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -114,7 +318,6 @@ export default function StoreBilling() {
                       >
                         <div className="flex-1">
                           <h5>{item.name}</h5>
-                          <p className="text-sm text-gray-600">{item.weight}</p>
                           <p className="text-sm text-blue-600">₹{item.price}</p>
                         </div>
                         <div className="flex items-center gap-2">

@@ -5,6 +5,9 @@ import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 import { apiFetch } from '../../../lib/api';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../../ui/dialog';
+import { Input } from '../../ui/input';
+import { toast } from 'react-toastify';
 
 interface ViewStoreProps {
   storeId: string;
@@ -16,6 +19,24 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
   const [store, setStore] = useState<any | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [inventoryLoading, setInventoryLoading] = useState<boolean>(false);
+  const [inventoryError, setInventoryError] = useState<string | null>(null);
+  const [inventory, setInventory] = useState<
+    Array<{ id: string; inventoryId?: string; productName: string; variant: string; stock: number; alert: 'red' | 'green' }>
+  >([]);
+  const [addStockOpen, setAddStockOpen] = useState(false);
+  const [targetInventoryId, setTargetInventoryId] = useState<string | null>(null);
+  const [addStockValue, setAddStockValue] = useState<string>('');
+  const [addingStock, setAddingStock] = useState(false);
+  const [addProductOpen, setAddProductOpen] = useState(false);
+  const [addProductForm, setAddProductForm] = useState({ productId: '', stock: '', categoryId: '' });
+  const [addingProduct, setAddingProduct] = useState(false);
+  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [categoriesError, setCategoriesError] = useState<string | null>(null);
+  const [productsOptions, setProductsOptions] = useState<Array<{ id: string; name: string; categoryId?: string }>>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productsError, setProductsError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -44,6 +65,151 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
     };
   }, [storeId]);
 
+  useEffect(() => {
+    let active = true;
+    setInventoryLoading(true);
+    setInventoryError(null);
+    setInventory([]);
+
+    apiFetch<{ success: boolean; storeInventory: any[]; message?: string }>(`/api/store-inventory/${storeId}`)
+      .then((res) => {
+        if (!active) return;
+        if (!res.success) throw new Error(res.message || 'Failed to fetch inventory');
+
+        const toIdString = (value: any): string | null => {
+          if (value == null) return null;
+          const t = typeof value;
+          if (t === 'string' || t === 'number' || t === 'bigint') return String(value);
+          if (t === 'object') {
+            if (typeof value._id === 'string') return value._id;
+            if (typeof value.$oid === 'string') return value.$oid;
+            if (typeof value.id === 'string') return value.id;
+          }
+          return null;
+        };
+
+        const short = (val: any) => {
+          const s = toIdString(val);
+          return s ? `#${s.slice(-6)}` : '—';
+        };
+
+        const productLabel = (prod: any) => {
+          if (prod && typeof prod === 'object' && typeof prod.name === 'string') return prod.name;
+          return short(prod);
+        };
+
+        const variantLabelFrom = (variantObj: any) => {
+          if (variantObj && typeof variantObj === 'object' && typeof variantObj.name === 'string') return variantObj.name;
+          return short(variantObj);
+        };
+
+        const normalized = (res.storeInventory || []).map((it, idx) => {
+          const variants = Array.isArray(it.variants) ? it.variants : [];
+          let variantLabel = '—';
+          if (variants.length === 1) {
+            variantLabel = variantLabelFrom(variants[0]?.variantId);
+          } else if (variants.length > 1) {
+            variantLabel = `${variants.length} variants`;
+          }
+          const stock = Number(it.totalStock ?? 0);
+          const invId = toIdString(it._id);
+          const idStr = invId || `${toIdString(it.productId) || 'row'}-${idx}`;
+          return {
+            id: idStr,
+            inventoryId: invId || undefined,
+            productName: productLabel(it.productId),
+            variant: variantLabel,
+            stock,
+            alert: (stock < 10 ? 'red' : 'green') as 'red' | 'green',
+          };
+        });
+        setInventory(normalized);
+      })
+      .catch((err) => {
+        if (!active) return;
+        const msg = err?.message || 'Failed to fetch inventory';
+        console.error('Fetch store inventory error:', err);
+        setInventoryError(msg);
+      })
+      .finally(() => {
+        if (active) setInventoryLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [storeId]);
+
+  // Load categories when add product dialog opens
+  useEffect(() => {
+    if (!addProductOpen || categories.length > 0) return;
+    let active = true;
+    setCategoriesLoading(true);
+    setCategoriesError(null);
+    apiFetch<{ success: boolean; categories?: any[]; message?: string }>(`/api/categories`)
+      .then((res) => {
+        if (!active) return;
+        if (!res.success) throw new Error(res.message || 'Failed to fetch categories');
+        const mapped = (res.categories || []).map((c) => ({ id: String(c._id || c.id || ''), name: c.name || 'Unnamed' })).filter(c => c.id);
+        setCategories(mapped);
+      })
+      .catch((err) => {
+        if (!active) return;
+        const msg = err?.message || 'Failed to fetch categories';
+        console.error('Fetch categories error:', err);
+        setCategoriesError(msg);
+      })
+      .finally(() => {
+        setCategoriesLoading(false);
+      });
+    return () => { active = false; };
+  }, [addProductOpen, categories.length]);
+
+  // Load products when category changes in add product dialog
+  useEffect(() => {
+    if (!addProductOpen || !addProductForm.categoryId) {
+      setProductsOptions([]);
+      return;
+    }
+    let active = true;
+    setProductsLoading(true);
+    setProductsError(null);
+    apiFetch<{ success: boolean; products?: any[]; message?: string }>(`/api/products`)
+      .then((res) => {
+        if (!active) return;
+        if (!res.success) throw new Error(res.message || 'Failed to fetch products');
+        const mapped = (res.products || [])
+          .filter((p) => {
+            const cat = p.category;
+            const catId = typeof cat === 'object' ? cat?._id || cat?.id : cat;
+            return String(catId || '') === addProductForm.categoryId;
+          })
+          .map((p) => ({ id: String(p._id || p.id || ''), name: p.name || 'Unnamed', categoryId: String((typeof p.category === 'object' ? p.category?._id || p.category?.id : p.category) || '') }))
+          .filter(p => p.id);
+        setProductsOptions(mapped);
+      })
+      .catch((err) => {
+        if (!active) return;
+        const msg = err?.message || 'Failed to fetch products';
+        console.error('Fetch products error:', err);
+        setProductsError(msg);
+      })
+      .finally(() => {
+        setProductsLoading(false);
+      });
+    return () => { active = false; };
+  }, [addProductOpen, addProductForm.categoryId]);
+
+  // Reset loading/errors when dialog closes so reopening is clean
+  useEffect(() => {
+    if (!addProductOpen) {
+      setCategoriesLoading(false);
+      setProductsLoading(false);
+      setCategoriesError(null);
+      setProductsError(null);
+    }
+  }, [addProductOpen]);
+
   const headerTitle = useMemo(() => {
     if (loading) return 'Loading store...';
     if (error) return 'Store unavailable';
@@ -58,17 +224,141 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
     return `${address} • ${manager}`;
   }, [loading, error, store?.address, store?.manager?.name]);
 
-  // Mock inventory data
-  const inventory = [
-    { id: 1, productName: 'Salmon', variant: 'Fresh - Premium Cut', stock: 12.5, alert: 'green' },
-    { id: 2, productName: 'Tuna', variant: 'Frozen - Steaks', stock: 8.2, alert: 'green' },
-    { id: 3, productName: 'Prawns', variant: 'Fresh - Large', stock: 3.5, alert: 'red' },
-    { id: 4, productName: 'Mackerel', variant: 'Fresh - Whole', stock: 15.0, alert: 'green' },
-    { id: 5, productName: 'Pomfret', variant: 'Fresh - Medium', stock: 4.2, alert: 'red' },
-    { id: 6, productName: 'Squid', variant: 'Fresh - Cleaned', stock: 2.8, alert: 'red' },
-    { id: 7, productName: 'Crab', variant: 'Live - Large', stock: 6.5, alert: 'green' },
-    { id: 8, productName: 'Lobster', variant: 'Fresh - Whole', stock: 9.3, alert: 'green' }
-  ];
+  // Inventory data now fetched from API
+
+  const openAddStock = (invId?: string) => {
+    if (!invId) return;
+    setTargetInventoryId(invId);
+    setAddStockValue('');
+    setAddStockOpen(true);
+  };
+
+  const handleConfirmAddStock = async () => {
+    if (!targetInventoryId) return;
+    const valueNum = Number(addStockValue);
+    if (!Number.isFinite(valueNum) || valueNum <= 0) {
+      toast.error('Enter a valid stock quantity (> 0).');
+      return;
+    }
+    setAddingStock(true);
+    try {
+      const res = await apiFetch<{ success: boolean; inventory: any; message?: string }>(
+        `/api/store-inventory/add`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ inventoryId: targetInventoryId, stock: valueNum })
+        }
+      );
+      if (!res.success) throw new Error(res.message || 'Failed to add stock');
+      const inv = res.inventory;
+      const total = Number(inv?.totalStock ?? NaN);
+      setInventory(prev => prev.map(item =>
+        item.inventoryId === inv?._id
+          ? { ...item, stock: Number.isFinite(total) ? total : item.stock, alert: (Number.isFinite(total) && total < 10 ? 'red' : 'green') }
+          : item
+      ));
+      setAddStockOpen(false);
+      setTargetInventoryId(null);
+      setAddStockValue('');
+      toast.success(res.message || 'Inventory updated successfully');
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to add stock';
+      toast.error(msg);
+    } finally {
+      setAddingStock(false);
+    }
+  };
+
+  const handleConfirmAddProduct = async () => {
+    const productIdVal = addProductForm.productId.trim();
+    const stockVal = Number(addProductForm.stock);
+    if (!addProductForm.categoryId) {
+      toast.error('Category is required.');
+      return;
+    }
+    if (!productIdVal) {
+      toast.error('Product is required.');
+      return;
+    }
+    if (!Number.isFinite(stockVal) || stockVal <= 0) {
+      toast.error('Enter a valid stock quantity (> 0).');
+      return;
+    }
+    setAddingProduct(true);
+    try {
+      const res = await apiFetch<{ success: boolean; storeInventory?: any; message?: string }>(
+        `/api/store-inventory/`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ storeId, productId: productIdVal, stock: stockVal })
+        }
+      );
+      if (!res.success) throw new Error(res.message || 'Failed to add product inventory');
+      
+      // Refetch inventory to get properly populated product/variant names
+      const inventoryRes = await apiFetch<{ success: boolean; storeInventory: any[]; message?: string }>(`/api/store-inventory/${storeId}`);
+      
+      if (inventoryRes.success) {
+        const toIdString = (value: any): string | null => {
+          if (value == null) return null;
+          const t = typeof value;
+          if (t === 'string' || t === 'number' || t === 'bigint') return String(value);
+          if (t === 'object') {
+            if (typeof value._id === 'string') return value._id;
+            if (typeof value.$oid === 'string') return value.$oid;
+            if (typeof value.id === 'string') return value.id;
+          }
+          return null;
+        };
+
+        const short = (val: any) => {
+          const s = toIdString(val);
+          return s ? `#${s.slice(-6)}` : '—';
+        };
+
+        const productLabel = (prod: any) => {
+          if (prod && typeof prod === 'object' && typeof prod.name === 'string') return prod.name;
+          return short(prod);
+        };
+
+        const variantLabelFrom = (variantObj: any) => {
+          if (variantObj && typeof variantObj === 'object' && typeof variantObj.name === 'string') return variantObj.name;
+          return short(variantObj);
+        };
+
+        const normalized = (inventoryRes.storeInventory || []).map((it, idx) => {
+          const variants = Array.isArray(it.variants) ? it.variants : [];
+          let variantLabel = '—';
+          if (variants.length === 1) {
+            variantLabel = variantLabelFrom(variants[0]?.variantId);
+          } else if (variants.length > 1) {
+            variantLabel = `${variants.length} variants`;
+          }
+          const stock = Number(it.totalStock ?? 0);
+          const invId = toIdString(it._id);
+          const idStr = invId || `${toIdString(it.productId) || 'row'}-${idx}`;
+          return {
+            id: idStr,
+            inventoryId: invId || undefined,
+            productName: productLabel(it.productId),
+            variant: variantLabel,
+            stock,
+            alert: (stock < 10 ? 'red' : 'green') as 'red' | 'green',
+          };
+        });
+        setInventory(normalized);
+      }
+      
+      setAddProductOpen(false);
+      setAddProductForm({ productId: '', stock: '', categoryId: '' });
+      toast.success(res.message || 'Product inventory added successfully');
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to add product inventory';
+      toast.error(msg);
+    } finally {
+      setAddingProduct(false);
+    }
+  };
 
   // Mock orders data
   const orders = [
@@ -148,47 +438,177 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
 
       {/* Store Inventory Section */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Store Inventory</CardTitle>
+          <Button
+            onClick={() => setAddProductOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            Add Product Inventory
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4">Product Name</th>
+                  <th className="text-left py-3 px-4">Product</th>
                   <th className="text-left py-3 px-4">Variant</th>
                   <th className="text-left py-3 px-4">Available Stock (kg)</th>
                   <th className="text-left py-3 px-4">Inventory Alert</th>
+                  <th className="text-left py-3 px-4">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {inventory.map((item) => (
-                  <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4">{item.productName}</td>
-                    <td className="py-3 px-4 text-gray-600">{item.variant}</td>
-                    <td className="py-3 px-4">{item.stock} kg</td>
-                    <td className="py-3 px-4">
-                      {item.alert === 'red' ? (
-                        <div className="flex items-center gap-2 text-red-600">
-                          <div className="w-3 h-3 rounded-full bg-red-600"></div>
-                          <span>Low Stock</span>
-                          <AlertCircle className="w-4 h-4" />
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 text-green-600">
-                          <div className="w-3 h-3 rounded-full bg-green-600"></div>
-                          <span>In Stock</span>
-                        </div>
-                      )}
-                    </td>
+                {inventoryLoading ? (
+                  <tr>
+                    <td colSpan={5} className="py-4 px-4 text-center text-gray-600">Loading inventory...</td>
                   </tr>
-                ))}
+                ) : inventoryError ? (
+                  <tr>
+                    <td colSpan={5} className="py-4 px-4 text-center text-red-600">{inventoryError}</td>
+                  </tr>
+                ) : inventory.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-4 px-4 text-center text-gray-500">No inventory found</td>
+                  </tr>
+                ) : (
+                  inventory.map((item) => (
+                    <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-3 px-4">{item.productName}</td>
+                      <td className="py-3 px-4 text-gray-600">{item.variant}</td>
+                      <td className="py-3 px-4">{item.stock} kg</td>
+                      <td className="py-3 px-4">
+                        {item.alert === 'red' ? (
+                          <div className="flex items-center gap-2 text-red-600">
+                            <div className="w-3 h-3 rounded-full bg-red-600"></div>
+                            <span>Low Stock</span>
+                            <AlertCircle className="w-4 h-4" />
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-green-600">
+                            <div className="w-3 h-3 rounded-full bg-green-600"></div>
+                            <span>In Stock</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        <Button
+                          size="sm"
+                          onClick={() => openAddStock(item.inventoryId)}
+                          disabled={!item.inventoryId}
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          Add Stock
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={addStockOpen} onOpenChange={setAddStockOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Stock</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <label className="text-sm text-gray-600">Quantity to add (kg)</label>
+            <Input
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              min="0"
+              placeholder="e.g., 5"
+              value={addStockValue}
+              onChange={(e) => setAddStockValue(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setAddStockOpen(false)} disabled={addingStock}>Cancel</Button>
+            <Button onClick={handleConfirmAddStock} disabled={addingStock || !targetInventoryId} className="bg-blue-600 hover:bg-blue-700 text-white">
+              {addingStock ? 'Adding…' : 'Add Stock'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={addProductOpen} onOpenChange={setAddProductOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Product Inventory</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm text-gray-600">Category</label>
+              <Select
+                value={addProductForm.categoryId}
+                onValueChange={(val) => {
+                  setAddProductForm({ categoryId: val, productId: '', stock: addProductForm.stock });
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={categoriesLoading ? 'Loading categories...' : 'Select category'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {categoriesLoading && <SelectItem value="__loading" disabled>Loading...</SelectItem>}
+                  {categoriesError && <SelectItem value="__error" disabled>{categoriesError}</SelectItem>}
+                  {!categoriesLoading && !categoriesError && categories.length === 0 && (
+                    <SelectItem value="__none" disabled>No categories</SelectItem>
+                  )}
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-gray-600">Product</label>
+              <Select
+                value={addProductForm.productId}
+                onValueChange={(val) => setAddProductForm({ ...addProductForm, productId: val })}
+                disabled={!addProductForm.categoryId || productsLoading || !!productsError}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={productsLoading ? 'Loading products...' : (!addProductForm.categoryId ? 'Select category first' : 'Select product')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {productsLoading && <SelectItem value="__loading" disabled>Loading...</SelectItem>}
+                  {productsError && <SelectItem value="__error" disabled>{productsError}</SelectItem>}
+                  {!productsLoading && !productsError && productsOptions.length === 0 && addProductForm.categoryId && (
+                    <SelectItem value="__none" disabled>No products for this category</SelectItem>
+                  )}
+                  {productsOptions.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm text-gray-600">Initial Stock (kg)</label>
+              <Input
+                type="number"
+                inputMode="decimal"
+                step="0.1"
+                min="0"
+                placeholder="e.g., 50"
+                value={addProductForm.stock}
+                onChange={(e) => setAddProductForm({ ...addProductForm, stock: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setAddProductOpen(false)} disabled={addingProduct}>Cancel</Button>
+            <Button onClick={handleConfirmAddProduct} disabled={addingProduct} className="bg-blue-600 hover:bg-blue-700 text-white">
+              {addingProduct ? 'Adding…' : 'Add Product'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Store Orders Section */}
       <Card>

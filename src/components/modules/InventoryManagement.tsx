@@ -40,8 +40,10 @@ export default function InventoryManagement() {
   const [variantSortOption, setVariantSortOption] = useState('recent');
   const [insertedProductId, setInsertedProductId] = useState<string | null>(null);
   const [insertedVariantId, setInsertedVariantId] = useState<string | null>(null);
+  const [categoriesPage, setCategoriesPage] = useState(1);
   const [productsPage, setProductsPage] = useState(1);
   const [variantsPage, setVariantsPage] = useState(1);
+  const CATEGORIES_PAGE_SIZE = 20;
   const PRODUCTS_PAGE_SIZE = 20;
   const VARIANTS_PAGE_SIZE = 20;
   
@@ -2181,12 +2183,17 @@ export default function InventoryManagement() {
   })();
 
   // pagination: compute paginated slices and totals
+  const categoriesTotal = filteredCategories.length;
   const productsTotal = displayProducts.length;
   const variantsTotal = displayVariants.length;
+  const categoriesTotalPages = Math.max(1, Math.ceil(categoriesTotal / CATEGORIES_PAGE_SIZE));
   const productsTotalPages = Math.max(1, Math.ceil(productsTotal / PRODUCTS_PAGE_SIZE));
   const variantsTotalPages = Math.max(1, Math.ceil(variantsTotal / VARIANTS_PAGE_SIZE));
 
   // Clamp current page
+  useEffect(() => {
+    if (categoriesPage > categoriesTotalPages) setCategoriesPage(categoriesTotalPages);
+  }, [categoriesTotalPages]);
   useEffect(() => {
     if (productsPage > productsTotalPages) setProductsPage(productsTotalPages);
   }, [productsTotalPages]);
@@ -2194,6 +2201,7 @@ export default function InventoryManagement() {
     if (variantsPage > variantsTotalPages) setVariantsPage(variantsTotalPages);
   }, [variantsTotalPages]);
 
+  const displayCategoriesPage = filteredCategories.slice((categoriesPage - 1) * CATEGORIES_PAGE_SIZE, categoriesPage * CATEGORIES_PAGE_SIZE);
   const displayProductsPage = displayProducts.slice((productsPage - 1) * PRODUCTS_PAGE_SIZE, productsPage * PRODUCTS_PAGE_SIZE);
   const displayVariantsPage = displayVariants.slice((variantsPage - 1) * VARIANTS_PAGE_SIZE, variantsPage * VARIANTS_PAGE_SIZE);
 
@@ -2212,6 +2220,19 @@ export default function InventoryManagement() {
   useEffect(() => {
     setInsertedVariantId(null);
   }, [variantSortOption, searchQuery, activeTab]);
+
+  // Reset pagination when switching tabs or search changes
+  useEffect(() => {
+    if (activeTab === 'categories') setCategoriesPage(1);
+    if (activeTab === 'products') setProductsPage(1);
+    if (activeTab === 'variants') setVariantsPage(1);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'categories') setCategoriesPage(1);
+    if (activeTab === 'products') setProductsPage(1);
+    if (activeTab === 'variants') setVariantsPage(1);
+  }, [searchQuery]);
 
   return (
     <div className="space-y-6">
@@ -2273,11 +2294,15 @@ export default function InventoryManagement() {
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between mb-3">
-                <div className="text-sm text-gray-600">Showing {(productsPage - 1) * PRODUCTS_PAGE_SIZE + 1} - {Math.min(productsPage * PRODUCTS_PAGE_SIZE, displayProducts.length)} of {displayProducts.length}</div>
+                <div className="text-sm text-gray-600">
+                  {categoriesTotal === 0
+                    ? 'Showing 0 of 0'
+                    : `Showing ${(categoriesPage - 1) * CATEGORIES_PAGE_SIZE + 1} - ${Math.min(categoriesPage * CATEGORIES_PAGE_SIZE, categoriesTotal)} of ${categoriesTotal}`}
+                </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" className="px-3 py-1" onClick={() => setProductsPage(p => Math.max(1, p - 1))} disabled={productsPage === 1}>Prev</Button>
-                  <div className="text-sm">Page {productsPage} of {productsTotalPages}</div>
-                  <Button variant="outline" className="px-3 py-1" onClick={() => setProductsPage(p => Math.min(productsTotalPages, p + 1))} disabled={productsPage === productsTotalPages}>Next</Button>
+                  <Button variant="outline" className="px-3 py-1" onClick={() => setCategoriesPage(p => Math.max(1, p - 1))} disabled={categoriesPage === 1}>Prev</Button>
+                  <div className="text-sm">Page {categoriesPage} of {categoriesTotalPages}</div>
+                  <Button variant="outline" className="px-3 py-1" onClick={() => setCategoriesPage(p => Math.min(categoriesTotalPages, p + 1))} disabled={categoriesPage === categoriesTotalPages}>Next</Button>
                 </div>
               </div>
               <div className="overflow-x-auto">
@@ -2314,7 +2339,7 @@ export default function InventoryManagement() {
                           <td colSpan={8} className="py-8 text-center text-gray-500">No categories found</td>
                         </tr>
                       ) : (
-                        filteredCategories.map((category, index) => {
+                        displayCategoriesPage.map((category, index) => {
                           const originalIndex = categories.findIndex((cat) => cat.id === category.id);
                           const isDragging = draggedCategoryIndex === originalIndex;
                           const isDragOver = dragOverCategoryIndex === originalIndex;
