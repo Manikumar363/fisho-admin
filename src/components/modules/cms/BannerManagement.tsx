@@ -11,16 +11,16 @@ interface BannerManagementProps {
   banner?: any;
   onSave: (bannerData: any) => void;
   onCancel: () => void;
+  onError?: (error: string) => void;
 }
 
-export default function BannerManagement({ banner, onSave, onCancel }: BannerManagementProps) {
+export default function BannerManagement({ banner, onSave, onCancel, onError }: BannerManagementProps) {
   const [title, setTitle] = useState(banner?.title || '');
   const [status, setStatus] = useState<'Active' | 'Inactive'>(banner?.status || 'Active');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>(banner?.image || '');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState('');
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -72,7 +72,6 @@ export default function BannerManagement({ banner, onSave, onCancel }: BannerMan
       return;
     }
 
-    setSubmitError('');
     setIsSubmitting(true);
 
     try {
@@ -120,10 +119,14 @@ export default function BannerManagement({ banner, onSave, onCancel }: BannerMan
         isDeleted: res.banner.isDeleted,
         createdAt: res.banner.createdAt,
         updatedAt: res.banner.updatedAt,
+        message: res.message,
       });
     } catch (err: any) {
       const message = err?.message || 'Something went wrong while saving the banner';
-      setSubmitError(message);
+      // Call onError callback to show toast in parent component
+      if (onError) {
+        onError(message);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -323,11 +326,6 @@ export default function BannerManagement({ banner, onSave, onCancel }: BannerMan
                   </Button>
                 </div>
               </form>
-              {submitError && (
-                <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                  {submitError}
-                </div>
-              )}
             </CardContent>
           </Card>
         </div>

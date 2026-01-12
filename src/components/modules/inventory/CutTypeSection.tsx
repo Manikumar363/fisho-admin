@@ -240,9 +240,64 @@ export default function CutTypeSection({ openAdd, onAddClose, resetAdd }: CutTyp
     }
   };
 
-  const openDeleteDialog = (cutType: CutType) => {
-    setDeletingCutType(cutType);
-    setDeleteOpen(true);
+  const openDeleteDialog = async (cutType: CutType) => {
+    // Check if Cut Type is being used by any Products or Variants
+    try {
+      // Check Products
+      const productsRes = await apiFetch<{
+        success: boolean;
+        products?: Array<{
+          _id: string;
+          name: string;
+          availableCutTypes?: Array<{ _id: string; name: string }>;
+        }>;
+      }>('/api/products');
+
+      if (productsRes?.success && productsRes.products) {
+        const productsUsingCutType = productsRes.products.filter(
+          (p) => p.availableCutTypes?.some((ct) => ct._id === cutType.id)
+        );
+
+        if (productsUsingCutType.length > 0) {
+          const productNames = productsUsingCutType.map(p => p.name).join(', ');
+          toast.error(
+            `Cannot delete this Cut Type. It is being used by ${productsUsingCutType.length} product(s): ${productNames}. Please remove this cut type from all products first.`
+          );
+          return;
+        }
+      }
+
+      // Check Variants
+      const variantsRes = await apiFetch<{
+        success: boolean;
+        variants?: Array<{
+          _id: string;
+          name: string;
+          cutType: { _id: string; name: string };
+        }>;
+      }>('/api/variants');
+
+      if (variantsRes?.success && variantsRes.variants) {
+        const variantsUsingCutType = variantsRes.variants.filter(
+          (v) => v.cutType?._id === cutType.id
+        );
+
+        if (variantsUsingCutType.length > 0) {
+          const variantNames = variantsUsingCutType.map(v => v.name).join(', ');
+          toast.error(
+            `Cannot delete this Cut Type. It is being used by ${variantsUsingCutType.length} product variant(s): ${variantNames}. Please remove or update these variants first.`
+          );
+          return;
+        }
+      }
+
+      // If not being used, proceed with delete dialog
+      setDeletingCutType(cutType);
+      setDeleteOpen(true);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to verify cut type usage';
+      toast.error(msg);
+    }
   };
 
   const fetchCutTypeById = async (id: string) => {

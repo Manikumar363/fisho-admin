@@ -13,7 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 import BannerManagement from './cms/BannerManagement';
 import TextContentEditor from './cms/TextContentEditor';
 import { apiFetch } from '../../lib/api';
@@ -274,7 +274,7 @@ export default function CMS() {
             }
           : banner
       ));
-      toast.success('Banner updated successfully');
+      toast.success(bannerData.message || 'Banner updated successfully');
     } else {
       // Add new banner
       const newBanner: ContentItem = {
@@ -288,8 +288,9 @@ export default function CMS() {
         sequence: bannerData.order,
       };
       setBanners([...banners, newBanner]);
-      toast.success('Banner added successfully');
+      toast.success(bannerData.message || 'Banner added successfully');
     }
+    loadBanners();
     setSelectedContent(null);
     setEditingItem(null);
   };
@@ -396,6 +397,7 @@ export default function CMS() {
         banner={editingItem}
         onSave={handleSaveBanner}
         onCancel={handleCancel}
+        onError={(error) => toast.error(error)}
       />
     );
   }
