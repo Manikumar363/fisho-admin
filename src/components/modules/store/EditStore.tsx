@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, MapPin, Key } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
@@ -7,26 +7,125 @@ import { Label } from '../../ui/label';
 import { Button } from '../../ui/button';
 import { Textarea } from '../../ui/textarea';
 import { Switch } from '../../ui/switch';
+import { apiFetch } from '../../../lib/api';
+import { toast } from 'react-toastify';
 
-export default function EditStore() {
-  const navigate = useNavigate();
-  const { storeId } = useParams();
+interface EditStoreProps {
+  storeId: string;
+  onBack: () => void;
+  onStoreUpdated?: (store: any) => void;
+}
 
-  const handleSubmit = (e: React.FormEvent) => {
+export default function EditStore({ storeId, onBack, onStoreUpdated }: EditStoreProps) {
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    address: '',
+    location: { lat: 0, lng: 0 },
+    managerName: '',
+    managerMobile: '',
+    managerEmail: '',
+    managerAddress: '',
+    contactNumber: '',
+    isActive: true,
+    acceptOnlineOrders: true,
+    acceptWalkinOrders: true
+  });
+
+  useEffect(() => {
+    setLoading(true);
+    apiFetch<{ success: boolean; store: any; message?: string }>(`/api/stores/${storeId}`)
+      .then((res) => {
+        if (!res.success) throw new Error(res.message || 'Failed to fetch store');
+        const store = res.store;
+        setFormData({
+          name: store.name || '',
+          address: store.address || '',
+          location: store.location || { lat: 0, lng: 0 },
+          managerName: store.manager?.name || '',
+          managerMobile: store.manager?.mobile || '',
+          managerEmail: store.manager?.email || '',
+          managerAddress: store.manager?.address || '',
+          contactNumber: store.contactNumber || '',
+          isActive: store.isActive !== false,
+          acceptOnlineOrders: store.acceptOnlineOrders !== false,
+          acceptWalkinOrders: store.acceptWalkinOrders !== false
+        });
+      })
+      .catch((err) => {
+        const msg = err?.message || 'Failed to load store';
+        toast.error(msg);
+      })
+      .finally(() => setLoading(false));
+  }, [storeId]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle form submission
-    navigate('/store-mapping');
+    setSubmitting(true);
+    try {
+      const res = await apiFetch<{ success: boolean; store: any; message?: string }>(
+        `/api/stores/${storeId}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            name: formData.name,
+            address: formData.address,
+            location: formData.location,
+            manager: {
+              name: formData.managerName,
+              mobile: formData.managerMobile,
+              email: formData.managerEmail,
+              address: formData.managerAddress
+            },
+            contactNumber: formData.contactNumber,
+            isActive: formData.isActive,
+            acceptOnlineOrders: formData.acceptOnlineOrders,
+            acceptWalkinOrders: formData.acceptWalkinOrders
+          })
+        }
+      );
+
+      if (!res.success) throw new Error(res.message || 'Failed to update store');
+      
+      toast.success(res.message || 'Store updated successfully');
+      if (onStoreUpdated && res.store) {
+        onStoreUpdated(res.store);
+      }
+      onBack();
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to update store';
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" onClick={onBack}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="py-6 text-gray-600">Loading store details...</CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="outline" onClick={() => navigate('/store-mapping')}>
+        <Button variant="outline" onClick={onBack}>
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Store Mapping
         </Button>
         <div>
-          <h1 className="mb-1">Edit Store - {storeId}</h1>
+          <h1 className="mb-1">Edit Store</h1>
           <p className="text-gray-600">Update store information and manager details</p>
         </div>
       </div>
@@ -43,8 +142,9 @@ export default function EditStore() {
                 <Label htmlFor="storeName">Store Name</Label>
                 <Input 
                   id="storeName" 
-                  placeholder="e.g., Fisho Marine Drive" 
-                  defaultValue="Fisho Marine Drive"
+                  placeholder="e.g., Fisho Marine Drive"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
                 />
               </div>
@@ -53,8 +153,9 @@ export default function EditStore() {
                 <Label htmlFor="storeLocation">Store Location (Text)</Label>
                 <Input 
                   id="storeLocation" 
-                  placeholder="e.g., Marine Drive, Mumbai" 
-                  defaultValue="Marine Drive, Mumbai"
+                  placeholder="e.g., Marine Drive, Mumbai"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   required
                 />
               </div>
@@ -99,8 +200,9 @@ export default function EditStore() {
                   <Label htmlFor="managerName">Manager Name</Label>
                   <Input 
                     id="managerName" 
-                    placeholder="Enter manager name" 
-                    defaultValue="Rajesh Kumar"
+                    placeholder="Enter manager name"
+                    value={formData.managerName}
+                    onChange={(e) => setFormData({ ...formData, managerName: e.target.value })}
                     required
                   />
                 </div>
@@ -110,8 +212,9 @@ export default function EditStore() {
                   <Input 
                     id="mobileNumber" 
                     type="tel"
-                    placeholder="+91 98765 43210" 
-                    defaultValue="+91 98765 43210"
+                    placeholder="+91 98765 43210"
+                    value={formData.managerMobile}
+                    onChange={(e) => setFormData({ ...formData, managerMobile: e.target.value })}
                     required
                   />
                 </div>
@@ -121,8 +224,9 @@ export default function EditStore() {
                   <Input 
                     id="contactNumber" 
                     type="tel"
-                    placeholder="+91 22 12345678" 
-                    defaultValue="+91 22 12345678"
+                    placeholder="+91 22 12345678"
+                    value={formData.contactNumber}
+                    onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
                     required
                   />
                 </div>
@@ -132,8 +236,9 @@ export default function EditStore() {
                   <Input 
                     id="emailId" 
                     type="email"
-                    placeholder="manager@fisho.com" 
-                    defaultValue="rajesh.marine@fisho.com"
+                    placeholder="manager@fisho.com"
+                    value={formData.managerEmail}
+                    onChange={(e) => setFormData({ ...formData, managerEmail: e.target.value })}
                     required
                   />
                 </div>
@@ -144,7 +249,8 @@ export default function EditStore() {
                     id="managerAddress" 
                     placeholder="Enter complete residential address" 
                     rows={3}
-                    defaultValue="123, Worli Sea Face, Mumbai - 400018"
+                    value={formData.managerAddress}
+                    onChange={(e) => setFormData({ ...formData, managerAddress: e.target.value })}
                   />
                 </div>
               </div>
@@ -202,7 +308,11 @@ export default function EditStore() {
                     <Label htmlFor="activeStatus">Store Status</Label>
                     <p className="text-sm text-gray-600">Activate or deactivate this store</p>
                   </div>
-                  <Switch id="activeStatus" defaultChecked />
+                  <Switch 
+                    id="activeStatus" 
+                    checked={formData.isActive}
+                    onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+                  />
                 </div>
 
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
@@ -210,7 +320,11 @@ export default function EditStore() {
                     <Label htmlFor="onlineOrders">Accept Online Orders</Label>
                     <p className="text-sm text-gray-600">Enable customers to place orders</p>
                   </div>
-                  <Switch id="onlineOrders" defaultChecked />
+                  <Switch 
+                    id="onlineOrders" 
+                    checked={formData.acceptOnlineOrders}
+                    onCheckedChange={(checked) => setFormData({ ...formData, acceptOnlineOrders: checked })}
+                  />
                 </div>
 
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
@@ -218,7 +332,11 @@ export default function EditStore() {
                     <Label htmlFor="walkinOrders">Accept Walk-in Orders</Label>
                     <p className="text-sm text-gray-600">Enable store billing for walk-in customers</p>
                   </div>
-                  <Switch id="walkinOrders" defaultChecked />
+                  <Switch 
+                    id="walkinOrders" 
+                    checked={formData.acceptWalkinOrders}
+                    onCheckedChange={(checked) => setFormData({ ...formData, acceptWalkinOrders: checked })}
+                  />
                 </div>
               </div>
             </div>
@@ -247,13 +365,14 @@ export default function EditStore() {
               <Button 
                 type="button" 
                 variant="outline"
-                onClick={() => navigate('/store-mapping')}
+                onClick={onBack}
+                disabled={submitting}
               >
                 Cancel
               </Button>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={submitting}>
                 <Save className="w-4 h-4 mr-2" />
-                Save Changes
+                {submitting ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>
           </form>

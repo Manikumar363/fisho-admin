@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -19,6 +19,8 @@ import {
   Navigation,
   MessageSquare
 } from 'lucide-react';
+import { getAdminData, getUserRole, clearAuthData } from '../../lib/api';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -30,10 +32,30 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [expandedSections, setExpandedSections] = useState<string[]>(['inventory']);
+  const [adminName, setAdminName] = useState('Admin User');
+  const [userRole, setUserRole] = useState('admin');
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
-  const handleLogout = () => {
+  useEffect(() => {
+    const adminData = getAdminData();
+    const role = getUserRole();
+    
+    if (adminData?.name) {
+      setAdminName(adminData.name);
+    }
+    if (role) {
+      setUserRole(role);
+    }
+  }, []);
+
+  const handleConfirmLogout = () => {
+    setShowLogoutDialog(false);
     onLogout();
     navigate('/login');
+  };
+
+  const handleLogoutClick = () => {
+    setShowLogoutDialog(true);
   };
 
   const toggleSection = (section: string) => {
@@ -53,27 +75,31 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
     path?: string;
     hasSubmenu?: boolean;
     submenu?: { label: string; path: string }[];
+    roles?: string[];
   }
 
-  const menuItems: MenuItem[] = [
+  const allMenuItems: MenuItem[] = [
     {
       id: 'dashboard',
       label: 'Dashboard',
       icon: LayoutDashboard,
-      path: '/dashboard'
+      path: '/dashboard',
+      roles: ['admin', 'subadmin']
     },
     {
       id: 'user-management',
       label: 'User Management',
       icon: Users,
-      path: '/user-management'
+      path: '/user-management',
+      roles: ['admin']
     },
     {
       id: 'inventory',
       label: 'Inventory Management',
       icon: Package,
       hasSubmenu: false,
-      path: '/inventory-management'
+      path: '/inventory-management',
+      roles: ['admin']
       // Example: Uncomment and edit below if you want submenu
       // hasSubmenu: true,
       // submenu: [
@@ -85,51 +111,64 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
       id: 'orders',
       label: 'Orders',
       icon: ShoppingCart,
-      path: '/orders'
+      path: '/orders',
+      roles: ['admin']
     },
     {
       id: 'pre-purchase',
       label: 'Pre Purchase Order',
       icon: ClipboardList,
-      path: '/pre-purchase-orders'
+      path: '/pre-purchase-orders',
+      roles: ['admin']
     },
      {
       id: 'offers',
       label: 'Offers',
       icon: Tag,
-      path: '/offers'
+      path: '/offers',
+      roles: ['admin']
     },
     {
       id: 'delivery-locations',
       label: 'Delivery Locations',
       icon: Navigation,
-      path: '/delivery-locations'
+      path: '/delivery-locations',
+      roles: ['admin']
     },
     {
       id: 'transactions',
       label: 'Transactions & Settlements',
       icon: CreditCard,
-      path: '/transactions'
+      path: '/transactions',
+      roles: ['admin', 'subadmin']
     },
     {
       id: 'cms',
       label: 'CMS',
       icon: FileText,
-      path: '/cms'
+      path: '/cms',
+      roles: ['admin']
     },
     {
       id: 'enquiries',
       label: 'Enquiries',
       icon: MessageSquare,
-      path: '/enquiries'
+      path: '/enquiries',
+      roles: ['admin']
     },
     {
       id: 'mapping',
-      label: 'Store Mapping',
+      label: userRole === 'subadmin' ? 'My Store' : 'Store Mapping',
       icon: MapPin,
-      path: '/store-mapping'
+      path: '/store-mapping',
+      roles: ['admin', 'subadmin']
     }
   ];
+
+  // Filter menu items based on user role
+  const menuItems = allMenuItems.filter(
+    (item: any) => !item.roles || item.roles.includes(userRole)
+  );
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -180,10 +219,13 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
               <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                 <User className="w-5 h-5 text-blue-600" />
               </div>
-              <span>Admin User</span>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium">{adminName}</span>
+                <span className="text-xs text-gray-500 capitalize">{userRole === 'subadmin' ? 'Sub Admin' : 'Admin'}</span>
+              </div>
             </div>
             <button 
-              onClick={handleLogout}
+              onClick={handleLogoutClick}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               title="Logout"
             >
@@ -197,6 +239,27 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
           {children}
         </main>
       </div>
+
+      {/* Logout Confirmation Dialog */}
+      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Logout</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to logout? You will need to login again to access the admin panel.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmLogout}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Logout
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

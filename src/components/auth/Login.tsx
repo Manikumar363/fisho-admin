@@ -6,8 +6,8 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 // Optionally use a toast for error feedback
-import { toast } from 'sonner';
-import { setToken } from '../../lib/api';
+import { toast } from 'react-toastify';
+import { setToken, setUserRole, setAdminData } from '../../lib/api';
 
 interface LoginProps {
   onLogin: () => void;
@@ -40,12 +40,18 @@ export default function Login({ onLogin }: LoginProps) {
         setLoading(false);
         return;
       }
-      // Store token if returned
+      // Store token, role, and admin data
       const json = await res.json().catch(() => ({}));
       const token: string | undefined =
         json?.token || json?.accessToken || json?.data?.token || json?.data?.accessToken;
+      const adminData = json?.admin || json?.data?.admin;
+      const role = adminData?.role || 'admin';
+
       if (token) {
         setToken(token);
+        setUserRole(role);
+        setAdminData(adminData);
+        toast.success(`Welcome ${adminData?.name || 'Admin'}! Login successful.`);
       }
       onLogin();
       navigate('/dashboard');

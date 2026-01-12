@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
-import { apiFetch } from '../../../lib/api';
+import { apiFetch, getUserRole } from '../../../lib/api';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../../ui/dialog';
 import { Input } from '../../ui/input';
 import { toast } from 'react-toastify';
@@ -37,6 +37,7 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
   const [productsOptions, setProductsOptions] = useState<Array<{ id: string; name: string; categoryId?: string }>>([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [productsError, setProductsError] = useState<string | null>(null);
+  const userRole = getUserRole();
 
   useEffect(() => {
     let active = true;
@@ -440,12 +441,14 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Store Inventory</CardTitle>
-          <Button
-            onClick={() => setAddProductOpen(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            Add Product Inventory
-          </Button>
+          {userRole === 'admin' && (
+            <Button
+              onClick={() => setAddProductOpen(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Add Product Inventory
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -493,14 +496,16 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
                         )}
                       </td>
                       <td className="py-3 px-4">
-                        <Button
-                          size="sm"
-                          onClick={() => openAddStock(item.inventoryId)}
-                          disabled={!item.inventoryId}
-                          className="bg-green-600 hover:bg-green-700 text-white"
-                        >
-                          Add Stock
-                        </Button>
+                        {userRole === 'admin' && (
+                          <Button
+                            size="sm"
+                            onClick={() => openAddStock(item.inventoryId)}
+                            disabled={!item.inventoryId}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            Add Stock
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   ))

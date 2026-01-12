@@ -18,6 +18,49 @@ export function setToken(token: string) {
   }
 }
 
+export function getUserRole(): string | null {
+  try {
+    return localStorage.getItem('user_role');
+  } catch {
+    return null;
+  }
+}
+
+export function setUserRole(role: string) {
+  try {
+    localStorage.setItem('user_role', role);
+  } catch {
+    // ignore storage errors
+  }
+}
+
+export function getAdminData(): any | null {
+  try {
+    const data = localStorage.getItem('admin_data');
+    return data ? JSON.parse(data) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setAdminData(adminData: any) {
+  try {
+    localStorage.setItem('admin_data', JSON.stringify(adminData));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+export function clearAuthData() {
+  try {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('admin_data');
+  } catch {
+    // ignore storage errors
+  }
+}
+
 export type ApiError = {
   status: number;
   message: string;

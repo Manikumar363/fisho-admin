@@ -17,11 +17,13 @@ import {
 } from '../ui/alert-dialog';
 import AddStore from './store/AddStore';
 import ViewStore from './store/ViewStore';
-import { apiFetch } from '../../lib/api';
+import EditStore from './store/EditStore';
+import { apiFetch, getUserRole } from '../../lib/api';
 
 export default function StoreMapping() {
   const [showAddStore, setShowAddStore] = useState(false);
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
+  const [editingStore, setEditingStore] = useState<string | null>(null);
   const [stores, setStores] = useState<any[]>([]);
   const [storesLoading, setStoresLoading] = useState(false);
   const [storesError, setStoresError] = useState<string | null>(null);
@@ -29,6 +31,7 @@ export default function StoreMapping() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const userRole = getUserRole();
 
   useEffect(() => {
     setStoresLoading(true);
@@ -72,6 +75,17 @@ export default function StoreMapping() {
     />;
   }
 
+  if (editingStore) {
+    return <EditStore 
+      storeId={editingStore} 
+      onBack={() => setEditingStore(null)}
+      onStoreUpdated={(updatedStore) => {
+        setStores(prev => prev.map(s => s._id === updatedStore._id ? updatedStore : s));
+        setEditingStore(null);
+      }}
+    />;
+  }
+
   if (selectedStore) {
     return <ViewStore storeId={selectedStore} onBack={() => setSelectedStore(null)} />;
   }
@@ -83,13 +97,15 @@ export default function StoreMapping() {
           <h1 className="mb-2">Store Mapping</h1>
           <p className="text-gray-600">Manage store locations and assignments</p>
         </div>
-        <Button 
-          onClick={() => setShowAddStore(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Store
-        </Button>
+        {userRole === 'admin' && (
+          <Button 
+            onClick={() => setShowAddStore(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Store
+          </Button>
+        )}
       </div>
 
       {/* Search */}
@@ -158,25 +174,32 @@ export default function StoreMapping() {
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex gap-2">
-                          <button className="p-1 hover:bg-gray-100 rounded">
-                            <Edit className="w-4 h-4 text-blue-600" />
-                          </button>
+                          {userRole === 'admin' && (
+                            <button 
+                              className="p-1 hover:bg-gray-100 rounded"
+                              onClick={() => setEditingStore(store._id)}
+                            >
+                              <Edit className="w-4 h-4 text-blue-600" />
+                            </button>
+                          )}
                           <button 
                             className="p-1 hover:bg-gray-100 rounded"
                             onClick={() => setSelectedStore(store._id)}
                           >
                             <Eye className="w-4 h-4 text-gray-600" />
                           </button>
-                          <button
-                            className="p-1 hover:bg-gray-100 rounded"
-                            onClick={() => {
-                              setDeleteTargetId(store._id);
-                              setShowDeleteDialog(true);
-                            }}
-                            disabled={isDeleting && deleteTargetId === store._id}
-                          >
-                            <Trash2 className="w-4 h-4 text-red-600" />
-                          </button>
+                          {userRole === 'admin' && (
+                            <button
+                              className="p-1 hover:bg-gray-100 rounded"
+                              onClick={() => {
+                                setDeleteTargetId(store._id);
+                                setShowDeleteDialog(true);
+                              }}
+                              disabled={isDeleting && deleteTargetId === store._id}
+                            >
+                              <Trash2 className="w-4 h-4 text-red-600" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

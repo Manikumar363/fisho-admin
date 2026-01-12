@@ -23,7 +23,7 @@ import Offers from './components/modules/Offers';
 import DeliveryLocations from './components/modules/DeliveryLocations';
 import CMS from './components/modules/CMS';
 import Enquiries from './components/modules/Enquiries';
-import { getToken } from './lib/api';
+import { getToken, clearAuthData } from './lib/api';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -45,7 +45,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('auth_token');
+    clearAuthData();
     setIsAuthenticated(false);
   };
 
