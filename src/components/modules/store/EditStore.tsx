@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save, MapPin, Key } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Save } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
@@ -9,6 +9,7 @@ import { Textarea } from '../../ui/textarea';
 import { Switch } from '../../ui/switch';
 import { apiFetch } from '../../../lib/api';
 import { toast } from 'react-toastify';
+import MapSection from './MapSection';
 
 interface EditStoreProps {
   storeId: string;
@@ -16,23 +17,67 @@ interface EditStoreProps {
   onStoreUpdated?: (store: any) => void;
 }
 
+type DayKey = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+
+const defaultHours: Record<DayKey, { open: string; close: string; isClosed: boolean }> = {
+  monday: { open: '10:00', close: '21:00', isClosed: false },
+  tuesday: { open: '10:00', close: '21:00', isClosed: false },
+  wednesday: { open: '10:00', close: '21:00', isClosed: false },
+  thursday: { open: '10:00', close: '22:00', isClosed: false },
+  friday: { open: '10:00', close: '22:00', isClosed: false },
+  saturday: { open: '09:00', close: '22:00', isClosed: false },
+  sunday: { open: '11:00', close: '19:00', isClosed: false },
+};
+
 export default function EditStore({ storeId, onBack, onStoreUpdated }: EditStoreProps) {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [managers, setManagers] = useState<any[]>([]);
+  const [managersLoading, setManagersLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     address: '',
-    location: { lat: 0, lng: 0 },
-    managerName: '',
-    managerMobile: '',
-    managerEmail: '',
-    managerAddress: '',
+    lat: '',
+    lng: '',
+    description: '',
     contactNumber: '',
+    managerId: '',
     isActive: true,
-    acceptOnlineOrders: true,
-    acceptWalkinOrders: true
+    operatingHours: defaultHours,
   });
 
+  const dayEntries = useMemo(() => Object.entries(formData.operatingHours) as [DayKey, { open: string; close: string; isClosed: boolean }][], [formData.operatingHours]);
+
+  // Fetch managers list
+  useEffect(() => {
+    let active = true;
+    const fetchManagers = async () => {
+      setManagersLoading(true);
+      try {
+        const res = await apiFetch<{ success: boolean; subadmins?: any[]; pagination?: any }>(`/api/subadmin/all-subadmins?page=1&limit=100`);
+        let list: any[] = [];
+        if (res && res.success && Array.isArray(res.subadmins)) {
+          list = res.subadmins;
+        } else {
+          const fallback = await apiFetch<{ success: boolean; users?: any[] }>(`/api/users/`);
+          if (fallback && fallback.success && Array.isArray(fallback.users)) list = fallback.users;
+        }
+        if (!active) return;
+        setManagers(list || []);
+      } catch (err) {
+        console.error('Failed to load managers', err);
+        if (!active) return;
+        setManagers([]);
+      } finally {
+        if (active) setManagersLoading(false);
+      }
+    };
+    fetchManagers();
+    return () => { active = false; };
+  }, []);
+
+  // Fetch store data
   useEffect(() => {
     setLoading(true);
     apiFetch<{ success: boolean; store: any; message?: string }>(`/api/stores/${storeId}`)
@@ -42,15 +87,13 @@ export default function EditStore({ storeId, onBack, onStoreUpdated }: EditStore
         setFormData({
           name: store.name || '',
           address: store.address || '',
-          location: store.location || { lat: 0, lng: 0 },
-          managerName: store.manager?.name || '',
-          managerMobile: store.manager?.mobile || '',
-          managerEmail: store.manager?.email || '',
-          managerAddress: store.manager?.address || '',
+          lat: store.lat?.toString() || store.location?.lat?.toString() || '',
+          lng: store.lng?.toString() || store.location?.lng?.toString() || '',
+          description: store.description || '',
           contactNumber: store.contactNumber || '',
+          managerId: store.manager?._id || store.manager?.id || store.manager || '',
           isActive: store.isActive !== false,
-          acceptOnlineOrders: store.acceptOnlineOrders !== false,
-          acceptWalkinOrders: store.acceptWalkinOrders !== false
+          operatingHours: store.operatingHours || defaultHours,
         });
       })
       .catch((err) => {
@@ -60,8 +103,56 @@ export default function EditStore({ storeId, onBack, onStoreUpdated }: EditStore
       .finally(() => setLoading(false));
   }, [storeId]);
 
+  function capitalize(s: string) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  function makeClosedHours() {
+    const obj = {} as Record<DayKey, { open: string; close: string; isClosed: boolean }>;
+    (Object.keys(defaultHours) as DayKey[]).forEach(d => {
+      obj[d] = { open: '', close: '', isClosed: true };
+    });
+    return obj;
+  }
+
+  const handleTimeChange = (day: DayKey, field: 'open' | 'close', value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      operatingHours: {
+        ...prev.operatingHours,
+        [day]: { ...prev.operatingHours[day], [field]: value, isClosed: false },
+      },
+    }));
+  };
+
+  const toggleClosed = (day: DayKey) => {
+    setFormData(prev => {
+      const next = { ...prev.operatingHours } as Record<DayKey, { open: string; close: string; isClosed: boolean }>;
+      const curr = next[day];
+      const isNow = !curr.isClosed;
+      next[day] = { open: isNow ? '' : defaultHours[day].open, close: isNow ? '' : defaultHours[day].close, isClosed: isNow };
+      return { ...prev, operatingHours: next };
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formData.name || !formData.address || !formData.managerId) {
+      toast.error('Please fill required fields: name, address, manager');
+      return;
+    }
+
+    if (!formData.lat || !formData.lng) {
+      toast.error('Please select a location so latitude and longitude are set');
+      return;
+    }
+
+    const latNum = Number(formData.lat);
+    const lngNum = Number(formData.lng);
+    if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
+      toast.error('Selected coordinates are invalid');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const res = await apiFetch<{ success: boolean; store: any; message?: string }>(
@@ -71,17 +162,13 @@ export default function EditStore({ storeId, onBack, onStoreUpdated }: EditStore
           body: JSON.stringify({
             name: formData.name,
             address: formData.address,
-            location: formData.location,
-            manager: {
-              name: formData.managerName,
-              mobile: formData.managerMobile,
-              email: formData.managerEmail,
-              address: formData.managerAddress
-            },
+            lat: latNum,
+            lng: lngNum,
+            description: formData.description,
             contactNumber: formData.contactNumber,
+            manager: formData.managerId,
             isActive: formData.isActive,
-            acceptOnlineOrders: formData.acceptOnlineOrders,
-            acceptWalkinOrders: formData.acceptWalkinOrders
+            operatingHours: formData.operatingHours,
           })
         }
       );
@@ -101,11 +188,16 @@ export default function EditStore({ storeId, onBack, onStoreUpdated }: EditStore
     }
   };
 
+  const handleBack = () => {
+    navigate('/store-mapping');
+    onBack();
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={onBack}>
+          <Button variant="outline" onClick={handleBack}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
@@ -118,15 +210,17 @@ export default function EditStore({ storeId, onBack, onStoreUpdated }: EditStore
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-h-[calc(100vh-6rem)] overflow-auto">
       <div className="flex items-center gap-4">
-        <Button variant="outline" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Store Mapping
-        </Button>
+        <button 
+          onClick={handleBack}
+          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
         <div>
-          <h1 className="mb-1">Edit Store</h1>
-          <p className="text-gray-600">Update store information and manager details</p>
+          <h1 className="mb-2">Edit Store</h1>
+          <p className="text-gray-600">Update store details and manager information</p>
         </div>
       </div>
 
@@ -136,241 +230,182 @@ export default function EditStore({ storeId, onBack, onStoreUpdated }: EditStore
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Store Details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
                 <Label htmlFor="storeName">Store Name</Label>
-                <Input 
-                  id="storeName" 
-                  placeholder="e.g., Fisho Marine Drive"
+                <Input
+                  id="storeName"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Enter store name"
                   required
                 />
               </div>
 
-              <div>
-                <Label htmlFor="storeLocation">Store Location (Text)</Label>
-                <Input 
-                  id="storeLocation" 
-                  placeholder="e.g., Marine Drive, Mumbai"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Google Maps Integration */}
-            <div>
-              <Label htmlFor="mapPin">Store Map Pin (Google Maps)</Label>
               <div className="space-y-2">
-                <div className="flex gap-2">
-                  <Input 
-                    id="mapPin" 
-                    placeholder="Enter Google Maps URL or coordinates" 
-                    defaultValue="https://maps.google.com/?q=18.943523,72.823469"
-                    required
-                  />
-                  <Button type="button" variant="outline">
-                    <MapPin className="w-4 h-4 mr-2" />
-                    Update Location
-                  </Button>
-                </div>
-                <p className="text-sm text-gray-500">
-                  Paste a Google Maps link or select location on map
-                </p>
+                <Label htmlFor="contactNumber">Contact Number</Label>
+                <Input
+                  id="contactNumber"
+                  type="tel"
+                  value={formData.contactNumber}
+                  onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
+                  placeholder="Enter contact number"
+                />
               </div>
             </div>
 
-            {/* Map Preview Placeholder */}
-            <div className="border rounded-lg p-4 bg-gray-50 h-64 flex items-center justify-center">
-              <div className="text-center text-gray-500">
-                <MapPin className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                <p>Map preview: Marine Drive, Mumbai</p>
-                <p className="text-sm">Google Maps integration</p>
+            <div className="space-y-2">
+              <Label htmlFor="storeDescription">Description</Label>
+              <Textarea
+                id="storeDescription"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Describe the store"
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Store Location</Label>
+              <MapSection
+                isEditing={true}
+                address={formData.address}
+                onAddressChange={(addr) => setFormData({ ...formData, address: addr })}
+                marker={{
+                  lat: formData.lat ? Number(formData.lat) : 25.2048,
+                  lng: formData.lng ? Number(formData.lng) : 55.2708,
+                }}
+                onMarkerChange={(lat, lng) =>
+                  setFormData(prev => ({ ...prev, lat: lat.toString(), lng: lng.toString() }))
+                }
+              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 mt-2">
+                <div>Latitude: {formData.lat || '—'}</div>
+                <div>Longitude: {formData.lng || '—'}</div>
               </div>
             </div>
 
-            {/* Manager Details */}
             <div className="border-t pt-6">
-              <h3 className="mb-4">Store Manager Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="managerName">Manager Name</Label>
-                  <Input 
-                    id="managerName" 
-                    placeholder="Enter manager name"
-                    value={formData.managerName}
-                    onChange={(e) => setFormData({ ...formData, managerName: e.target.value })}
+              <h3 className="mb-4">Manager Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="managerId">Store Manager</Label>
+                  <select
+                    id="managerId"
+                    value={formData.managerId}
+                    onChange={(e) => setFormData({ ...formData, managerId: e.target.value })}
+                    className="w-full border rounded px-3 py-2 text-sm"
                     required
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="mobileNumber">Mobile Number</Label>
-                  <Input 
-                    id="mobileNumber" 
-                    type="tel"
-                    placeholder="+91 98765 43210"
-                    value={formData.managerMobile}
-                    onChange={(e) => setFormData({ ...formData, managerMobile: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="contactNumber">Store Contact Number</Label>
-                  <Input 
-                    id="contactNumber" 
-                    type="tel"
-                    placeholder="+91 22 12345678"
-                    value={formData.contactNumber}
-                    onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="emailId">Email ID</Label>
-                  <Input 
-                    id="emailId" 
-                    type="email"
-                    placeholder="manager@fisho.com"
-                    value={formData.managerEmail}
-                    onChange={(e) => setFormData({ ...formData, managerEmail: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <Label htmlFor="managerAddress">Address of Store Manager</Label>
-                  <Textarea 
-                    id="managerAddress" 
-                    placeholder="Enter complete residential address" 
-                    rows={3}
-                    value={formData.managerAddress}
-                    onChange={(e) => setFormData({ ...formData, managerAddress: e.target.value })}
-                  />
+                  >
+                    <option value="">Select manager (ID)</option>
+                    {managersLoading && <option disabled>Loading...</option>}
+                    {managers.map((m) => (
+                      <option key={m._id || m.id} value={m._id || m.id}>
+                        {m.name ? `${m.name} — ${m.email || m._id || m.id}` : (m.email || m._id || m.id)}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>
 
-            {/* Password Reset */}
             <div className="border-t pt-6">
-              <h3 className="mb-4">Store Portal Access</h3>
-              <div className="space-y-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <Key className="w-5 h-5 text-blue-600 mt-0.5" />
-                    <div className="flex-1">
-                      <Label>Change Password for Store Portal</Label>
-                      <p className="text-sm text-gray-600 mb-3">
-                        Update the login password for store manager portal access
-                      </p>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <Label htmlFor="newPassword">New Password</Label>
-                          <Input 
-                            id="newPassword" 
-                            type="password"
-                            placeholder="Enter new password" 
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="confirmPassword">Confirm Password</Label>
-                          <Input 
-                            id="confirmPassword" 
-                            type="password"
-                            placeholder="Re-enter password" 
-                          />
-                        </div>
-                      </div>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        className="mt-3 border-blue-600 text-blue-600 hover:bg-blue-50"
-                      >
-                        Reset Password
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+              <h3 className="mb-2">Operating Hours</h3>
+              <p className="text-sm text-gray-500">Set open/close times per day. Toggle Closed when the store is closed that day.</p>
+              <div className="overflow-x-auto mt-3">
+                <table className="w-full text-sm table-auto">
+                  <thead>
+                    <tr className="text-left">
+                      <th className="py-2 px-3">Day</th>
+                      <th className="py-2 px-3">Open</th>
+                      <th className="py-2 px-3">Close</th>
+                      <th className="py-2 px-3">Closed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(Object.keys(formData.operatingHours) as DayKey[]).map((d) => {
+                      const h = formData.operatingHours[d];
+                      const dayLabel = capitalize(d);
+                      return (
+                        <tr key={d} className="border-t">
+                          <td className="py-2 px-3 align-middle">{dayLabel}</td>
+                          <td className="py-2 px-3">
+                            <input 
+                              type="time" 
+                              value={h.open} 
+                              disabled={h.isClosed} 
+                              onChange={(e) => handleTimeChange(d, 'open', e.target.value)} 
+                              className="w-full border rounded px-2 py-1 text-sm" 
+                            />
+                          </td>
+                          <td className="py-2 px-3">
+                            <input 
+                              type="time" 
+                              value={h.close} 
+                              disabled={h.isClosed} 
+                              onChange={(e) => handleTimeChange(d, 'close', e.target.value)} 
+                              className="w-full border rounded px-2 py-1 text-sm" 
+                            />
+                          </td>
+                          <td className="py-2 px-3">
+                            <input 
+                              type="checkbox" 
+                              checked={h.isClosed} 
+                              onChange={() => toggleClosed(d)} 
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex gap-2 mt-3">
+                <button 
+                  type="button" 
+                  className="text-sm px-3 py-1 border rounded" 
+                  onClick={() => setFormData(prev => ({ ...prev, operatingHours: defaultHours }))}
+                >
+                  Auto-fill defaults
+                </button>
+                <button 
+                  type="button" 
+                  className="text-sm px-3 py-1 border rounded" 
+                  onClick={() => setFormData(prev => ({ ...prev, operatingHours: makeClosedHours() }))}
+                >
+                  Clear
+                </button>
               </div>
             </div>
 
-            {/* Store Settings */}
             <div className="border-t pt-6">
-              <h3 className="mb-4">Store Settings</h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <Label htmlFor="activeStatus">Store Status</Label>
-                    <p className="text-sm text-gray-600">Activate or deactivate this store</p>
-                  </div>
-                  <Switch 
-                    id="activeStatus" 
-                    checked={formData.isActive}
-                    onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
-                  />
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="storeStatus">Store Status</Label>
+                  <p className="text-sm text-gray-500">Set the store as active or inactive</p>
                 </div>
-
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <Label htmlFor="onlineOrders">Accept Online Orders</Label>
-                    <p className="text-sm text-gray-600">Enable customers to place orders</p>
-                  </div>
-                  <Switch 
-                    id="onlineOrders" 
-                    checked={formData.acceptOnlineOrders}
-                    onCheckedChange={(checked) => setFormData({ ...formData, acceptOnlineOrders: checked })}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <Label htmlFor="walkinOrders">Accept Walk-in Orders</Label>
-                    <p className="text-sm text-gray-600">Enable store billing for walk-in customers</p>
-                  </div>
-                  <Switch 
-                    id="walkinOrders" 
-                    checked={formData.acceptWalkinOrders}
-                    onCheckedChange={(checked) => setFormData({ ...formData, acceptWalkinOrders: checked })}
-                  />
-                </div>
+                <Switch
+                  id="storeStatus"
+                  checked={formData.isActive}
+                  onCheckedChange={(checked: boolean) => setFormData({ ...formData, isActive: checked })}
+                />
               </div>
             </div>
 
-            {/* Additional Information */}
-            <div className="border-t pt-6">
-              <h3 className="mb-4">Store Performance Metrics</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Today's Revenue</p>
-                  <p><span className="dirham-symbol">&#xea;</span>45,230</p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Current Stock Quantity</p>
-                  <p>450 units</p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Total Orders Today</p>
-                  <p>34 orders</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <div className="flex gap-3 justify-end pt-4">
-              <Button 
-                type="button" 
+            <div className="flex gap-4 pt-4">
+              <Button
+                type="button"
                 variant="outline"
-                onClick={onBack}
-                disabled={submitting}
+                onClick={handleBack}
+                className="flex-1"
               >
                 Cancel
               </Button>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={submitting}>
+              <Button
+                type="submit"
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={submitting}
+              >
                 <Save className="w-4 h-4 mr-2" />
                 {submitting ? 'Saving...' : 'Save Changes'}
               </Button>

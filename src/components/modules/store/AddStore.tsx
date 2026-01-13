@@ -36,6 +36,7 @@ export default function AddStore({ onBack, onStoreCreated }: AddStoreProps) {
     lat: '',
     lng: '',
     description: '',
+    contactNumber: '',
     managerId: '',
     isActive: true,
     operatingHours: defaultHours,
@@ -152,6 +153,7 @@ export default function AddStore({ onBack, onStoreCreated }: AddStoreProps) {
           lat: latNum,
           lng: lngNum,
           description: formData.description,
+          contactNumber: formData.contactNumber,
           manager: formData.managerId,
           operatingHours: parsedHours,
         }),
@@ -212,15 +214,26 @@ export default function AddStore({ onBack, onStoreCreated }: AddStoreProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="storeDescription">Description</Label>
-                <Textarea
-                  id="storeDescription"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Describe the store"
-                  rows={3}
+                <Label htmlFor="contactNumber">Contact Number</Label>
+                <Input
+                  id="contactNumber"
+                  type="tel"
+                  value={formData.contactNumber}
+                  onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
+                  placeholder="Enter contact number"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="storeDescription">Description</Label>
+              <Textarea
+                id="storeDescription"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Describe the store"
+                rows={3}
+              />
             </div>
 
             <div className="space-y-2">

@@ -56,11 +56,13 @@ export default function StoreMapping() {
       const address = store.address?.toLowerCase() || '';
       const managerName = store.manager?.name?.toLowerCase() || '';
       const managerEmail = store.manager?.email?.toLowerCase() || '';
+      const contactNumber = store.contactNumber?.toLowerCase() || '';
       return (
         name.includes(term) ||
         address.includes(term) ||
         managerName.includes(term) ||
-        managerEmail.includes(term)
+        managerEmail.includes(term) ||
+        contactNumber.includes(term)
       );
     });
   }, [stores, searchTerm]);
@@ -114,7 +116,7 @@ export default function StoreMapping() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <Input
-              placeholder="Search by store name, location, or manager..."
+              placeholder="Search by store name, location, manager, or contact number..."
               className="pl-10"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -136,6 +138,7 @@ export default function StoreMapping() {
                   <th className="text-left py-3 px-4">Store ID</th>
                   <th className="text-left py-3 px-4">Store Name</th>
                   <th className="text-left py-3 px-4">Address</th>
+                  <th className="text-left py-3 px-4">Contact Number</th>
                   <th className="text-left py-3 px-4">Manager</th>
                   <th className="text-left py-3 px-4">Manager Email</th>
                   <th className="text-left py-3 px-4">Status</th>
@@ -146,15 +149,15 @@ export default function StoreMapping() {
               <tbody>
                 {storesLoading ? (
                   <tr>
-                    <td colSpan={8} className="py-4 px-4 text-center text-gray-600">Loading stores...</td>
+                    <td colSpan={9} className="py-4 px-4 text-center text-gray-600">Loading stores...</td>
                   </tr>
                 ) : storesError ? (
                   <tr>
-                    <td colSpan={8} className="py-4 px-4 text-center text-red-600">{storesError}</td>
+                    <td colSpan={9} className="py-4 px-4 text-center text-red-600">{storesError}</td>
                   </tr>
                 ) : filteredStores.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-4 px-4 text-center text-gray-500">No stores found</td>
+                    <td colSpan={9} className="py-4 px-4 text-center text-gray-500">No stores found</td>
                   </tr>
                 ) : (
                   filteredStores.map((store) => (
@@ -162,6 +165,7 @@ export default function StoreMapping() {
                       <td className="py-3 px-4 text-blue-600">{store._id}</td>
                       <td className="py-3 px-4">{store.name}</td>
                       <td className="py-3 px-4">{store.address}</td>
+                      <td className="py-3 px-4">{store.phone || '—'}</td>
                       <td className="py-3 px-4">{store.manager?.name || '—'}</td>
                       <td className="py-3 px-4">{store.manager?.email || '—'}</td>
                       <td className="py-3 px-4">

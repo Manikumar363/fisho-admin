@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp,
@@ -16,35 +16,53 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
+import { getUserRole } from '../../lib/api';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [userRole, setUserRole] = useState<string>('admin');
+
+  useEffect(() => {
+    const role = getUserRole();
+    if (role) {
+      setUserRole(role);
+    }
+  }, []);
 
   const kpiData = [
-    { label: 'Active Users', value: '15,234', change: '+22.1%', icon: Users, color: 'text-indigo-600', bgColor: 'bg-indigo-100', onClick: () => navigate('/user-management?filter=end-users') },
-    { label: 'Total Orders', value: '2,543', change: '+12.5%', icon: ShoppingBag, color: 'text-blue-600', bgColor: 'bg-blue-100', onClick: () => navigate('/orders') },
-    { label: 'Transactions', value: '3,245', change: '+16.7%', icon: CreditCard, color: 'text-pink-600', bgColor: 'bg-pink-100' },
-    { label: 'Total Revenue', value: '₹8.2L', change: '+18.4%', icon: DollarSign, color: 'text-emerald-600', bgColor: 'bg-emerald-100' },
-    { label: 'Inventory Alerts', value: '12', change: '-3', icon: AlertTriangle, color: 'text-amber-600', bgColor: 'bg-amber-100', onClick: () => navigate('/inventory-management?filter=low-stock') },
-    { label: 'Express Orders', value: '856', change: '+8.3%', icon: Zap, color: 'text-orange-600', bgColor: 'bg-orange-100', onClick: () => navigate('/orders?type=express') },
-    { label: 'Next-Day Orders', value: '1,423', change: '+15.2%', icon: Calendar, color: 'text-green-600', bgColor: 'bg-green-100', onClick: () => navigate('/orders?type=next-day') },
-    { label: 'Bulk Orders', value: '264', change: '+5.7%', icon: PackageIcon, color: 'text-purple-600', bgColor: 'bg-purple-100', onClick: () => navigate('/orders?type=bulk') },
-    { label: 'Waste Management', value: '3.2%', change: '-0.8%', icon: AlertTriangle, color: 'text-red-600', bgColor: 'bg-red-100', onClick: () => navigate('/waste-management') },
-    { label: "Today's Revenue", value: '₹1.8L', change: '+11.3%', icon: Receipt, color: 'text-teal-600', bgColor: 'bg-teal-100', onClick: () => navigate('/transactions') }
+    { label: 'Active Users', value: '15,234', change: '+22.1%', icon: Users, color: 'text-indigo-600', bgColor: 'bg-indigo-100', onClick: () => navigate('/user-management?filter=end-users'), roles: ['admin', 'subadmin'] },
+    { label: 'Total Orders', value: '2,543', change: '+12.5%', icon: ShoppingBag, color: 'text-blue-600', bgColor: 'bg-blue-100', onClick: () => navigate('/orders'), roles: ['admin', 'subadmin'] },
+    { label: 'Transactions', value: '3,245', change: '+16.7%', icon: CreditCard, color: 'text-pink-600', bgColor: 'bg-pink-100', roles: ['admin', 'subadmin'] },
+    { label: 'Total Revenue', value: '₹8.2L', change: '+18.4%', icon: DollarSign, color: 'text-emerald-600', bgColor: 'bg-emerald-100', roles: ['admin', 'subadmin'] },
+    { label: 'Inventory Alerts', value: '12', change: '-3', icon: AlertTriangle, color: 'text-amber-600', bgColor: 'bg-amber-100', onClick: () => navigate('/inventory-management?filter=low-stock'), roles: ['admin'] },
+    { label: 'Express Orders', value: '856', change: '+8.3%', icon: Zap, color: 'text-orange-600', bgColor: 'bg-orange-100', onClick: () => navigate('/orders?type=express'), roles: ['admin', 'subadmin'] },
+    { label: 'Next-Day Orders', value: '1,423', change: '+15.2%', icon: Calendar, color: 'text-green-600', bgColor: 'bg-green-100', onClick: () => navigate('/orders?type=next-day'), roles: ['admin', 'subadmin'] },
+    { label: 'Bulk Orders', value: '264', change: '+5.7%', icon: PackageIcon, color: 'text-purple-600', bgColor: 'bg-purple-100', onClick: () => navigate('/orders?type=bulk'), roles: ['admin', 'subadmin'] },
+    { label: 'Waste Management', value: '3.2%', change: '-0.8%', icon: AlertTriangle, color: 'text-red-600', bgColor: 'bg-red-100', onClick: () => navigate('/waste-management'), roles: ['admin', 'subadmin'] },
+    { label: "Today's Revenue", value: '₹1.8L', change: '+11.3%', icon: Receipt, color: 'text-teal-600', bgColor: 'bg-teal-100', onClick: () => navigate('/transactions'), roles: ['admin', 'subadmin'] }
   ];
+
+  // Filter KPI data based on user role
+  const filteredKpiData = kpiData.filter(
+    (kpi) => !kpi.roles || kpi.roles.includes(userRole)
+  );
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="mb-2">Dashboard</h1>
-          <p className="text-gray-600">Welcome to Fisho Admin Panel</p>
+          <p className="text-gray-600">
+            Welcome to Fisho {userRole === 'subadmin' ? 'Sub Admin' : 'Admin'} Panel
+          </p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-50">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Offer
-          </Button>
+          {userRole === 'admin' && (
+            <Button variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-50">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Offer
+            </Button>
+          )}
           <Button 
             className="bg-blue-600 hover:bg-blue-700"
             onClick={() => navigate('/store-billing')}
@@ -57,7 +75,7 @@ export default function Dashboard() {
 
       {/* KPI Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        {kpiData.map((kpi, index) => (
+        {filteredKpiData.map((kpi, index) => (
           <Card 
             key={index} 
             className={kpi.onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}

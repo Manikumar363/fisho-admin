@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import Login from './components/auth/Login';
 import ForgotPassword from './components/auth/ForgotPassword';
 import OTPVerification from './components/auth/OTPVerification';
@@ -26,6 +26,12 @@ import Enquiries from './components/modules/Enquiries';
 import { getToken, clearAuthData } from './lib/api';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+
+function EditStoreWrapper() {
+  const { storeId } = useParams<{ storeId: string }>();
+  if (!storeId) return <Navigate to="/store-mapping" />;
+  return <EditStore storeId={storeId} onBack={() => window.history.back()} />;
+}
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -99,7 +105,10 @@ export default function App() {
                   <Route path="/waste-management" element={<WasteManagement />} />
                   <Route path="/store-mapping" element={<StoreMapping />} />
                   <Route path="/store-mapping/add" element={<AddStore onBack={() => window.history.back()} />} />
-                  <Route path="/store-mapping/edit/:storeId" element={<EditStore />} />
+                  <Route 
+                    path="/store-mapping/edit/:storeId" 
+                    element={<EditStoreWrapper />} 
+                  />
                   <Route path="/pre-purchase-orders" element={<PrePurchaseOrders />} />
                    <Route path="/offers" element={<Offers />} />
                   <Route path="/delivery-locations" element={<DeliveryLocations />} />

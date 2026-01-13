@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Download, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Download, AlertCircle, ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
@@ -8,10 +8,52 @@ import { apiFetch, getUserRole } from '../../../lib/api';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../../ui/dialog';
 import { Input } from '../../ui/input';
 import { toast } from 'react-toastify';
+import { Plus} from 'lucide-react';
 
 interface ViewStoreProps {
   storeId: string;
   onBack: () => void;
+}
+
+interface OrderItem {
+  snapshot: {
+    productName: string;
+    variantName: string;
+    priceAtPurchase: number;
+    unitPriceAtPurchase: number;
+    retailPriceAtPurchase: number;
+    subtotal: number;
+  };
+  product: string;
+  variant: string;
+  quantity: number;
+  _id: string;
+}
+
+interface Order {
+  _id: string;
+  pricing: {
+    grandTotal: string;
+    tax: string;
+    discount: string;
+    shipping: string;
+  };
+  shippingAddress: {
+    name: string;
+    phone: string;
+  };
+  payment: {
+    method: string;
+    status: string;
+  };
+  store: any;
+  items: OrderItem[];
+  orderType: string;
+  invoiceUrl?: string;
+  invoiceNo: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
@@ -37,6 +79,15 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
   const [productsOptions, setProductsOptions] = useState<Array<{ id: string; name: string; categoryId?: string }>>([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [productsError, setProductsError] = useState<string | null>(null);
+  
+  // Order history state
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState<boolean>(false);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalOrders, setTotalOrders] = useState(0);
+  
   const userRole = getUserRole();
 
   useEffect(() => {
@@ -141,6 +192,45 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
     };
   }, [storeId]);
 
+  // Fetch order history
+  useEffect(() => {
+    let active = true;
+    setOrdersLoading(true);
+    setOrdersError(null);
+    setOrders([]);
+
+    // Debug: Log the storeId being used
+    console.log('Fetching orders for storeId:', storeId);
+
+    apiFetch<{ 
+      success: boolean; 
+      data: Order[]; 
+      pagination: { page: number; limit: number; total: number; pages: number };
+      message?: string 
+    }>(`/api/order/order-history?storeId=${storeId}&orderType=pos&page=${currentPage}&limit=20`)
+      .then((res) => {
+        if (!active) return;
+        if (!res.success) throw new Error(res.message || 'Failed to fetch order history');
+        console.log('Received orders:', res.data.length, 'orders for store:', storeId);
+        setOrders(res.data || []);
+        setTotalPages(res.pagination?.pages || 1);
+        setTotalOrders(res.pagination?.total || 0);
+      })
+      .catch((err) => {
+        if (!active) return;
+        const msg = err?.message || 'Failed to fetch order history';
+        console.error('Fetch order history error:', err);
+        setOrdersError(msg);
+      })
+      .finally(() => {
+        if (active) setOrdersLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [storeId, currentPage]);
+
   // Load categories when add product dialog opens
   useEffect(() => {
     if (!addProductOpen || categories.length > 0) return;
@@ -224,8 +314,6 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
     const manager = store?.manager?.name ? `Managed by ${store.manager.name}` : 'Manager not assigned';
     return `${address} • ${manager}`;
   }, [loading, error, store?.address, store?.manager?.name]);
-
-  // Inventory data now fetched from API
 
   const openAddStock = (invId?: string) => {
     if (!invId) return;
@@ -361,53 +449,44 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
     }
   };
 
-  // Mock orders data
-  const orders = [
-    { 
-      orderId: 'ORD-1234', 
-      date: '2024-12-04', 
-      customerName: 'John Doe', 
-      orderValue: '₹2,450', 
-      deliveryType: 'Next Day', 
-      status: 'Delivered' 
-    },
-    { 
-      orderId: 'ORD-1235', 
-      date: '2024-12-04', 
-      customerName: 'Jane Smith', 
-      orderValue: '₹3,200', 
-      deliveryType: 'Express', 
-      status: 'In Transit' 
-    },
-    { 
-      orderId: 'ORD-1236', 
-      date: '2024-12-03', 
-      customerName: 'Mike Johnson', 
-      orderValue: '₹1,890', 
-      deliveryType: 'Next Day', 
-      status: 'Delivered' 
-    },
-    { 
-      orderId: 'ORD-1237', 
-      date: '2024-12-03', 
-      customerName: 'Sarah Wilson', 
-      orderValue: '₹4,560', 
-      deliveryType: 'Bulk Order', 
-      status: 'Processing' 
-    },
-    { 
-      orderId: 'ORD-1238', 
-      date: '2024-12-02', 
-      customerName: 'Tom Brown', 
-      orderValue: '₹2,100', 
-      deliveryType: 'Express', 
-      status: 'Delivered' 
-    }
-  ];
-
   const handleDownloadLedger = () => {
     console.log('Downloading ledger for month:', selectedMonth);
     // Download logic here
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-IN', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  };
+
+  const formatCurrency = (amount: string | number) => {
+    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+    return (
+      <>
+        <span className="dirham-symbol mr-2">&#xea;</span>
+        {num.toFixed(2)}
+      </>
+    );
+  };
+
+  const getStatusBadgeVariant = (status: string) => {
+    const statusLower = status.toLowerCase();
+    if (statusLower === 'delivered') return 'default';
+    if (statusLower === 'processing' || statusLower === 'pending') return 'secondary';
+    if (statusLower === 'cancelled' || statusLower === 'failed') return 'destructive';
+    return 'outline';
+  };
+
+  const handleViewInvoice = (invoiceUrl?: string) => {
+    if (invoiceUrl) {
+      window.open(invoiceUrl, '_blank');
+    } else {
+      toast.info('Invoice not available');
+    }
   };
 
   return (
@@ -446,6 +525,7 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
               onClick={() => setAddProductOpen(true)}
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
+              <Plus className="w-4 h-4 mr-2" />
               Add Product Inventory
             </Button>
           )}
@@ -618,20 +698,9 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
       {/* Store Orders Section */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Store Orders</CardTitle>
-          <div className="flex items-center gap-4">
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Select month" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="december-2024">December 2024</SelectItem>
-                <SelectItem value="november-2024">November 2024</SelectItem>
-                <SelectItem value="october-2024">October 2024</SelectItem>
-                <SelectItem value="september-2024">September 2024</SelectItem>
-                <SelectItem value="august-2024">August 2024</SelectItem>
-              </SelectContent>
-            </Select>
+          <CardTitle>Store Orders (POS)</CardTitle>
+          <div className="text-sm text-gray-600">
+            Total: {totalOrders} orders
           </div>
         </CardHeader>
         <CardContent>
@@ -639,38 +708,109 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4">Order ID</th>
+                  <th className="text-left py-3 px-4">Invoice No</th>
                   <th className="text-left py-3 px-4">Date</th>
-                  <th className="text-left py-3 px-4">Customer Name</th>
-                  <th className="text-left py-3 px-4">Order Value</th>
-                  <th className="text-left py-3 px-4">Delivery Type</th>
+                  <th className="text-left py-3 px-4">Customer</th>
+                  <th className="text-left py-3 px-4">Items</th>
+                  <th className="text-left py-3 px-4">Total Amount</th>
+                  <th className="text-left py-3 px-4">Payment</th>
+                  <th className="text-left py-3 px-4">Method</th>
                   <th className="text-left py-3 px-4">Status</th>
+                  <th className="text-left py-3 px-4">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {orders.map((order) => (
-                  <tr key={order.orderId} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4 text-blue-600">{order.orderId}</td>
-                    <td className="py-3 px-4">{order.date}</td>
-                    <td className="py-3 px-4">{order.customerName}</td>
-                    <td className="py-3 px-4">{order.orderValue}</td>
-                    <td className="py-3 px-4">{order.deliveryType}</td>
-                    <td className="py-3 px-4">
-                      <Badge 
-                        variant={
-                          order.status === 'Delivered' ? 'default' : 
-                          order.status === 'In Transit' ? 'secondary' : 
-                          'outline'
-                        }
-                      >
-                        {order.status}
-                      </Badge>
-                    </td>
+                {ordersLoading ? (
+                  <tr>
+                    <td colSpan={9} className="py-4 px-4 text-center text-gray-600">Loading orders...</td>
                   </tr>
-                ))}
+                ) : ordersError ? (
+                  <tr>
+                    <td colSpan={9} className="py-4 px-4 text-center text-red-600">{ordersError}</td>
+                  </tr>
+                ) : orders.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-4 px-4 text-center text-gray-500">No orders found</td>
+                  </tr>
+                ) : (
+                  orders.map((order) => (
+                    <tr key={order._id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-3 px-4 text-blue-600 font-mono text-sm">{order.invoiceNo}</td>
+                      <td className="py-3 px-4 text-sm">{formatDate(order.createdAt)}</td>
+                      <td className="py-3 px-4">
+                        <div>
+                          <div className="font-medium">{order.shippingAddress?.name || '—'}</div>
+                          <div className="text-xs text-gray-500">{order.shippingAddress?.phone || '—'}</div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-sm">{order.items?.length || 0} items</td>
+                      <td className="py-3 px-4 font-medium">{formatCurrency(order.pricing?.grandTotal || 0)}</td>
+                      <td className="py-3 px-4">
+                        <div className="text-sm">
+                          <Badge 
+                            variant={order.payment?.status === 'paid' ? 'default' : 'secondary'}
+                            className="text-xs mt-1"
+                          >
+                            {order.payment?.status || 'pending'}
+                          </Badge>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="text-sm font-medium text-gray-700">
+                          {order.orderType === 'pos' || order.orderType === 'instore' ? 'Instore' : order.orderType || '—'}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <Badge variant={getStatusBadgeVariant(order.status)}>
+                          {order.status}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4">
+                        {order.invoiceUrl && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleViewInvoice(order.invoiceUrl)}
+                            className="text-xs"
+                          >
+                            <ExternalLink className="w-3 h-3 mr-1" />
+                            Invoice
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
+          
+          {/* Pagination */}
+          {!ordersLoading && !ordersError && orders.length > 0 && totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <div className="text-sm text-gray-600">
+                Page {currentPage} of {totalPages}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -692,13 +832,27 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
                   selectedMonth === 'september-2024' ? 'September 2024' : 'August 2024'}
               </p>
             </div>
-            <Button 
-              onClick={handleDownloadLedger}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Download Ledger (Selected Month)
-            </Button>
+            <div className="flex items-center gap-4">
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Select month" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="december-2024">December 2024</SelectItem>
+                  <SelectItem value="november-2024">November 2024</SelectItem>
+                  <SelectItem value="october-2024">October 2024</SelectItem>
+                  <SelectItem value="september-2024">September 2024</SelectItem>
+                  <SelectItem value="august-2024">August 2024</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button 
+                onClick={handleDownloadLedger}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download Ledger
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
