@@ -13,6 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+
 export default function UserManagement() {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('end-users');
@@ -42,6 +43,13 @@ export default function UserManagement() {
     contactNumber: ''
   });
   const [searchTerm, setSearchTerm] = useState('');
+  const [originalVendorForm, setOriginalVendorForm] = useState({
+  vendorName: '',
+  companyName: '',
+  vatNumber: '',
+  email: '',
+  contactNumber: ''
+});
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filters, setFilters] = useState({
     status: '',
@@ -62,6 +70,11 @@ export default function UserManagement() {
   });
 
   const [subadminForm, setSubadminForm] = useState({
+    name: '',
+    email: '',
+    phone: ''
+  });
+    const [originalSubadminForm, setOriginalSubadminForm] = useState({
     name: '',
     email: '',
     phone: ''
@@ -388,12 +401,14 @@ export default function UserManagement() {
   };
 
   const handleOpenEditSubadmin = (manager: any) => {
-    setEditingSubadminId(manager._id);
-    setSubadminForm({
+    const formData = {
       name: manager.name || '',
       email: manager.email || '',
       phone: manager.phone || ''
-    });
+    };
+    setEditingSubadminId(manager._id);
+    setSubadminForm(formData);
+    setOriginalSubadminForm(formData); 
     setShowEditSubadminModal(true);
   };
 
@@ -639,15 +654,17 @@ export default function UserManagement() {
   };
 
   const handleOpenEditVendor = (vendor: any) => {
-    setEditingVendorId(vendor._id);
-    setVendorForm({
-      vendorName: vendor.name,
-      companyName: vendor.companyName,
-      vatNumber: vendor.vatNumber,
-      email: vendor.email,
-      contactNumber: vendor.phone
-    });
-    setShowEditVendorModal(true);
+    const formData = {
+    vendorName: vendor.name,
+    companyName: vendor.companyName,
+    vatNumber: vendor.vatNumber,
+    email: vendor.email,
+    contactNumber: vendor.phone
+  };
+  setEditingVendorId(vendor._id);
+  setVendorForm(formData);
+  setOriginalVendorForm(formData);
+  setShowEditVendorModal(true);
   };
 
   const clearFilters = () => {
@@ -898,7 +915,7 @@ export default function UserManagement() {
                     ) : (
                       getFilteredEndUsers().map((user) => (
                         <tr key={user._id} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="py-3 px-4 text-blue-600">{user._id}</td>
+                          <td className="py-3 px-4 text-blue-600">{user._id.substring(0, 8)}...</td>
                           <td className="py-3 px-4">{user.firstName} {user.lastName}</td>
                           <td className="py-3 px-4">{user.countryCode} {user.phone}</td>
                           <td className="py-3 px-4">{user.email}</td>
@@ -1045,7 +1062,7 @@ export default function UserManagement() {
                     ) : (
                       getFilteredStoreManagers().map((manager) => (
                         <tr key={manager._id} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="py-3 px-4 text-blue-600">{manager._id}</td>
+                          <td className="py-3 px-4 text-blue-600">{manager._id.substring(0, 8)}...</td>
                           <td className="py-3 px-4">{manager.name}</td>
                           <td className="py-3 px-4">{manager.phone}</td>
                           <td className="py-3 px-4">{manager.email}</td>
@@ -1129,7 +1146,7 @@ export default function UserManagement() {
                    )  : (
                       getFilteredVendors().map((vendor) => (
                         <tr key={vendor._id} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="py-3 px-4 text-blue-600">{vendor._id}</td>
+                          <td className="py-3 px-4 text-blue-600">{vendor._id.substring(0, 8)}...</td>
                           <td className="py-3 px-4">{vendor.name}</td>
                           <td className="py-3 px-4">{vendor.companyName}</td>
                           <td className="py-3 px-4">{vendor.vatNumber}</td>
@@ -1175,7 +1192,11 @@ export default function UserManagement() {
       </Tabs>
 
       {/* Add Vendor Modal */}
-      <Dialog open={showAddVendorModal} onOpenChange={setShowAddVendorModal}>
+      <Dialog open={showAddVendorModal} onOpenChange={(open) => {
+  // Only close if the user explicitly closes it (open === false from close button)
+  // Prevent closing on outside click by not calling setShowXModal
+  if (!open) return;
+}}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Add New Vendor</DialogTitle>
@@ -1241,7 +1262,15 @@ export default function UserManagement() {
             </div>
             
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowAddVendorModal(false)}>
+              <Button type="button" variant="outline" onClick={() =>{ setShowAddVendorModal(false);
+              setVendorForm({
+                vendorName: '',
+                companyName: '',
+                vatNumber: '',
+                email: '',
+                contactNumber: ''
+              });
+           } }>
                 Cancel
               </Button>
               <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
@@ -1253,7 +1282,11 @@ export default function UserManagement() {
       </Dialog>
 
       {/* Edit Vendor Modal */}
-      <Dialog open={showEditVendorModal} onOpenChange={setShowEditVendorModal}>
+      <Dialog open={showEditVendorModal} onOpenChange={(open) => {
+  // Only close if the user explicitly closes it (open === false from close button)
+  // Prevent closing on outside click by not calling setShowXModal
+  if (!open) return;
+}}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Vendor</DialogTitle>
@@ -1267,6 +1300,7 @@ export default function UserManagement() {
                   value={vendorForm.vendorName}
                   onChange={(e) => setVendorForm({ ...vendorForm, vendorName: e.target.value })}
                   placeholder="Enter vendor name"
+                  autoComplete='off'
                   required
                 />
               </div>
@@ -1278,6 +1312,7 @@ export default function UserManagement() {
                   value={vendorForm.companyName}
                   onChange={(e) => setVendorForm({ ...vendorForm, companyName: e.target.value })}
                   placeholder="Enter company name"
+                  autoComplete='off'
                   required
                 />
               </div>
@@ -1322,16 +1357,45 @@ export default function UserManagement() {
               <Button type="button" variant="outline" onClick={() => setShowEditVendorModal(false)}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
+              <Button 
+              type="submit" 
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={
+                !vendorForm.vendorName.trim() ||
+                !vendorForm.companyName.trim() ||
+                !vendorForm.vatNumber.trim() ||
+                !vendorForm.email.trim() ||
+                !vendorForm.contactNumber.trim() ||
+                (vendorForm.vendorName === originalVendorForm.vendorName &&
+                 vendorForm.companyName === originalVendorForm.companyName &&
+                 vendorForm.vatNumber === originalVendorForm.vatNumber &&
+                 vendorForm.email === originalVendorForm.email &&
+                 vendorForm.contactNumber === originalVendorForm.contactNumber)
+               }
+              >
                 Update Vendor
               </Button>
             </DialogFooter>
+            
           </form>
+          
         </DialogContent>
+        
       </Dialog>
 
       {/* Add End User Modal */}
-      <Dialog open={showAddEndUserModal} onOpenChange={setShowAddEndUserModal}>
+      <Dialog open={showAddEndUserModal} onOpenChange={(open) => {
+        if (!open) {
+          // Clear form when dialog closes
+          setEndUserForm({
+            firstName: '',
+            lastName: '',
+            email: '',
+            contactNumber: ''
+          });
+          setShowAddEndUserModal(false);
+        }
+      }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Add New End User</DialogTitle>
@@ -1340,7 +1404,7 @@ export default function UserManagement() {
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
+                  <Label htmlFor="firstName">First Name *</Label>
                   <Input
                     id="firstName"
                     value={endUserForm.firstName}
@@ -1350,7 +1414,7 @@ export default function UserManagement() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
+                  <Label htmlFor="lastName">Last Name *</Label>
                   <Input
                     id="lastName"
                     value={endUserForm.lastName}
@@ -1362,7 +1426,7 @@ export default function UserManagement() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="userEmail">Email ID</Label>
+                <Label htmlFor="userEmail">Email ID *</Label>
                 <Input
                   id="userEmail"
                   type="email"
@@ -1374,26 +1438,44 @@ export default function UserManagement() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="userContact">Contact Number</Label>
+                <Label htmlFor="userContact">Contact Number *</Label>
                 <Input
                   id="userContact"
                   type="tel"
                   value={endUserForm.contactNumber}
-                  onChange={(e) => setEndUserForm({ ...endUserForm, contactNumber: e.target.value })}
-                  placeholder="Enter contact number"
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9]/g, '');
+                    setEndUserForm({ ...endUserForm, contactNumber: value });
+                  }}
+                  placeholder="Enter 10-digit phone number"
                   required
                 />
               </div>
             </div>
             
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowAddEndUserModal(false)}>
+              <Button type="button" variant="outline" onClick={() => {
+                setShowAddEndUserModal(false);
+                setEndUserForm({
+                  firstName: '',
+                  lastName: '',
+                  email: '',
+                  contactNumber: ''
+                });
+              }}>
                 Cancel
               </Button>
               <Button 
                 type="submit" 
                 className="bg-blue-600 hover:bg-blue-700 text-white"
-                disabled={isAddingEndUser}
+                disabled={
+                  isAddingEndUser ||
+                  !endUserForm.firstName.trim() ||
+                  !endUserForm.lastName.trim() ||
+                  !endUserForm.email.trim() ||
+                  !endUserForm.contactNumber.trim() ||
+                  !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(endUserForm.email)
+                }
               >
                 {isAddingEndUser ? 'Adding...' : 'Add User'}
               </Button>
@@ -1403,7 +1485,11 @@ export default function UserManagement() {
       </Dialog>
 
       {/* Add Delivery Partner Modal */}
-      <Dialog open={showAddDeliveryPartnerModal} onOpenChange={setShowAddDeliveryPartnerModal}>
+      <Dialog open={showAddDeliveryPartnerModal} onOpenChange={(open) => {
+  // Only close if the user explicitly closes it (open === false from close button)
+  // Prevent closing on outside click by not calling setShowXModal
+  if (!open) return;
+}}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Add New Delivery Partner</DialogTitle>
@@ -1489,7 +1575,15 @@ export default function UserManagement() {
       </Dialog>
 
       {/* Add Subadmin Modal */}
-      <Dialog open={showAddSubadminModal} onOpenChange={setShowAddSubadminModal}>
+      <Dialog open={showAddSubadminModal} onOpenChange={(open) => {
+          // Only close if the user explicitly closes it (open === false from close button)
+          // Prevent closing on outside click by not calling setShowXModal
+          if (!open){
+           setSubadminForm({ name: '', email: '', phone: '' });
+            setShowAddSubadminModal(false);
+          }
+
+        }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Add New Subadmin</DialogTitle>
@@ -1525,7 +1619,12 @@ export default function UserManagement() {
                   id="subadminPhone"
                   type="tel"
                   value={subadminForm.phone}
-                  onChange={(e) => setSubadminForm({ ...subadminForm, phone: e.target.value })}
+                  onChange={(e) =>{
+                    const value = e.target.value.replace(/[^0-9]/g, '');
+                   setSubadminForm({ ...subadminForm, phone: value })}                    
+
+                  } 
+
                   placeholder="Enter contact number"
                   required
                 />
@@ -1533,13 +1632,21 @@ export default function UserManagement() {
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowAddSubadminModal(false)}>
+              <Button type="button" variant="outline" onClick={() => {
+                setShowAddSubadminModal(false);
+                setSubadminForm({ name: '', email: '', phone: '' });
+              }}>
                 Cancel
               </Button>
               <Button 
                 type="submit" 
                 className="bg-blue-600 hover:bg-blue-700 text-white"
-                disabled={isAddingSubadmin}
+                disabled={isAddingSubadmin  ||
+                  !subadminForm.name.trim() ||
+                  !subadminForm.email.trim() ||
+                  !subadminForm.phone.trim() ||
+                  !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(subadminForm.email)
+                }
               >
                 {isAddingSubadmin ? 'Adding...' : 'Add Subadmin'}
               </Button>
@@ -1549,7 +1656,10 @@ export default function UserManagement() {
       </Dialog>
 
       {/* Edit Subadmin Modal */}
-      <Dialog open={showEditSubadminModal} onOpenChange={setShowEditSubadminModal}>
+      <Dialog open={showEditSubadminModal} onOpenChange={(open) => {
+ 
+  if (!open) return;
+}}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Subadmin</DialogTitle>
@@ -1596,7 +1706,18 @@ export default function UserManagement() {
               <Button type="button" variant="outline" onClick={() => setShowEditSubadminModal(false)}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
+              <Button
+               type="submit" 
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={
+                  !subadminForm.name.trim() ||
+                  !subadminForm.email.trim() ||
+                  !subadminForm.phone.trim() ||
+                  !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(subadminForm.email) ||
+                  (subadminForm.name === originalSubadminForm.name &&
+                   subadminForm.email === originalSubadminForm.email &&
+                   subadminForm.phone === originalSubadminForm.phone)
+                }>
                 Update Subadmin
               </Button>
             </DialogFooter>
@@ -1816,82 +1937,95 @@ export default function UserManagement() {
 
       {/* Deleted Users Modal */}
       <Dialog open={showDeletedUsersModal} onOpenChange={setShowDeletedUsersModal}>
-        <DialogContent className="max-w-5xl max-h-[80vh] overflow-hidden flex flex-col">
-          <DialogHeader>
+        <DialogContent className="max-w-3xl w-[90vw] max-h-[85vh] flex flex-col p-0 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 sm:max-w-6xl">
+          <DialogHeader className="px-6 py-4 border-b bg-white">
             <DialogTitle>Deleted Users</DialogTitle>
           </DialogHeader>
+          
           <div className="flex-1 overflow-y-auto">
-            {deletedUsersLoading ? (
-              <div className="flex justify-center items-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              </div>
-            ) : deletedUsersError ? (
-              <div className="py-8 text-center text-red-600">{deletedUsersError}</div>
-            ) : deletedUsers.length === 0 ? (
-              <div className="py-8 text-center text-gray-500">No deleted users found</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-4">User ID</th>
-                      <th className="text-left py-3 px-4">Name</th>
-                      <th className="text-left py-3 px-4">Email</th>
-                      <th className="text-left py-3 px-4">Phone</th>
-                      <th className="text-left py-3 px-4">Delete Reason</th>
-                      <th className="text-left py-3 px-4">Deleted At</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {deletedUsers.map((user) => (
-                      <tr key={user._id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-3 px-4 text-blue-600">{user._id}</td>
-                        <td className="py-3 px-4">{user.firstName} {user.lastName}</td>
-                        <td className="py-3 px-4">{user.email}</td>
-                        <td className="py-3 px-4">{user.countryCode} {user.phone}</td>
-                        <td className="py-3 px-4">{user.deleteReason || '—'}</td>
-                        <td className="py-3 px-4">
-                          {user.updatedAt ? new Date(user.updatedAt).toLocaleString() : '—'}
-                        </td>
+            <div className="px-6 py-4">
+              {deletedUsersLoading ? (
+                <div className="flex justify-center items-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : deletedUsersError ? (
+                <div className="py-8 text-center text-red-600">{deletedUsersError}</div>
+              ) : deletedUsers.length === 0 ? (
+                <div className="py-8 text-center text-gray-500">No deleted users found</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-3 px-4">User ID</th>
+                        <th className="text-left py-3 px-4">User Name</th>
+                        <th className="text-left py-3 px-4">Email</th>
+                        <th className="text-left py-3 px-4">Phone Number</th>
+                        <th className="text-left py-3 px-4">Delete Reason</th>
+                        <th className="text-left py-3 px-4">Deleted At</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody>
+                      {deletedUsers.map((user) => (
+                        <tr key={user._id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-3 px-4 text-blue-600">{user._id.substring(0, 8)}...</td>
+                          <td className="py-3 px-4">{user.firstName} {user.lastName}</td>
+                          <td className="py-3 px-4">{user.email}</td>
+                          <td className="py-3 px-4">{user.countryCode} {user.phone}</td>
+                          <td className="py-3 px-4">{user.deleteReason || '—'}</td>
+                          <td className="py-3 px-4 text-sm">
+                            {user.updatedAt ? new Date(user.updatedAt).toLocaleDateString('en-IN', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric'
+                            }) : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
-          <DialogFooter className="border-t pt-4">
-            <div className="flex items-center justify-between w-full">
-              <div className="text-sm text-gray-600">
-                Page {deletedUsersPage} of {deletedUsersTotalPages}
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    if (deletedUsersPage > 1) {
-                      setDeletedUsersPage(deletedUsersPage - 1);
-                    }
-                  }}
-                  disabled={deletedUsersPage === 1 || deletedUsersLoading}
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    if (deletedUsersPage < deletedUsersTotalPages) {
-                      setDeletedUsersPage(deletedUsersPage + 1);
-                    }
-                  }}
-                  disabled={deletedUsersPage >= deletedUsersTotalPages || deletedUsersLoading}
-                >
-                  Next
-                </Button>
-                <Button onClick={() => setShowDeletedUsersModal(false)}>Close</Button>
-              </div>
+          
+          <DialogFooter className="border-t px-6 py-4 flex items-center justify-between bg-white">
+            <div className="text-sm text-gray-600">
+              Page {deletedUsersPage} of {deletedUsersTotalPages}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (deletedUsersPage > 1) {
+                    setDeletedUsersPage(deletedUsersPage - 1);
+                    fetchDeletedUsers();
+                  }
+                }}
+                disabled={deletedUsersPage === 1 || deletedUsersLoading}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (deletedUsersPage < deletedUsersTotalPages) {
+                    setDeletedUsersPage(deletedUsersPage + 1);
+                    fetchDeletedUsers();
+                  }
+                }}
+                disabled={deletedUsersPage >= deletedUsersTotalPages || deletedUsersLoading}
+              >
+                Next
+              </Button>
+              <Button 
+                onClick={() => setShowDeletedUsersModal(false)}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Close
+              </Button>
             </div>
           </DialogFooter>
         </DialogContent>

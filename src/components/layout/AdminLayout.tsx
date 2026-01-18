@@ -17,10 +17,26 @@ import {
   ClipboardList,
   Tag,
   Navigation,
-  MessageSquare
+  MessageSquare,
+  KeyRound, // add
 } from 'lucide-react';
 import { getAdminData, getUserRole, clearAuthData } from '../../lib/api';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu'; // add
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -88,14 +104,14 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
     },
     {
       id: 'user-management',
-      label: 'User Management',
+      label: 'Users',
       icon: Users,
       path: '/user-management',
       roles: ['admin']
     },
     {
       id: 'inventory',
-      label: 'Inventory Management',
+      label: 'Inventory',
       icon: Package,
       hasSubmenu: false,
       path: '/inventory-management',
@@ -116,7 +132,7 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
     },
     {
       id: 'pre-purchase',
-      label: 'Pre Purchase Order',
+      label: 'Pre Purchase Orders',
       icon: ClipboardList,
       path: '/pre-purchase-orders',
       roles: ['admin']
@@ -137,7 +153,7 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
     },
     {
       id: 'transactions',
-      label: 'Transactions & Settlements',
+      label: 'Transactions',
       icon: CreditCard,
       path: '/transactions',
       roles: ['admin', 'subadmin']
@@ -214,24 +230,40 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
             {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
 
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                <User className="w-5 h-5 text-blue-600" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">{adminName}</span>
-                <span className="text-xs text-gray-500 capitalize">{userRole === 'subadmin' ? 'Sub Admin' : 'Admin'}</span>
-              </div>
-            </div>
-            <button 
-              onClick={handleLogoutClick}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Logout"
-            >
-              <LogOut className="w-5 h-5 text-gray-600 hover:text-red-600" />
-            </button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-3 p-2 rounded-lg border border-transparent hover:bg-gray-100 transition-colors">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <User className="w-5 h-5 text-blue-600" />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="text-sm font-medium">{adminName}</span>
+                  <span className="text-xs text-gray-500 capitalize">
+                    {userRole === 'subadmin' ? 'Sub Admin' : 'Admin'}
+                  </span>
+                </div>
+                <ChevronDown className="w-4 h-4 text-gray-500" />
+              </button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onSelect={() => navigate('/profile')}>
+                <User className="w-4 h-4" />
+                <span>Profile</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => navigate('/change-password')}>
+                <KeyRound className="w-4 h-4" />
+                <span>Change Password</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                variant="destructive"
+                onSelect={() => setShowLogoutDialog(true)}
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </header>
 
         {/* Content Area */}

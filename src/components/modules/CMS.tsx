@@ -140,7 +140,9 @@ export default function CMS() {
         message?: string;
       }>('/api/banners');
 
-      if (!res.success) throw new Error(res.message || 'Failed to fetch banners');
+      if (!res.success) {
+        throw new Error(res.message || 'Failed to fetch banners');
+      }
 
       const mapped: ContentItem[] = (res.banners || []).map((b) => ({
         id: b._id,
@@ -154,6 +156,7 @@ export default function CMS() {
       setBanners(mapped);
     } catch (e: any) {
       const msg = e?.message || 'Failed to load banners';
+      console.error('Load banners error:', e);
       setBannersError(msg);
       toast.error(msg);
     } finally {
@@ -183,6 +186,7 @@ export default function CMS() {
 
   const confirmDelete = async () => {
     if (!itemToDelete) return;
+    
     try {
       if (itemToDelete.type === 'banners') {
         setBannersLoading(true);
@@ -201,15 +205,22 @@ export default function CMS() {
           message?: string;
         }>(`/api/banners/${itemToDelete.id}`, { method: 'DELETE' });
 
-        if (!res.success) throw new Error(res.message || 'Failed to delete banner');
+        if (!res.success) {
+          throw new Error(res.message || 'Failed to delete banner');
+        }
+        
         toast.success(res.message || 'Banner deleted successfully');
+        console.log('Banner deleted:', itemToDelete.id);
         await loadBanners();
       } else {
+        // For text content (delete locally)
         setTextContents(textContents.filter(content => content.id !== itemToDelete.id));
         toast.success(`${itemToDelete.title} deleted successfully`);
+        console.log('Content deleted:', itemToDelete.id);
       }
     } catch (e: any) {
       const msg = e?.message || 'Delete failed';
+      console.error('Delete error:', e);
       toast.error(msg);
     } finally {
       setDeleteDialogOpen(false);
@@ -223,34 +234,43 @@ export default function CMS() {
     setPagesError(null);
     try {
       const entries: Array<Promise<ContentItem>> = (['terms', 'privacy', 'about', 'deliveryTc', 'deliveryPrivacy'] as const).map(async (key) => {
-        const res = await apiFetch<{
-          success: boolean;
-          page?: {
-            _id: string;
-            title: string;
-            description: string;
-            isDeleted: boolean;
-            isActive: boolean;
-            createdAt: string;
-            updatedAt: string;
-          };
-          message?: string;
-        }>(`/api/page/get-page/${PAGE_IDS[key]}`);
+        try {
+          const res = await apiFetch<{
+            success: boolean;
+            page?: {
+              _id: string;
+              title: string;
+              description: string;
+              isDeleted: boolean;
+              isActive: boolean;
+              createdAt: string;
+              updatedAt: string;
+            };
+            message?: string;
+          }>(`/api/page/get-page/${PAGE_IDS[key]}`);
 
-        if (!res?.success || !res.page) throw new Error(res?.message || `Failed to fetch ${key}`);
-        return {
-          id: res.page._id,
-          title: res.page.title,
-          lastUpdated: new Date(res.page.updatedAt).toISOString().split('T')[0],
-          status: res.page.isActive ? 'Active' : 'Inactive',
-          type: key,
-        } as ContentItem;
+          if (!res?.success || !res.page) {
+            throw new Error(res?.message || `Failed to fetch ${key}`);
+          }
+          
+          return {
+            id: res.page._id,
+            title: res.page.title,
+            lastUpdated: new Date(res.page.updatedAt).toISOString().split('T')[0],
+            status: res.page.isActive ? 'Active' : 'Inactive',
+            type: key,
+          } as ContentItem;
+        } catch (err: any) {
+          console.error(`Error loading ${key}:`, err);
+          throw err;
+        }
       });
 
       const results = await Promise.all(entries);
       setTextContents(results);
     } catch (e: any) {
       const msg = e?.message || 'Failed to load pages';
+      console.error('Load pages error:', e);
       setPagesError(msg);
       toast.error(msg);
     } finally {
@@ -258,72 +278,100 @@ export default function CMS() {
     }
   };
 
-  const handleSaveBanner = (bannerData: any) => {
-    if (editingItem) {
-      // Update existing banner
-      setBanners(banners.map(banner =>
-        banner.id === editingItem.id
-          ? {
-              ...banner,
-              title: bannerData.title ?? banner.title,
-              status: bannerData.status ?? banner.status,
-              lastUpdated: bannerData.updatedAt
-                ? new Date(bannerData.updatedAt).toISOString().split('T')[0]
-                : new Date().toISOString().split('T')[0],
-              sequence: bannerData.order ?? banner.sequence,
-            }
-          : banner
-      ));
-      toast.success(bannerData.message || 'Banner updated successfully');
-    } else {
-      // Add new banner
-      const newBanner: ContentItem = {
-        id: bannerData.id,
-        title: bannerData.title,
-        status: bannerData.status,
-        lastUpdated: bannerData.updatedAt
-          ? new Date(bannerData.updatedAt).toISOString().split('T')[0]
-          : new Date().toISOString().split('T')[0],
-        type: 'banners',
-        sequence: bannerData.order,
-      };
-      setBanners([...banners, newBanner]);
-      toast.success(bannerData.message || 'Banner added successfully');
+  const handleSaveBanner = async (bannerData: any) => {
+    try {
+      if (editingItem) {
+        // Update existing banner
+        setBanners(banners.map(banner =>
+          banner.id === editingItem.id
+            ? {
+                ...banner,
+                title: bannerData.title ?? banner.title,
+                status: bannerData.status ?? banner.status,
+                lastUpdated: bannerData.updatedAt
+                  ? new Date(bannerData.updatedAt).toISOString().split('T')[0]
+                  : new Date().toISOString().split('T')[0],
+                sequence: bannerData.order ?? banner.sequence,
+              }
+            : banner
+        ));
+        toast.success(bannerData.message || 'Banner updated successfully');
+        console.log('Banner updated:', editingItem.id);
+      } else {
+        // Add new banner
+        const newBanner: ContentItem = {
+          id: bannerData.id || bannerData._id,
+          title: bannerData.title,
+          status: bannerData.status || 'Active',
+          lastUpdated: bannerData.updatedAt
+            ? new Date(bannerData.updatedAt).toISOString().split('T')[0]
+            : new Date().toISOString().split('T')[0],
+          type: 'banners',
+          sequence: bannerData.order,
+        };
+        setBanners([...banners, newBanner]);
+        toast.success(bannerData.message || 'Banner added successfully');
+        console.log('Banner created:', newBanner.id);
+      }
+      
+      // Reload banners to get latest data
+      setTimeout(() => {
+        loadBanners();
+      }, 500);
+      
+      setSelectedContent(null);
+      setEditingItem(null);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to save banner';
+      console.error('Save banner error:', e);
+      toast.error(msg);
     }
-    loadBanners();
-    setSelectedContent(null);
-    setEditingItem(null);
   };
 
-  const handleSaveTextContent = (contentData: any) => {
-    // Use the server's updatedAt timestamp if available, otherwise use now
-    const updatedDate = contentData.updatedAtIso
-      ? new Date(contentData.updatedAtIso).toISOString().split('T')[0]
-      : new Date().toISOString().split('T')[0];
+  const handleSaveTextContent = async (contentData: any) => {
+    try {
+      // Use the server's updatedAt timestamp if available, otherwise use now
+      const updatedDate = contentData.updatedAtIso
+        ? new Date(contentData.updatedAtIso).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0];
 
-    if (editingItem) {
-      // Update existing content with server timestamp
-      setTextContents(textContents.map(content =>
-        content.id === editingItem.id
-          ? { ...content, title: contentData.title, lastUpdated: updatedDate }
-          : content
-      ));
-      toast.success('Content updated successfully');
-    } else {
-      // Add new content
-      const typePrefix = selectedContent === 'terms' ? 'TERMS' : selectedContent === 'privacy' ? 'PRIVACY' : 'ABOUT';
-      const existingCount = textContents.filter(c => c.type === selectedContent).length;
-      const newContent: ContentItem = {
-        id: `${typePrefix}-${String(existingCount + 1).padStart(3, '0')}`,
-        title: contentData.title,
-        lastUpdated: updatedDate,
-        type: selectedContent!
-      };
-      setTextContents([...textContents, newContent]);
-      toast.success('Content added successfully');
+      if (editingItem) {
+        // Update existing content with server timestamp
+        setTextContents(textContents.map(content =>
+          content.id === editingItem.id
+            ? { ...content, title: contentData.title, lastUpdated: updatedDate, status: 'Active' }
+            : content
+        ));
+        toast.success('Content updated successfully');
+        console.log('Content updated:', editingItem.id);
+      } else {
+        // Add new content
+        const typePrefix = selectedContent === 'terms' ? 'TERMS' : selectedContent === 'privacy' ? 'PRIVACY' : selectedContent === 'about' ? 'ABOUT' : 'DELIVERY';
+        const existingCount = textContents.filter(c => c.type === selectedContent).length;
+        const newContent: ContentItem = {
+          id: contentData.id || `${typePrefix}-${String(existingCount + 1).padStart(3, '0')}`,
+          title: contentData.title,
+          lastUpdated: updatedDate,
+          type: selectedContent!,
+          status: 'Active'
+        };
+        setTextContents([...textContents, newContent]);
+        toast.success('Content added successfully');
+        console.log('Content created:', newContent.id);
+      }
+      
+      // Reload pages to get latest data
+      setTimeout(() => {
+        loadPages();
+      }, 500);
+      
+      setSelectedContent(null);
+      setEditingItem(null);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to save content';
+      console.error('Save content error:', e);
+      toast.error(msg);
     }
-    setSelectedContent(null);
-    setEditingItem(null);
   };
 
   const handleCancel = () => {
@@ -360,10 +408,12 @@ export default function CMS() {
         throw new Error(res?.message || 'Failed to reorder banner');
       }
       toast.success(res?.message || 'Banner reordered successfully');
+      console.log('Banner reordered:', movingBanner.id);
       await loadBanners();
     } catch (e: any) {
       setBanners(previous);
       const msg = e?.message || 'Failed to reorder banner';
+      console.error('Reorder error:', e);
       toast.error(msg);
     } finally {
       setIsReordering(false);
@@ -371,6 +421,7 @@ export default function CMS() {
   };
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-IN', {
       day: '2-digit',
@@ -397,7 +448,10 @@ export default function CMS() {
         banner={editingItem}
         onSave={handleSaveBanner}
         onCancel={handleCancel}
-        onError={(error) => toast.error(error)}
+        onError={(error) => {
+          console.error('BannerManagement error:', error);
+          toast.error(error);
+        }}
       />
     );
   }
@@ -461,7 +515,7 @@ export default function CMS() {
                       <div className="p-4 text-gray-600">Loading banners...</div>
                     )}
                     {contentType.id === 'banners' && bannersError && (
-                      <div className="p-4 text-red-600">{bannersError}</div>
+                      <div className="p-4 text-red-600">Error: {bannersError}</div>
                     )}
                     {contentType.items.map((item, index) => (
                       <div

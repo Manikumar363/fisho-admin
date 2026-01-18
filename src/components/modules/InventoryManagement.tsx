@@ -80,6 +80,52 @@ export default function InventoryManagement() {
     bestseller: false,
     isExpressDelivery: false
   });
+  // Original category form state (for change detection)
+const [originalCategoryForm, setOriginalCategoryForm] = useState({
+  speciesName: '',
+  speciesIcon: null as File | null,
+  existingIcon: '',
+  description: '',
+  availability: true
+});
+
+// Original product form state (for change detection)
+const [originalProductForm, setOriginalProductForm] = useState({
+  category: '',
+  productName: '',
+  productImage: null as File | null,
+  existingImage: '',
+  description: '',
+  nutritionFacts: '',
+  cutTypes: [] as string[],
+  availableWeights: [] as number[],
+  availableStock: '',
+  defaultProfit: '',
+  defaultDiscount: '',
+  costPricePerKg: '',
+  availability: true,
+  featured: false,
+  bestseller: false,
+  isExpressDelivery: false
+});
+
+// Original variant form state (for change detection)
+const [originalVariantForm, setOriginalVariantForm] = useState({
+  species: '',
+  product: '',
+  variantName: '',
+  variantImage: null as File | null,
+  existingImage: '',
+  cutType: '',
+  featured: false,
+  bestSeller: false,
+  profit: '',
+  displayPrice: '',
+  discount: '',
+  sellingPrice: '',
+  notes: '',
+  availability: true
+});
 
   // Fetch cut types for product form
   const [cutTypesData, setCutTypesData] = useState<Array<{ _id: string; name: string }>>([]);
@@ -126,6 +172,7 @@ export default function InventoryManagement() {
     notes: '',
     availability: true
   });
+
 
   // Products loaded for selected species (category) in Variant modal
   const [variantProducts, setVariantProducts] = useState<Array<{ id: string; name: string; costPrice?: number; profit?: number; discount?: number; cutTypeIds?: string[] }>>([]);
@@ -656,7 +703,7 @@ export default function InventoryManagement() {
     [newVariants[index], newVariants[targetIndex]] = [newVariants[targetIndex], newVariants[index]];
     setVariants(newVariants);
   };
-
+  
   const handleAddCutType = (cutTypeId: string) => {
     if (!cutTypeId) return;
     setProductForm((prev) => {
@@ -702,16 +749,24 @@ export default function InventoryManagement() {
   };
 
   const handleEditCategory = (category: any) => {
-    setEditingCategoryId(category.id);
-    setCategoryForm({
-      speciesName: category.name,
-      speciesIcon: null,
-      existingIcon: category.iconPath || '',
-      existingIconUrl: typeof category.icon === 'string' && category.icon !== '🗂️' ? category.icon : '',
-      description: category.description || '',
-      availability: category.availability === 'Available'
-    });
-    setShowAddModal(true);
+    const formData = {
+    speciesName: category.name,
+    speciesIcon: null,
+    existingIcon: category.iconPath || '',
+    existingIconUrl: typeof category.icon === 'string' && category.icon !== '🗂️' ? category.icon : '',
+    description: category.description || '',
+    availability: category.availability === 'Available'
+  };
+  setEditingCategoryId(category.id);
+  setCategoryForm(formData);
+  setOriginalCategoryForm({
+    speciesName: formData.speciesName,
+    speciesIcon: null,
+    existingIcon: formData.existingIcon,
+    description: formData.description,
+    availability: formData.availability
+  });
+  setShowAddModal(true);
   };
 
   const handleViewCategory = async (categoryId: string) => {
@@ -999,15 +1054,11 @@ export default function InventoryManagement() {
         }
       }
 
-      // Set editing state
-      setEditingVariantId(variantId);
-      
-      // Populate form with variant data
-      setVariantForm({
+      const formData = {
         species: categoryId,
         product: v.product._id,
         variantName: v.name,
-        variantImage: null,
+        variantImage: null as File | null,
         existingImage: v.image || '',
         existingImageUrl: v.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${v.image}` : v.image) : '',
         cutType: v.cutType._id,
@@ -1019,8 +1070,26 @@ export default function InventoryManagement() {
         sellingPrice: String(v.sellingPrice),
         notes: v.notes || '',
         availability: v.isActive
-      });
+      };
 
+      setEditingVariantId(variantId);
+      setVariantForm(formData);
+      setOriginalVariantForm({
+        species: formData.species,
+        product: formData.product,
+        variantName: formData.variantName,
+        variantImage: null,
+        existingImage: formData.existingImage,
+        cutType: formData.cutType,
+        featured: formData.featured,
+        bestSeller: formData.bestSeller,
+        profit: formData.profit,
+        displayPrice: formData.displayPrice,
+        discount: formData.discount,
+        sellingPrice: formData.sellingPrice,
+        notes: formData.notes,
+        availability: formData.availability
+      });
       setShowAddModal(true);
     } catch (e: any) {
       const msg = e?.message || 'Failed to load variant details';
@@ -1845,10 +1914,41 @@ export default function InventoryManagement() {
         <Button type="button" variant="outline" onClick={() => setShowAddModal(false)} disabled={isSubmitting}>
           Cancel
         </Button>
-        <Button type="submit" className="bg-blue-600 cursor-pointer hover:bg-blue-700" disabled={isSubmitting}>
-          {isSubmitting
-            ? (editingProductId ? 'Updating Product...' : 'Adding Product...')
-            : (editingProductId ? 'Update Product' : 'Add Product')}
+        <Button 
+          type="submit" 
+          className="bg-blue-600 cursor-pointer hover:bg-blue-700" 
+          disabled={
+            isSubmitting ||
+            !productForm.category ||
+            !productForm.productName.trim() ||
+            !productForm.description.trim() ||
+            !productForm.nutritionFacts.trim() ||
+            productForm.cutTypes.length === 0 ||
+            productForm.availableWeights.length === 0 ||
+            !productForm.availableStock ||
+            !productForm.costPricePerKg ||
+            !productForm.defaultProfit ||
+            !productForm.defaultDiscount ||
+            (!!editingProductId &&
+             productForm.category === originalProductForm.category &&
+             productForm.productName === originalProductForm.productName &&
+             !productForm.productImage &&
+             productForm.existingImage === originalProductForm.existingImage &&
+             productForm.description === originalProductForm.description &&
+             productForm.nutritionFacts === originalProductForm.nutritionFacts &&
+             JSON.stringify(productForm.cutTypes) === JSON.stringify(originalProductForm.cutTypes) &&
+             JSON.stringify(productForm.availableWeights) === JSON.stringify(originalProductForm.availableWeights) &&
+             productForm.availableStock === originalProductForm.availableStock &&
+             productForm.defaultProfit === originalProductForm.defaultProfit &&
+             productForm.defaultDiscount === originalProductForm.defaultDiscount &&
+             productForm.costPricePerKg === originalProductForm.costPricePerKg &&
+             productForm.availability === originalProductForm.availability &&
+             productForm.featured === originalProductForm.featured &&
+             productForm.bestseller === originalProductForm.bestseller &&
+             productForm.isExpressDelivery === originalProductForm.isExpressDelivery)
+          }
+        >
+          {editingProductId ? 'Update Product' : 'Add Product'}
         </Button>
       </DialogFooter>
     </form>
@@ -2074,11 +2174,38 @@ export default function InventoryManagement() {
           <Button type="button" variant="outline" onClick={() => setShowAddModal(false)}>
             Cancel
           </Button>
-          <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={isSubmitting}>
-            {isSubmitting
-              ? (editingVariantId ? 'Updating...' : 'Adding...')
-              : (editingVariantId ? 'Update Variant' : 'Add Variant')}
-          </Button>
+  <Button 
+    type="submit" 
+    className="bg-blue-600 cursor-pointer hover:bg-blue-700" 
+    disabled={
+      isSubmitting ||
+      !variantForm.product ||
+      !variantForm.variantName.trim() ||
+      !variantForm.cutType ||
+      !variantForm.profit ||
+      !variantForm.displayPrice ||
+      !variantForm.discount ||
+      (!!editingVariantId &&
+       variantForm.species === originalVariantForm.species &&
+       variantForm.product === originalVariantForm.product &&
+       variantForm.variantName === originalVariantForm.variantName &&
+       !variantForm.variantImage &&
+       variantForm.existingImage === originalVariantForm.existingImage &&
+       variantForm.cutType === originalVariantForm.cutType &&
+       variantForm.featured === originalVariantForm.featured &&
+       variantForm.bestSeller === originalVariantForm.bestSeller &&
+       variantForm.profit === originalVariantForm.profit &&
+       variantForm.displayPrice === originalVariantForm.displayPrice &&
+       variantForm.discount === originalVariantForm.discount &&
+       variantForm.sellingPrice === originalVariantForm.sellingPrice &&
+       variantForm.notes === originalVariantForm.notes &&
+       variantForm.availability === originalVariantForm.availability)
+    }
+  >
+    {isSubmitting
+      ? (editingVariantId ? 'Updating...' : 'Adding...')
+      : (editingVariantId ? 'Update Variant' : 'Add Variant')}
+  </Button>
         </DialogFooter>
       </form>
     );
@@ -2589,9 +2716,8 @@ export default function InventoryManagement() {
                               title="Edit product"
                               onClick={() => {
                                 // Prefill form for editing
-                                setEditingProductId(product.id);
                                 const resolvedCategoryId = getCategoryIdForProduct(product);
-                                setProductForm({
+                                const formData = {
                                   category: resolvedCategoryId,
                                   productName: product.name,
                                   productImage: null,
@@ -2611,6 +2737,26 @@ export default function InventoryManagement() {
                                   featured: product.featured ?? false,
                                   bestseller: product.bestseller ?? false,
                                   isExpressDelivery: product.isExpressDelivery ?? false
+                                };
+                                setEditingProductId(product.id);
+                                setProductForm(formData);
+                                setOriginalProductForm({
+                                  category: formData.category,
+                                  productName: formData.productName,
+                                  productImage: null,
+                                  existingImage: formData.existingImage,
+                                  description: formData.description,
+                                  nutritionFacts: formData.nutritionFacts,
+                                  cutTypes: [...formData.cutTypes],
+                                  availableWeights: [...formData.availableWeights],
+                                  availableStock: formData.availableStock,
+                                  defaultProfit: formData.defaultProfit,
+                                  defaultDiscount: formData.defaultDiscount,
+                                  costPricePerKg: formData.costPricePerKg,
+                                  availability: formData.availability,
+                                  featured: formData.featured,
+                                  bestseller: formData.bestseller,
+                                  isExpressDelivery: formData.isExpressDelivery
                                 });
                                 setShowAddModal(true);
                               }}

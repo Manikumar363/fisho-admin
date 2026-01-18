@@ -53,6 +53,7 @@ export default function CutTypeSection({ openAdd, onAddClose, resetAdd }: CutTyp
   const [viewOpen, setViewOpen] = useState(false);
   const [viewingCutType, setViewingCutType] = useState<CutType | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
+  const [originalEditName, setOriginalEditName] = useState('');
 
   const fetchCutTypes = async () => {
     setLoading(true);
@@ -103,6 +104,8 @@ export default function CutTypeSection({ openAdd, onAddClose, resetAdd }: CutTyp
     if (!q) return cutTypes;
     return cutTypes.filter((ct) => ct.name.toLowerCase().includes(q));
   }, [cutTypes, searchQuery]);
+
+  
 
   const handleAdd = async () => {
     const name = newName.trim();
@@ -197,10 +200,11 @@ export default function CutTypeSection({ openAdd, onAddClose, resetAdd }: CutTyp
   };
 
   const openEditDialog = (cutType: CutType) => {
-    setEditingCutType(cutType);
-    setEditName(cutType.name);
-    setEditOpen(true);
-  };
+  setEditingCutType(cutType);
+  setEditName(cutType.name);
+  setOriginalEditName(cutType.name);
+  setEditOpen(true);
+};
 
   const handleDelete = async () => {
     if (!deletingCutType) return;
@@ -488,12 +492,13 @@ export default function CutTypeSection({ openAdd, onAddClose, resetAdd }: CutTyp
       <Dialog
         open={editOpen}
         onOpenChange={(next) => {
-          setEditOpen(next);
-          if (!next) {
-            setEditingCutType(null);
-            setEditName('');
-          }
-        }}
+         setEditOpen(next);
+         if (!next) {
+           setEditingCutType(null);
+           setEditName('');
+           setOriginalEditName('');
+         }
+       }}
       >
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
@@ -523,7 +528,15 @@ export default function CutTypeSection({ openAdd, onAddClose, resetAdd }: CutTyp
             >
               Cancel
             </Button>
-            <Button className="bg-blue-600 hover:bg-blue-700 w-fit px-3 text-sm" onClick={handleEdit} disabled={isSubmitting}>
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700 w-fit px-3 text-sm" 
+              onClick={handleEdit} 
+              disabled={
+                isSubmitting ||
+                !editName.trim() ||
+                (editName.trim() === originalEditName.trim())
+              }
+            >
               {isSubmitting ? (
                 <span className="inline-flex items-center gap-2">
                   <Loader className="w-4 h-4 animate-spin" />
@@ -532,9 +545,9 @@ export default function CutTypeSection({ openAdd, onAddClose, resetAdd }: CutTyp
               ) : (
                 'Update Cut Type'
               )}
-            </Button>
+</Button>
           </DialogFooter>
-        </DialogContent>
+        </DialogContent>            
       </Dialog>
 
       <Dialog

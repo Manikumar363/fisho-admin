@@ -7,7 +7,7 @@ import { Input } from '../../ui/input';
 import { Button } from '../../ui/button';
 import { Label } from '../../ui/label';
 import { apiFetch, getToken } from '../../../lib/api';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 
 interface TextContentEditorProps {
   contentType: 'terms' | 'privacy' | 'about' | 'deliveryTc' | 'deliveryPrivacy';

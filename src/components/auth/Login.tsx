@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
@@ -21,6 +20,18 @@ export default function Login({ onLogin }: LoginProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Validation function
+  const isEmailValid = (emailValue: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(emailValue);
+  };
+
+  const isPasswordValid = (passwordValue: string): boolean => {
+    return passwordValue.length >= 6;
+  };
+
+  const isFormValid = isEmailValid(email) && isPasswordValid(password);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,7 +143,11 @@ export default function Login({ onLogin }: LoginProps) {
               </button>
             </div>
 
-            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
+            <Button 
+              type="submit" 
+              className="w-full bg-blue-600 hover:bg-blue-700" 
+              disabled={!isFormValid || loading}
+            >
               {loading ? 'Logging in...' : 'Login'}
             </Button>
           </form>

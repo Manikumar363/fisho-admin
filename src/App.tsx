@@ -26,6 +26,8 @@ import Enquiries from './components/modules/Enquiries';
 import { getToken, clearAuthData } from './lib/api';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import Profile from './components/modules/Profile';
+import ChangePassword from './components/modules/ChangePassword';
 
 function EditStoreWrapper() {
   const { storeId } = useParams<{ storeId: string }>();
@@ -114,6 +116,8 @@ export default function App() {
                   <Route path="/delivery-locations" element={<DeliveryLocations />} />
                   <Route path="/enquiries" element={<Enquiries />} />
                   <Route path="/cms" element={<CMS />} />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/change-password" element={<ChangePassword />} />
                 </Routes>
               </AdminLayout>
             }
