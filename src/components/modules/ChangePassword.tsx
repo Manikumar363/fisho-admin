@@ -200,12 +200,12 @@ export default function ChangePassword() {
                     onChange={handleInputChange}
                     placeholder="Enter your current password"
                     disabled={loading}
-                    className="pr-10"
+                    className="pr-14"
                   />
                   <button
                     type="button"
                     onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    className="absolute inset-y-0 right-0  top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
                   >
                     {showCurrentPassword ? (
                       <EyeOff className="w-4 h-4" />
@@ -230,12 +230,12 @@ export default function ChangePassword() {
                     onChange={handleInputChange}
                     placeholder="Enter new password (min 8 characters)"
                     disabled={loading}
-                    className="pr-10"
+                    className="pr-14"
                   />
                   <button
                     type="button"
                     onClick={() => setShowNewPassword(!showNewPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    className="absolute inset-y-0 right-0  top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
                   >
                     {showNewPassword ? (
                       <EyeOff className="w-4 h-4" />
@@ -271,12 +271,12 @@ export default function ChangePassword() {
                     onChange={handleInputChange}
                     placeholder="Re-enter new password"
                     disabled={loading}
-                    className="pr-10"
+                    className=" pr-14"
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-8 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    className="absolute inset-y-0 right-0  top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
                   >
                     {showConfirmPassword ? (
                       <EyeOff className="w-4 h-4" />
