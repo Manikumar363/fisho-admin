@@ -1409,12 +1409,8 @@ export default function UserManagement() {
       </Tabs>
 
       {/* Add Vendor Modal */}
-      <Dialog open={showAddVendorModal} onOpenChange={(open) => {
-  // Only close if the user explicitly closes it (open === false from close button)
-  // Prevent closing on outside click by not calling setShowXModal
-  if (!open) return;
-}}>
-        <DialogContent className="max-w-md">
+      <Dialog open={showAddVendorModal} onOpenChange={setShowAddVendorModal}>
+        <DialogContent className="max-w-md" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Add New Vendor</DialogTitle>
           </DialogHeader>
@@ -1792,16 +1788,8 @@ export default function UserManagement() {
       </Dialog>
 
       {/* Add Subadmin Modal */}
-      <Dialog open={showAddSubadminModal} onOpenChange={(open) => {
-          // Only close if the user explicitly closes it (open === false from close button)
-          // Prevent closing on outside click by not calling setShowXModal
-          if (!open){
-           setSubadminForm({ name: '', email: '', phone: '' });
-            setShowAddSubadminModal(false);
-          }
-
-        }}>
-        <DialogContent className="max-w-md">
+      <Dialog open={showAddSubadminModal} onOpenChange={setShowAddSubadminModal}>
+        <DialogContent className="max-w-md" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Add New Subadmin</DialogTitle>
           </DialogHeader>
