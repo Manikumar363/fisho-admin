@@ -1531,6 +1531,12 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
 
   const renderCategoryModal = () => {
     const isEdit = editingCategoryId !== null;
+    const categoryUnchanged = isEdit &&
+      categoryForm.speciesName === originalCategoryForm.speciesName &&
+      categoryForm.description === originalCategoryForm.description &&
+      categoryForm.availability === originalCategoryForm.availability &&
+      categoryForm.existingIcon === originalCategoryForm.existingIcon &&
+      !categoryForm.speciesIcon;
     return (
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -1614,7 +1620,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
           <Button type="button" variant="outline" onClick={() => setShowAddModal(false)} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={isSubmitting}>
+          <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={isSubmitting || categoryUnchanged}>
             {isSubmitting ? (
               <>
                 <Loader className="w-4 h-4 mr-2 animate-spin" />
@@ -1631,7 +1637,6 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
 
   const renderProductModal = () => (
     <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto">
-      <h2 className="text-lg font-semibold mb-4">{editingProductId ? 'Edit Product' : 'Add New Products'}</h2>
       <div className="grid grid-cols-2 gap-4">
         <div>
           <Label htmlFor="category">Select Category *</Label>

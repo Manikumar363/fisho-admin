@@ -32,15 +32,25 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    const fromLogin = (location.state as any)?.showWelcome;
+    // Accept welcome flag either from navigation state or a session flag set at login
+    const fromLoginState = (location.state as any)?.showWelcome;
+    const fromLoginSession = sessionStorage.getItem('showWelcome') === '1';
+    const fromLoginLocal = localStorage.getItem('showWelcome') === '1';
+    const fromLogin = fromLoginState || fromLoginSession || fromLoginLocal;
     const isDashboard = location.pathname === '/' || location.pathname === '/dashboard';
     if (!fromLogin || !isDashboard) return;
 
     const adminName = getAdminData()?.name || 'Admin';
     toast.success(`Welcome ${adminName}! Login successful.`);
 
+    // Clear the flags so it doesn't show again on other routes
+    sessionStorage.removeItem('showWelcome');
+    localStorage.removeItem('showWelcome');
+
     // Clear state so the toast only shows once and doesn't leak to other routes
-    navigate(location.pathname, { replace: true, state: {} });
+    setTimeout(() => {
+      navigate(location.pathname, { replace: true, state: {} });
+    }, 0);
   }, [location.state, location.pathname, navigate]);
 
   const kpiData = [

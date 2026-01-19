@@ -43,6 +43,7 @@ export default function UserManagement() {
     contactNumber: ''
   });
   const [searchTerm, setSearchTerm] = useState('');
+  const [deletedUsersSearchTerm, setDeletedUsersSearchTerm] = useState('');
   const [originalVendorForm, setOriginalVendorForm] = useState({
   vendorName: '',
   companyName: '',
@@ -655,7 +656,34 @@ export default function UserManagement() {
 
   const handleShowDeletedUsers = () => {
     setShowDeletedUsersModal(true);
+    setDeletedUsersSearchTerm('');
     fetchDeletedUsers();
+  };
+
+  const getFilteredDeletedUsers = () => {
+    if (!deletedUsersSearchTerm.trim()) {
+      return deletedUsers;
+    }
+
+    const term = deletedUsersSearchTerm.toLowerCase().trim();
+    return deletedUsers.filter(user => {
+      const userId = user._id?.toLowerCase() || '';
+      const firstName = user.firstName?.toLowerCase() || '';
+      const lastName = user.lastName?.toLowerCase() || '';
+      const email = user.email?.toLowerCase() || '';
+      const phone = user.phone?.toLowerCase() || '';
+      const countryCode = user.countryCode?.toLowerCase() || '';
+      const fullName = `${firstName} ${lastName}`;
+      const fullPhone = `${countryCode} ${phone}`;
+      
+      return userId.includes(term) ||
+             firstName.includes(term) ||
+             lastName.includes(term) ||
+             email.includes(term) ||
+             phone.includes(term) ||
+             fullName.includes(term) ||
+             fullPhone.includes(term);
+    });
   };
 
   const handleOpenEditVendor = (vendor: any) => {
@@ -1663,7 +1691,17 @@ export default function UserManagement() {
             </div>
             
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => {
+              <Button type="button" 
+              className="bg-gray-200 
+                border-4 border-gray-300 
+                text-gray-700 
+                hover:bg-gray-200 
+                hover:border-gray-400
+                font-semibold 
+                shadomw-md
+                px-6 py-2
+                transition-colors"
+               onClick={() => {
                 setShowAddEndUserModal(false);
                 setEndUserForm({
                   firstName: '',
@@ -2143,6 +2181,18 @@ export default function UserManagement() {
             <DialogTitle>Deleted Users</DialogTitle>
           </DialogHeader>
           
+          <div className="px-6 py-3 border-b bg-gray-50">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Input
+                placeholder="Search by name, phone, email, or user ID..."
+                className="pl-10"
+                value={deletedUsersSearchTerm}
+                onChange={(e) => setDeletedUsersSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+          
           <div className="flex-1 overflow-y-auto px-6 py-4">
               {deletedUsersLoading ? (
                 <div className="flex justify-center items-center py-8">
@@ -2152,6 +2202,8 @@ export default function UserManagement() {
                 <div className="py-8 text-center text-red-600">{deletedUsersError}</div>
               ) : deletedUsers.length === 0 ? (
                 <div className="py-8 text-center text-gray-500">No deleted users found</div>
+              ) : getFilteredDeletedUsers().length === 0 ? (
+                <div className="py-8 text-center text-gray-500">No results found for "{deletedUsersSearchTerm}"</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -2166,7 +2218,7 @@ export default function UserManagement() {
                       </tr>
                     </thead>
                     <tbody>
-                      {deletedUsers.map((user) => (
+                      {getFilteredDeletedUsers().map((user) => (
                         <tr key={user._id} className="border-b border-gray-100 hover:bg-gray-50">
                           <td className="py-3 px-4 text-blue-600">{user._id.substring(0, 8)}...</td>
                           <td className="py-3 px-4">{user.firstName} {user.lastName}</td>
@@ -2190,7 +2242,13 @@ export default function UserManagement() {
           
           <DialogFooter className="border-t px-6 py-4 flex items-center justify-between bg-white">
             <div className="text-sm text-gray-600">
-              Page {deletedUsersPage} of {deletedUsersTotalPages}
+              {getFilteredDeletedUsers().length > 0 ? (
+                <>
+                  Showing {getFilteredDeletedUsers().length} of {deletedUsers.length} deleted users
+                </>
+              ) : (
+                <span>Page {deletedUsersPage} of {deletedUsersTotalPages}</span>
+              )}
             </div>
             <div className="flex gap-2">
               <Button

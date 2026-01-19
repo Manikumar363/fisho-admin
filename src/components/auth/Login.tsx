@@ -64,6 +64,9 @@ export default function Login({ onLogin }: LoginProps) {
         setAdminData(adminData);
       }
       onLogin();
+      // Also set a short-lived flag so Dashboard can show welcome toast even if location state is lost
+      sessionStorage.setItem('showWelcome', '1');
+      localStorage.setItem('showWelcome', '1');
       navigate('/dashboard', { state: { showWelcome: true } });
     } catch (err: any) {
       setError('Network error');

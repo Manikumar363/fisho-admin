@@ -13,7 +13,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
-import { toast } from 'react-toastify';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import BannerManagement from './cms/BannerManagement';
 import TextContentEditor from './cms/TextContentEditor';
 import { apiFetch } from '../../lib/api';
@@ -209,7 +210,7 @@ export default function CMS() {
           throw new Error(res.message || 'Failed to delete banner');
         }
         
-        toast.success(res.message || 'Banner deleted successfully');
+        toast.success('Banner Successfully deleted');
         console.log('Banner deleted:', itemToDelete.id);
         await loadBanners();
       } else {
@@ -295,8 +296,8 @@ export default function CMS() {
               }
             : banner
         ));
-        toast.success(bannerData.message || 'Banner updated successfully');
-        console.log('Banner updated:', editingItem.id);
+        toast.success('Banner Updated Successfully');
+        console.log('Banner updated:', editingItem.id);   
       } else {
         // Add new banner
         const newBanner: ContentItem = {
@@ -310,7 +311,7 @@ export default function CMS() {
           sequence: bannerData.order,
         };
         setBanners([...banners, newBanner]);
-        toast.success(bannerData.message || 'Banner added successfully');
+        toast.success('Banner Successfully added');
         console.log('Banner created:', newBanner.id);
       }
       
@@ -628,6 +629,18 @@ export default function CMS() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
     </div>
   );
 }
