@@ -2002,7 +2002,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
               <SelectTrigger>
                 <SelectValue placeholder="Choose product" />
               </SelectTrigger>
-              <SelectContent className="max-h-60 overflow-y-auto">
+              <SelectContent className="max-h-80 overflow-y-scroll" style={{maxHeight: '320px'}}>
                 {variantProducts.map(p => (
                   <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                 ))}
