@@ -159,7 +159,7 @@ export default function ChangePassword() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+              <div className="w-12 h-12 border-2 border-blue-600 rounded-full flex items-center justify-center">
                 <Key className="w-6 h-6 text-blue-600" />
               </div>
               <div>

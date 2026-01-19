@@ -986,21 +986,19 @@ export default function UserManagement() {
                       <th className="text-left py-3 px-4">User Name</th>
                       <th className="text-left py-3 px-4">Phone Number</th>
                       <th className="text-left py-3 px-4">Email</th>
-                      <th className="text-left py-3 px-4">Revenue</th>
-                      <th className="text-left py-3 px-4">Total Orders</th>
                       <th className="text-left py-3 px-4">Status</th>
                       <th className="text-left py-3 px-4">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {endUsersLoading ? (
-                      <tr><td colSpan={8} className="py-8 text-center text-gray-500">Loading users...</td></tr>
+                      <tr><td colSpan={6} className="py-8 text-center text-gray-500">Loading users...</td></tr>
                     ) : endUsersError ? (
-                      <tr><td colSpan={8} className="py-8 text-center text-red-600">{endUsersError}</td></tr>
+                      <tr><td colSpan={6} className="py-8 text-center text-red-600">{endUsersError}</td></tr>
                     ) : endUsers.length === 0 ? (
-                      <tr><td colSpan={8} className="py-8 text-center text-gray-500">No users found</td></tr>
+                      <tr><td colSpan={6} className="py-8 text-center text-gray-500">No users found</td></tr>
                     ) : getFilteredEndUsers().length === 0 ? (
-                      <tr><td colSpan={8} className="py-8 text-center text-gray-500">No users match your search</td></tr>
+                      <tr><td colSpan={6} className="py-8 text-center text-gray-500">No users match your search</td></tr>
                     ) : (
                       getFilteredEndUsers().map((user) => (
                         <tr key={user._id} className="border-b border-gray-100 hover:bg-gray-50">
@@ -1008,8 +1006,6 @@ export default function UserManagement() {
                           <td className="py-3 px-4">{user.firstName} {user.lastName}</td>
                           <td className="py-3 px-4">{user.countryCode} {user.phone}</td>
                           <td className="py-3 px-4">{user.email}</td>
-                          <td className="py-3 px-4">—</td>
-                          <td className="py-3 px-4">—</td>
                           <td className="py-3 px-4">
                             <Badge variant={user.isActive ? 'default' : 'secondary'}>
                               {user.isActive ? 'Active' : 'Inactive'}

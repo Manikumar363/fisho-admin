@@ -339,12 +339,12 @@ export default function Profile() {
                 {adminData.role === 'subadmin' ? 'Sub Admin' : 'Admin'}
               </Badge>
 
-              {/* Join Date */}
+              {/* Join Date 
               {adminData.joinDate && (
                 <p className="text-gray-500 text-sm text-center">
                   Joined {new Date(adminData.joinDate).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })}
                 </p>
-              )}
+              )}*/}
             </div>
           </CardContent>
         </Card>
