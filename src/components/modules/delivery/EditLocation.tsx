@@ -52,8 +52,28 @@ export default function EditLocation({ location, onBack, onSave }: EditLocationP
     nextDay: location.deliveryType.includes('Next Day Delivery')
   });
 
+  // Store original values for comparison
+  const originalData = {
+    locationName: location.locationName,
+    nearestStore: location.nearestStore,
+    status: location.status === 'Active',
+    express: location.deliveryType.includes('Express Delivery'),
+    nextDay: location.deliveryType.includes('Next Day Delivery')
+  };
+
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+
+  // Check if any changes have been made
+  const hasChanges = () => {
+    return (
+      formData.locationName !== originalData.locationName ||
+      formData.nearestStore !== originalData.nearestStore ||
+      formData.status !== originalData.status ||
+      deliveryTypes.express !== originalData.express ||
+      deliveryTypes.nextDay !== originalData.nextDay
+    );
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -152,25 +172,26 @@ export default function EditLocation({ location, onBack, onSave }: EditLocationP
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
+      <div className="space-y-4">
         <Button
           variant="ghost"
           size="sm"
           onClick={onBack}
           disabled={loading}
+          className='w-fit'
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back
         </Button>
         <div>
-          <h1 className="mb-1">Edit Delivery Location</h1>
-          <p className="text-gray-600">Update location details - {location.id}</p>
+          <h1 className="mb-1 font-bold text-2xl ml-2">Edit Delivery Location</h1>
+          <p className="text-gray-600 mt-1 ml-2">Location details - {location.id}</p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Location Details</CardTitle>
+          <CardTitle className='text-lg font-semibold'>Location Details</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -199,7 +220,7 @@ export default function EditLocation({ location, onBack, onSave }: EditLocationP
                 Delivery Type <span className="text-red-500">*</span>
               </Label>
               <div className="space-y-3">
-                <div className="flex items-center space-x-3 border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                <div className="flex items-center gap-3 border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
                   <Checkbox
                     id="express"
                     checked={deliveryTypes.express}
@@ -217,23 +238,6 @@ export default function EditLocation({ location, onBack, onSave }: EditLocationP
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-3 border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-                  <Checkbox
-                    id="nextDay"
-                    checked={deliveryTypes.nextDay}
-                    onCheckedChange={(checked) => handleDeliveryTypeChange('nextDay', checked as boolean)}
-                    disabled={loading}
-                  />
-                  <div className="flex-1">
-                    <label
-                      htmlFor="nextDay"
-                      className="cursor-pointer"
-                    >
-                      <p className="text-sm">Next Day Delivery</p>
-                      <p className="text-xs text-gray-500">Delivery within 24 hours</p>
-                    </label>
-                  </div>
-                </div>
               </div>
               {errors.deliveryType && (
                 <p className="text-sm text-red-500">{errors.deliveryType}</p>
@@ -306,7 +310,7 @@ export default function EditLocation({ location, onBack, onSave }: EditLocationP
               <Button
                 type="submit"
                 className="bg-blue-600 hover:bg-blue-700"
-                disabled={loading}
+                disabled={loading || !hasChanges()}
               >
                 {loading ? (
                   <>

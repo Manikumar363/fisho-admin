@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Edit, Trash2, Eye, Loader } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Eye, Loader, Filter } from 'lucide-react';
 import { Card, CardContent } from '../ui/card';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -57,6 +57,14 @@ export default function DeliveryLocations() {
   const [viewData, setViewData] = useState<ApiCommunity | null>(null);
   const [viewCode, setViewCode] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [filters, setFilters] = useState({
+    deliveryType: '',
+    status: '',
+    sortBy: 'name-asc'
+  });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(20);
 
   useEffect(() => {
     let mounted = true;
@@ -165,14 +173,71 @@ export default function DeliveryLocations() {
     return types[0]?.replace(' Delivery', '') || '';
   };
 
+  const clearFilters = () => {
+    setFilters({
+      deliveryType: '',
+      status: '',
+      sortBy: 'name-asc'
+    });
+  };
+
+  const hasActiveFilters = () => {
+    return filters.deliveryType !== '' || filters.status !== '' || filters.sortBy !== 'name-asc';
+  };
+
   const filteredLocations = useMemo(() => {
-    const filtered = locations.filter(location =>
+    let filtered = locations.filter(location =>
       location.locationName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       location.nearestStore.toLowerCase().includes(searchQuery.toLowerCase()) ||
       location.id.toLowerCase().includes(searchQuery.toLowerCase())
     );
-    return filtered.sort((a, b) => a.locationName.localeCompare(b.locationName, undefined, { sensitivity: 'base' }));
-  }, [locations, searchQuery]);
+
+    // Apply delivery type filter
+    if (filters.deliveryType) {
+      if (filters.deliveryType === 'both') {
+        filtered = filtered.filter(location => location.deliveryType.length === 2);
+      } else if (filters.deliveryType === 'express') {
+        filtered = filtered.filter(location => 
+          location.deliveryType.includes('Express Delivery') && location.deliveryType.length === 1
+        );
+      } else if (filters.deliveryType === 'next-day') {
+        filtered = filtered.filter(location => 
+          location.deliveryType.includes('Next Day Delivery') && location.deliveryType.length === 1
+        );
+      }
+    }
+
+    // Apply status filter
+    if (filters.status) {
+      filtered = filtered.filter(location => 
+        location.status.toLowerCase() === filters.status
+      );
+    }
+
+    // Apply sorting
+    const sorted = [...filtered];
+    if (filters.sortBy === 'name-asc') {
+      sorted.sort((a, b) => a.locationName.localeCompare(b.locationName, undefined, { sensitivity: 'base' }));
+    } else if (filters.sortBy === 'name-desc') {
+      sorted.sort((a, b) => b.locationName.localeCompare(a.locationName, undefined, { sensitivity: 'base' }));
+    }
+
+    return sorted;
+  }, [locations, searchQuery, filters]);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredLocations.length / itemsPerPage);
+  
+  const paginatedLocations = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredLocations.slice(startIndex, endIndex);
+  }, [filteredLocations, currentPage, itemsPerPage]);
+
+  // Reset to page 1 when filters or search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filters]);
 
   const openView = async (code: string) => {
     setViewCode(code);
@@ -231,14 +296,24 @@ export default function DeliveryLocations() {
       {/* Search */}
       <Card>
         <CardContent className="p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <Input
-              placeholder="Search by location name, store, or location ID..."
-              className="pl-10"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+          <div className="flex gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Input
+                placeholder="Search by location name, store, or location ID..."
+                className="pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <Button 
+              variant="outline"
+              onClick={() => setShowFilterModal(true)}
+              className={hasActiveFilters() ? 'border-blue-600 text-blue-600' : ''}
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              Filters {hasActiveFilters() && <span className="ml-1 text-xs bg-blue-600 text-white px-2 py-0.5 rounded">Active</span>}
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -268,14 +343,14 @@ export default function DeliveryLocations() {
                       <tr>
                         <td colSpan={7} className="text-center py-8 text-red-600">{error}</td>
                       </tr>
-                    ) : filteredLocations.length === 0 ? (
+                    ) : paginatedLocations.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="text-center py-8 text-gray-500">
                           No locations found
                         </td>
                       </tr>
                     ) : (
-                      filteredLocations.map((location) => (
+                      paginatedLocations.map((location) => (
                         <tr key={location.id} className="border-b border-gray-100 hover:bg-gray-50">
                           <td className="py-3 px-4">{location.id}</td>
                           <td className="py-3 px-4">{location.locationName}</td>
@@ -343,6 +418,38 @@ export default function DeliveryLocations() {
               </div>
             )}
           </div>
+          
+          {/* Pagination */}
+          {!loading && !error && filteredLocations.length > 0 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <div className="text-sm text-gray-600">
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredLocations.length)} of {filteredLocations.length} locations
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <div className="flex items-center gap-2 px-3">
+                  <span className="text-sm text-gray-600">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -410,6 +517,98 @@ export default function DeliveryLocations() {
 
           <DialogFooter>
             <Button variant="outline" onClick={closeView}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Filter Modal */}
+      <Dialog open={showFilterModal} onOpenChange={setShowFilterModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Filters</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="deliveryType" className="text-sm font-medium">Delivery Type</label>
+              <select
+                id="deliveryType"
+                value={filters.deliveryType}
+                onChange={(e) => setFilters({ ...filters, deliveryType: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Delivery Types</option>
+                <option value="express">Express Delivery</option>
+                <option value="next-day">Next Day Delivery</option>
+                <option value="both">Both</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="status" className="text-sm font-medium">Status</label>
+              <select
+                id="status"
+                value={filters.status}
+                onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-sm font-medium">Sort By</label>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="name-asc"
+                    name="sortBy"
+                    value="name-asc"
+                    checked={filters.sortBy === 'name-asc'}
+                    onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <label htmlFor="name-asc" className="text-sm font-normal cursor-pointer">
+                    Name (A-Z)
+                  </label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="name-desc"
+                    name="sortBy"
+                    value="name-desc"
+                    checked={filters.sortBy === 'name-desc'}
+                    onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <label htmlFor="name-desc" className="text-sm font-normal cursor-pointer">
+                    Name (Z-A)
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <Button 
+              type="button" 
+              variant="outline"
+              onClick={clearFilters}
+              disabled={!hasActiveFilters()}
+            >
+              Clear Filters
+            </Button>
+            <Button 
+              type="button"
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={() => setShowFilterModal(false)}
+            >
+              Apply
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -98,6 +98,8 @@ export default function UserManagement() {
   const [vendors, setVendors] = useState<any[]>([]);
   const [vendorsLoading, setVendorsLoading] = useState(false);
   const [vendorsError, setVendorsError] = useState<string | null>(null);
+  const [vendorsPage, setVendorsPage] = useState(1);
+  const [itemsPerPage] = useState(20);
 
   // Store Managers API integration
   const [storeManagers, setStoreManagers] = useState<any[]>([]);
@@ -105,6 +107,9 @@ export default function UserManagement() {
   const [storeManagersError, setStoreManagersError] = useState<string | null>(null);
   const [storeManagersPage, setStoreManagersPage] = useState(1);
   const [storeManagersTotalPages, setStoreManagersTotalPages] = useState(1);
+
+  // Delivery Partners pagination
+  const [deliveryPartnersPage, setDeliveryPartnersPage] = useState(1);
 
   useEffect(() => {
     const filterParam = searchParams.get('filter');
@@ -117,7 +122,7 @@ export default function UserManagement() {
     if (activeTab !== 'end-users') return;
     setEndUsersLoading(true);
     setEndUsersError(null);
-    apiFetch<{ success: boolean; users: any[]; pagination?: any; message?: string }>(`/api/user/all-users?page=${endUsersPage}&limit=15`)
+    apiFetch<{ success: boolean; users: any[]; pagination?: any; message?: string }>(`/api/user/all-users?page=${endUsersPage}&limit=${itemsPerPage}`)
       .then(res => {
         if (!res.success) throw new Error(res.message || 'Failed to fetch users');
         setEndUsers(res.users || []);
@@ -127,7 +132,7 @@ export default function UserManagement() {
         setEndUsersError(e?.message || 'Failed to load users');
       })
       .finally(() => setEndUsersLoading(false));
-  }, [activeTab, endUsersPage]);
+  }, [activeTab, endUsersPage, itemsPerPage]);
 
   const fetchDeletedUsers = async () => {
     setDeletedUsersLoading(true);
@@ -172,7 +177,7 @@ export default function UserManagement() {
     if (activeTab !== 'store-managers') return;
     setStoreManagersLoading(true);
     setStoreManagersError(null);
-    apiFetch<{ success: boolean; subadmins: any[]; pagination?: any; message?: string }>(`/api/subadmin/all-subadmins?page=${storeManagersPage}&limit=15`)
+    apiFetch<{ success: boolean; subadmins: any[]; pagination?: any; message?: string }>(`/api/subadmin/all-subadmins?page=${storeManagersPage}&limit=${itemsPerPage}`)
       .then(res => {
         if (!res.success) throw new Error(res.message || 'Failed to fetch store managers');
         setStoreManagers(res.subadmins || []);
@@ -182,7 +187,7 @@ export default function UserManagement() {
         setStoreManagersError(e?.message || 'Failed to load store managers');
       })
       .finally(() => setStoreManagersLoading(false));
-  }, [activeTab, storeManagersPage]);
+  }, [activeTab, storeManagersPage, itemsPerPage]);
 
   const deliveryPartners = [
     { id: 'DP-001', name: 'Mohammed Ali', email: 'ali@fisho.com', phone: '+91 98765 11111', deliveries: 342, earnings: '₹68,400', rating: 4.8, status: 'Active' },
@@ -342,7 +347,7 @@ export default function UserManagement() {
         contactNumber: ''
       });
       setEndUsersPage(1);
-      const refreshRes = await apiFetch<{ success: boolean; users: any[]; pagination?: any; message?: string }>(`/api/user/all-users?page=1&limit=15`);
+      const refreshRes = await apiFetch<{ success: boolean; users: any[]; pagination?: any; message?: string }>(`/api/user/all-users?page=1&limit=${itemsPerPage}`);
       if (refreshRes.success) {
         setEndUsers(refreshRes.users || []);
         setEndUsersTotalPages(refreshRes.pagination?.totalPages || 1);
@@ -386,7 +391,7 @@ export default function UserManagement() {
 
       // Refresh store managers list
       setStoreManagersPage(1);
-      const refreshRes = await apiFetch<{ success: boolean; subadmins: any[]; pagination?: any; message?: string }>(`/api/subadmin/all-subadmins?page=1&limit=15`);
+      const refreshRes = await apiFetch<{ success: boolean; subadmins: any[]; pagination?: any; message?: string }>(`/api/subadmin/all-subadmins?page=1&limit=${itemsPerPage}`);
       if (refreshRes.success) {
         setStoreManagers(refreshRes.subadmins || []);
         setStoreManagersTotalPages(refreshRes.pagination?.totalPages || 1);
@@ -444,7 +449,7 @@ export default function UserManagement() {
 
       // Refresh store managers list
       setStoreManagersLoading(true);
-      const refreshRes = await apiFetch<{ success: boolean; subadmins: any[]; pagination?: any; message?: string }>(`/api/subadmin/all-subadmins?page=${storeManagersPage}&limit=15`);
+      const refreshRes = await apiFetch<{ success: boolean; subadmins: any[]; pagination?: any; message?: string }>(`/api/subadmin/all-subadmins?page=${storeManagersPage}&limit=${itemsPerPage}`);
       if (refreshRes.success) {
         setStoreManagers(refreshRes.subadmins || []);
         setStoreManagersTotalPages(refreshRes.pagination?.totalPages || 1);
@@ -587,7 +592,7 @@ export default function UserManagement() {
         
         // Refresh the users list
         setEndUsersPage(1);
-        const refreshRes = await apiFetch<{ success: boolean; users: any[]; pagination?: any; message?: string }>(`/api/user/all-users?page=1&limit=15`);
+        const refreshRes = await apiFetch<{ success: boolean; users: any[]; pagination?: any; message?: string }>(`/api/user/all-users?page=1&limit=${itemsPerPage}`);
         if (refreshRes.success) {
           setEndUsers(refreshRes.users || []);
           setEndUsersTotalPages(refreshRes.pagination?.totalPages || 1);
@@ -629,7 +634,7 @@ export default function UserManagement() {
 
         // Refresh the store managers list
         setStoreManagersLoading(true);
-        const refreshRes = await apiFetch<{ success: boolean; subadmins: any[]; pagination?: any; message?: string }>(`/api/subadmin/all-subadmins?page=${storeManagersPage}&limit=15`);
+        const refreshRes = await apiFetch<{ success: boolean; subadmins: any[]; pagination?: any; message?: string }>(`/api/subadmin/all-subadmins?page=${storeManagersPage}&limit=${itemsPerPage}`);
         if (refreshRes.success) {
           setStoreManagers(refreshRes.subadmins || []);
           setStoreManagersTotalPages(refreshRes.pagination?.totalPages || 1);
@@ -739,15 +744,46 @@ export default function UserManagement() {
   };
 
   const getFilteredDeliveryPartners = () => {
-    if (!searchTerm.trim()) return deliveryPartners;
-    const term = searchTerm.toLowerCase().trim();
-    return deliveryPartners.filter(partner => 
-      partner.id?.toLowerCase().includes(term) ||
-      partner.name?.toLowerCase().includes(term) ||
-      partner.email?.toLowerCase().includes(term) ||
-      partner.phone?.toLowerCase().includes(term)
-    );
+    let filtered = deliveryPartners;
+
+    // Apply search term filter
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter(partner => 
+        partner.id?.toLowerCase().includes(term) ||
+        partner.name?.toLowerCase().includes(term) ||
+        partner.email?.toLowerCase().includes(term) ||
+        partner.phone?.toLowerCase().includes(term)
+      );
+    }
+
+    // Apply status filter
+    if (filters.status) {
+      filtered = filtered.filter(partner => {
+        const partnerStatus = partner.status?.toLowerCase();
+        return partnerStatus === filters.status;
+      });
+    }
+
+    // Apply sorting
+    const sorted = [...filtered];
+    if (filters.sortBy === 'name-asc') {
+      sorted.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+    } else if (filters.sortBy === 'name-desc') {
+      sorted.sort((a, b) => b.name.toLowerCase().localeCompare(a.name.toLowerCase()));
+    }
+
+    return sorted;
   };
+
+  const getPaginatedDeliveryPartners = () => {
+    const filtered = getFilteredDeliveryPartners();
+    const startIndex = (deliveryPartnersPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filtered.slice(startIndex, endIndex);
+  };
+
+  const deliveryPartnersTotalPages = Math.ceil(getFilteredDeliveryPartners().length / itemsPerPage);
 
   const getFilteredStoreManagers = () => {
     let filtered = storeManagers;
@@ -768,7 +804,29 @@ export default function UserManagement() {
       });
     }
 
-    return filtered;
+    // Apply sorting
+    const sorted = [...filtered];
+    if (filters.sortBy === 'name-asc') {
+      sorted.sort((a, b) => {
+        const nameA = a.name?.toLowerCase() || '';
+        const nameB = b.name?.toLowerCase() || '';
+        return nameA.localeCompare(nameB);
+      });
+    } else if (filters.sortBy === 'name-desc') {
+      sorted.sort((a, b) => {
+        const nameA = a.name?.toLowerCase() || '';
+        const nameB = b.name?.toLowerCase() || '';
+        return nameB.localeCompare(nameA);
+      });
+    } else if (filters.sortBy === 'recently-added') {
+      sorted.sort((a, b) => {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return dateB - dateA;
+      });
+    }
+
+    return sorted;
   };
 
   const getFilteredVendors = () => {
@@ -794,8 +852,39 @@ export default function UserManagement() {
       });
     }
 
-    return filtered;
+    // Apply sorting
+    const sorted = [...filtered];
+    if (filters.sortBy === 'name-asc') {
+      sorted.sort((a, b) => {
+        const nameA = a.name?.toLowerCase() || '';
+        const nameB = b.name?.toLowerCase() || '';
+        return nameA.localeCompare(nameB);
+      });
+    } else if (filters.sortBy === 'name-desc') {
+      sorted.sort((a, b) => {
+        const nameA = a.name?.toLowerCase() || '';
+        const nameB = b.name?.toLowerCase() || '';
+        return nameB.localeCompare(nameA);
+      });
+    } else if (filters.sortBy === 'recently-added') {
+      sorted.sort((a, b) => {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return dateB - dateA;
+      });
+    }
+
+    return sorted;
   };
+
+  const getPaginatedVendors = () => {
+    const filtered = getFilteredVendors();
+    const startIndex = (vendorsPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filtered.slice(startIndex, endIndex);
+  };
+
+  const vendorsTotalPages = Math.ceil(getFilteredVendors().length / itemsPerPage);
 
   return (
     <div className="space-y-6">
@@ -950,6 +1039,36 @@ export default function UserManagement() {
                   </tbody>
                 </table>
               </div>
+              {!endUsersLoading && !endUsersError && getFilteredEndUsers().length > 0 && (
+                <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                  <div className="text-sm text-gray-600">
+                    Showing {((endUsersPage - 1) * itemsPerPage) + 1} to {Math.min(endUsersPage * itemsPerPage, getFilteredEndUsers().length)} of {getFilteredEndUsers().length} users
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEndUsersPage(prev => Math.max(1, prev - 1))}
+                      disabled={endUsersPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <div className="flex items-center gap-2 px-3">
+                      <span className="text-sm text-gray-600">
+                        Page {endUsersPage} of {endUsersTotalPages}
+                      </span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEndUsersPage(prev => Math.min(endUsersTotalPages, prev + 1))}
+                      disabled={endUsersPage === endUsersTotalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -983,7 +1102,14 @@ export default function UserManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {getFilteredDeliveryPartners().map((partner) => (
+                    {getFilteredDeliveryPartners().length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="text-center py-8 text-gray-500">
+                          No delivery partners found
+                        </td>
+                      </tr>
+                    ) : (
+                      getPaginatedDeliveryPartners().map((partner) => (
                       <tr key={partner.id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-3 px-4 text-blue-600">{partner.id}</td>
                         <td className="py-3 px-4">{partner.name}</td>
@@ -1016,10 +1142,41 @@ export default function UserManagement() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    ))
+                    )}
                   </tbody>
                 </table>
               </div>
+              {getFilteredDeliveryPartners().length > 0 && (
+                <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                  <div className="text-sm text-gray-600">
+                    Showing {((deliveryPartnersPage - 1) * itemsPerPage) + 1} to {Math.min(deliveryPartnersPage * itemsPerPage, getFilteredDeliveryPartners().length)} of {getFilteredDeliveryPartners().length} partners
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDeliveryPartnersPage(prev => Math.max(1, prev - 1))}
+                      disabled={deliveryPartnersPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <div className="flex items-center gap-2 px-3">
+                      <span className="text-sm text-gray-600">
+                        Page {deliveryPartnersPage} of {deliveryPartnersTotalPages}
+                      </span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDeliveryPartnersPage(prev => Math.min(deliveryPartnersTotalPages, prev + 1))}
+                      disabled={deliveryPartnersPage === deliveryPartnersTotalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1103,6 +1260,36 @@ export default function UserManagement() {
                   </tbody>
                 </table>
               </div>
+              {!storeManagersLoading && !storeManagersError && getFilteredStoreManagers().length > 0 && (
+                <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                  <div className="text-sm text-gray-600">
+                    Showing {((storeManagersPage - 1) * itemsPerPage) + 1} to {Math.min(storeManagersPage * itemsPerPage, getFilteredStoreManagers().length)} of {getFilteredStoreManagers().length} managers
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setStoreManagersPage(prev => Math.max(1, prev - 1))}
+                      disabled={storeManagersPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <div className="flex items-center gap-2 px-3">
+                      <span className="text-sm text-gray-600">
+                        Page {storeManagersPage} of {storeManagersTotalPages}
+                      </span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setStoreManagersPage(prev => Math.min(storeManagersTotalPages, prev + 1))}
+                      disabled={storeManagersPage === storeManagersTotalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1144,7 +1331,7 @@ export default function UserManagement() {
                     ) :  getFilteredVendors().length === 0 ? (
                       <tr><td colSpan={8} className="py-8 text-center text-gray-500">No vendors match your search</td></tr>
                    )  : (
-                      getFilteredVendors().map((vendor) => (
+                      getPaginatedVendors().map((vendor) => (
                         <tr key={vendor._id} className="border-b border-gray-100 hover:bg-gray-50">
                           <td className="py-3 px-4 text-blue-600">{vendor._id.substring(0, 8)}...</td>
                           <td className="py-3 px-4">{vendor.name}</td>
@@ -1186,6 +1373,36 @@ export default function UserManagement() {
                   </tbody>
                 </table>
               </div>
+              {!vendorsLoading && !vendorsError && getFilteredVendors().length > 0 && (
+                <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                  <div className="text-sm text-gray-600">
+                    Showing {((vendorsPage - 1) * itemsPerPage) + 1} to {Math.min(vendorsPage * itemsPerPage, getFilteredVendors().length)} of {getFilteredVendors().length} vendors
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setVendorsPage(prev => Math.max(1, prev - 1))}
+                      disabled={vendorsPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <div className="flex items-center gap-2 px-3">
+                      <span className="text-sm text-gray-600">
+                        Page {vendorsPage} of {vendorsTotalPages}
+                      </span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setVendorsPage(prev => Math.min(vendorsTotalPages, prev + 1))}
+                      disabled={vendorsPage === vendorsTotalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -2100,20 +2317,154 @@ export default function UserManagement() {
             )}
 
             {activeTab === 'vendors' && (
-              <div className="text-center text-gray-500 py-4">
-                No additional filters available for vendors
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Sort By</Label>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="vendor-recently-added"
+                      name="vendor-sortBy"
+                      value="recently-added"
+                      checked={filters.sortBy === 'recently-added'}
+                      onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <Label htmlFor="vendor-recently-added" className="text-sm font-normal cursor-pointer">
+                      Recently Added
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="vendor-name-asc"
+                      name="vendor-sortBy"
+                      value="name-asc"
+                      checked={filters.sortBy === 'name-asc'}
+                      onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <Label htmlFor="vendor-name-asc" className="text-sm font-normal cursor-pointer">
+                      Name (A-Z)
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="vendor-name-desc"
+                      name="vendor-sortBy"
+                      value="name-desc"
+                      checked={filters.sortBy === 'name-desc'}
+                      onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <Label htmlFor="vendor-name-desc" className="text-sm font-normal cursor-pointer">
+                      Name (Z-A)
+                    </Label>
+                  </div>
+                </div>
               </div>
             )}
 
             {activeTab === 'delivery-partners' && (
-              <div className="text-center text-gray-500 py-4">
-                No additional filters available for delivery partners
-              </div>
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="dp-status" className="text-sm font-medium">Status</Label>
+                  <select
+                    id="dp-status"
+                    value={filters.status}
+                    onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Sort By</Label>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id="dp-name-asc"
+                        name="dp-sortBy"
+                        value="name-asc"
+                        checked={filters.sortBy === 'name-asc'}
+                        onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <Label htmlFor="dp-name-asc" className="text-sm font-normal cursor-pointer">
+                        Name (A-Z)
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id="dp-name-desc"
+                        name="dp-sortBy"
+                        value="name-desc"
+                        checked={filters.sortBy === 'name-desc'}
+                        onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <Label htmlFor="dp-name-desc" className="text-sm font-normal cursor-pointer">
+                        Name (Z-A)
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+              </>
             )}
 
             {activeTab === 'store-managers' && (
-              <div className="text-center text-gray-500 py-4">
-                No additional filters available for store managers
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Sort By</Label>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="sm-recently-added"
+                      name="sm-sortBy"
+                      value="recently-added"
+                      checked={filters.sortBy === 'recently-added'}
+                      onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <Label htmlFor="sm-recently-added" className="text-sm font-normal cursor-pointer">
+                      Recently Added
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="sm-name-asc"
+                      name="sm-sortBy"
+                      value="name-asc"
+                      checked={filters.sortBy === 'name-asc'}
+                      onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <Label htmlFor="sm-name-asc" className="text-sm font-normal cursor-pointer">
+                      Name (A-Z)
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="sm-name-desc"
+                      name="sm-sortBy"
+                      value="name-desc"
+                      checked={filters.sortBy === 'name-desc'}
+                      onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <Label htmlFor="sm-name-desc" className="text-sm font-normal cursor-pointer">
+                      Name (Z-A)
+                    </Label>
+                  </div>
+                </div>
               </div>
             )}
           </div>

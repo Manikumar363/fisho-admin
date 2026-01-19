@@ -81,8 +81,8 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
       newErrors.locationName = 'Location name is required';
     }
 
-    if (!deliveryTypes.express && !deliveryTypes.nextDay) {
-      newErrors.deliveryType = 'Please select at least one delivery type';
+    if (!deliveryTypes.express) {
+      newErrors.deliveryType = 'Please select Express Delivery';
     }
 
     setErrors(newErrors);
@@ -158,25 +158,26 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
+      <div className="space-y-4">
         <Button
           variant="ghost"
           size="sm"
           onClick={onBack}
           disabled={loading}
+          className="w-fit"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back
         </Button>
         <div>
-          <h1 className="mb-1">Add Delivery Location</h1>
-          <p className="text-gray-600">Add a new delivery service location</p>
+          <h1 className="text-2xl ml-2 font-bold">Add Delivery Location</h1>
+          <p className="text-gray-600 ml-2 mt-1">Create a new delivery location for your service area</p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Location Details</CardTitle>
+          <CardTitle className=' text-lg font-semibold'>Location Details</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -195,7 +196,7 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
                 disabled={loading}
               />
               {errors.locationName && (
-                <p className="text-sm text-red-500">{errors.locationName}</p>
+                <p className="text-sm text-red-600 font-medium">{errors.locationName}</p>
               )}
             </div>
 
@@ -205,7 +206,7 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
                 Delivery Type <span className="text-red-500">*</span>
               </Label>
               <div className="space-y-3">
-                <div className="flex items-center space-x-3 border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                <div className="flex items-center gap-4 border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
                   <Checkbox
                     id="express"
                     checked={deliveryTypes.express}
@@ -217,7 +218,7 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
                       htmlFor="express"
                       className="cursor-pointer"
                     >
-                      <p className="text-sm">Express Delivery</p>
+                      <p className="text-sm pr-1">Express Delivery</p>
                       <p className="text-xs text-gray-500">Same-day delivery service</p>
                     </label>
                   </div>
@@ -242,7 +243,7 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
                 </div>*/}
               </div>
               {errors.deliveryType && (
-                <p className="text-sm text-red-500">{errors.deliveryType}</p>
+                <p className="text-sm text-red-600 font-medium">{errors.deliveryType}</p>
               )}
             </div>
 

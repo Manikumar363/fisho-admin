@@ -239,7 +239,7 @@ export default function BannerManagement({ banner, onSave, onCancel, onError }: 
                   </div>
                 )}
                 {errors.image && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                  <div className="p-3 bg-red-50 border text-red-600 font-medium border-red-200 rounded-lg text-red-700 text-sm">
                     {errors.image}
                   </div>
                 )}
@@ -272,7 +272,7 @@ export default function BannerManagement({ banner, onSave, onCancel, onError }: 
                     className={errors.title ? 'border-red-500' : ''}
                   />
                   {errors.title && (
-                    <p className="text-red-500 text-xs">{errors.title}</p>
+                    <p className="text-red-600 text-sm font-medium">{errors.title}</p>
                   )}
                 </div>
 

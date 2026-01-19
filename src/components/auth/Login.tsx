@@ -62,10 +62,9 @@ export default function Login({ onLogin }: LoginProps) {
         setToken(token);
         setUserRole(role);
         setAdminData(adminData);
-        toast.success(`Welcome ${adminData?.name || 'Admin'}! Login successful.`);
       }
       onLogin();
-      navigate('/dashboard');
+      navigate('/dashboard', { state: { showWelcome: true } });
     } catch (err: any) {
       setError('Network error');
       toast?.error?.('Network error');

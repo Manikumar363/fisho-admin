@@ -2002,7 +2002,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
               <SelectTrigger>
                 <SelectValue placeholder="Choose product" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-60 overflow-y-auto">
                 {variantProducts.map(p => (
                   <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                 ))}
@@ -2573,7 +2573,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                     <SelectValue placeholder="Sort by" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="recent">Recently Added</SelectItem>
+                    <SelectItem value="recent">Filters</SelectItem>
                     <SelectItem value="name-asc">Name (A to Z)</SelectItem>
                     <SelectItem value="name-desc">Name (Z to A)</SelectItem>
                     <SelectItem value="stock-asc">Stock (Low to High)</SelectItem>
@@ -2804,7 +2804,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                     <SelectValue placeholder="Sort by" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="recent">Recently Added</SelectItem>
+                    <SelectItem value="recent">Filters</SelectItem>
                     <SelectItem value="name-asc">Name (A to Z)</SelectItem>
                     <SelectItem value="name-desc">Name (Z to A)</SelectItem>
                     <SelectItem value="price-asc">Price (Low to High)</SelectItem>
@@ -2994,200 +2994,16 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
       {/* View Modal */}
       <Dialog open={showViewModal} onOpenChange={setShowViewModal}>
         <DialogContent className="sm:max-w-[600px]">
-          <div style={{ maxHeight: '80vh', overflowY: 'auto', padding: 24 }}>
-            <DialogHeader>
-              <DialogTitle>
-                View {activeTab === 'categories' ? 'Category' : activeTab === 'products' ? 'Product' : 'Product Variant'}
-              </DialogTitle>
-            </DialogHeader>
-            {activeTab === 'categories' && (
+          <DialogHeader>
+            <DialogTitle>View Product Variant</DialogTitle>
+          </DialogHeader>
+          <div style={{ maxHeight: '75vh', overflowY: 'auto', paddingLeft: 24, paddingRight: 24, paddingBottom: 24 }}>
+            {/* Content for viewing product variant details */}
+            {viewingVariant && (
               <div className="space-y-4">
-                <div>
-                  <Label htmlFor="speciesName">Species Name</Label>
-                  <Input
-                    id="speciesName"
-                    value={selectedItem?.name || ''}
-                    readOnly
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="speciesIcon">Species Icon</Label>
-                  <Input
-                    id="speciesIcon"
-                    type="file"
-                    accept="image/*"
-                    readOnly
-                  />
-                  <p className="text-sm text-gray-500 mt-1">Upload an icon or image for this species</p>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <Label htmlFor="availability">Availability</Label>
-                    <p className="text-sm text-gray-600">Make this category available to users</p>
-                  </div>
-                  <Switch
-                    id="availability"
-                    checked={selectedItem?.availability === 'Available'}
-                    onCheckedChange={(checked: boolean) => {
-                      const updatedCategories = categories.map(cat => 
-                        cat.id === selectedItem.id ? { ...cat, availability: (checked ? 'Available' : 'Unavailable') as 'Available' | 'Unavailable' } : cat
-                      );
-                      setCategories(updatedCategories);
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-            {activeTab === 'products' && (
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="species">Select Species</Label>
-                  <Select value={selectedItem?.species || ''} onValueChange={(value: string) => {
-                    const updatedProducts = products.map(prod => 
-                      prod.id === selectedItem.id ? { ...prod, species: value } : prod
-                    );
-                    setProducts(updatedProducts);
-                  }}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose species" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="prawns">Prawns</SelectItem>
-                      <SelectItem value="fish">Fish</SelectItem>
-                      <SelectItem value="crab">Crab</SelectItem>
-                      <SelectItem value="squid">Squid</SelectItem>
-                      <SelectItem value="lobster">Lobster</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="productName">Product Name</Label>
-                  <Input
-                    id="productName"
-                    value={selectedItem?.name || ''}
-                    readOnly
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="productImage">Product Image</Label>
-                  <Input
-                    id="productImage"
-                    type="file"
-                    accept="image/*"
-                    readOnly
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={selectedItem?.description || ''}
-                    readOnly
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="nutritionFacts">Nutrition Facts</Label>
-                  <Textarea
-                    id="nutritionFacts"
-                    value={selectedItem?.nutritionFacts || ''}
-                    readOnly
-                  />
-                </div>
-
-                <div>
-                  <Label>Available Cut Types</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {(selectedItem?.cutTypes || []).map((cutType: string, index: number) => {
-                      const cutTypeName = cutTypesData.find(ct => ct._id === cutType)?.name || cutType;
-                      return (
-                        <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                          {cutTypeName}
-                        </Badge>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="availableStock">Available Stock (KG)</Label>
-                    <Input
-                      id="availableStock"
-                      type="number"
-                      value={selectedItem?.stock || ''}
-                      readOnly
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="costPricePerKg">Cost Price Per KG (<span className="dirham-symbol mr-2">&#xea;</span>)</Label>
-                    <Input
-                      id="costPricePerKg"
-                      type="number"
-                      value={selectedItem?.costPrice || ''}
-                      readOnly
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="defaultProfit">Default Profit %</Label>
-                    <Input
-                      id="defaultProfit"
-                      type="number"
-                      value={selectedItem?.profit || ''}
-                      readOnly
-                      className="bg-gray-100"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="defaultDiscount">Default Discount %</Label>
-                    <Input
-                      id="defaultDiscount"
-                      type="number"
-                      value={selectedItem?.discount || ''}
-                      readOnly
-                      className="bg-gray-100"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <Label htmlFor="productAvailability">Availability</Label>
-                    <p className="text-sm text-gray-600">Make this product available to users</p>
-                  </div>
-                  <Switch
-                    id="productAvailability"
-                    checked={selectedItem?.availability}
-                    onCheckedChange={(checked: boolean) => {
-                      const updatedProducts = products.map(prod => 
-                        prod.id === selectedItem.id ? { ...prod, availability: checked } : prod
-                      );
-                      setProducts(updatedProducts);
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-            {activeTab === 'variants' && isLoadingVariantView && (
-              <div className="flex justify-center items-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              </div>
-            )}
-            {activeTab === 'variants' && !isLoadingVariantView && viewingVariant && (
-              <div className="space-y-6">
                 {/* Variant Image */}
                 {viewingVariant.image && (
-                  <div className="flex justify-center">
+                  <div className="flex mt-4 justify-center">
                     <ImageWithFallback
                       src={viewingVariant.image}
                       alt={viewingVariant.name}
@@ -3233,7 +3049,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                   <div>
                     <Label className="text-gray-600">Featured</Label>
                     <div className="mt-1">
-                      <Badge variant={viewingVariant.featured ? 'default' : 'secondary'}>
+                      <Badge variant={viewingVariant.featured ? 'default' : 'secondary'} className="text-xs">
                         {viewingVariant.featured ? 'Yes' : 'No'}
                       </Badge>
                     </div>
@@ -3241,7 +3057,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                   <div>
                     <Label className="text-gray-600">Best Seller</Label>
                     <div className="mt-1">
-                      <Badge variant={viewingVariant.bestSeller ? 'default' : 'secondary'}>
+                      <Badge variant={viewingVariant.bestSeller ? 'default' : 'secondary'} className="text-xs">
                         {viewingVariant.bestSeller ? 'Yes' : 'No'}
                       </Badge>
                     </div>
@@ -3304,11 +3120,6 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                 </div>
               </div>
             )}
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowViewModal(false)}>
-                Close
-              </Button>
-            </DialogFooter>
           </div>
         </DialogContent>
       </Dialog>

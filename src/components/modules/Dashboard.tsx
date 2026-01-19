@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   TrendingUp,
   ShoppingBag,
@@ -16,10 +16,12 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
-import { getUserRole } from '../../lib/api';
+import { toast } from 'react-toastify';
+import { getAdminData, getUserRole } from '../../lib/api';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [userRole, setUserRole] = useState<string>('admin');
 
   useEffect(() => {
@@ -28,6 +30,18 @@ export default function Dashboard() {
       setUserRole(role);
     }
   }, []);
+
+  useEffect(() => {
+    const fromLogin = (location.state as any)?.showWelcome;
+    const isDashboard = location.pathname === '/' || location.pathname === '/dashboard';
+    if (!fromLogin || !isDashboard) return;
+
+    const adminName = getAdminData()?.name || 'Admin';
+    toast.success(`Welcome ${adminName}! Login successful.`);
+
+    // Clear state so the toast only shows once and doesn't leak to other routes
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [location.state, location.pathname, navigate]);
 
   const kpiData = [
     { label: 'Active Users', value: '15,234', change: '+22.1%', icon: Users, color: 'text-indigo-600', bgColor: 'bg-indigo-100', onClick: () => navigate('/user-management?filter=end-users'), roles: ['admin', 'subadmin'] },

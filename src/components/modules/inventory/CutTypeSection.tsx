@@ -6,6 +6,7 @@ import { Button } from '../../ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../../ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../../ui/alert-dialog';
 import { Label } from '../../ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 import { apiFetch } from '../../../lib/api';
 import { toast } from 'react-toastify';
 
@@ -42,6 +43,9 @@ export default function CutTypeSection({ openAdd, onAddClose, resetAdd }: CutTyp
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [sortBy, setSortBy] = useState<'recent' | 'name-asc' | 'name-desc'>('recent');
   const [addOpen, setAddOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -101,9 +105,32 @@ export default function CutTypeSection({ openAdd, onAddClose, resetAdd }: CutTyp
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return cutTypes;
-    return cutTypes.filter((ct) => ct.name.toLowerCase().includes(q));
-  }, [cutTypes, searchQuery]);
+    let result = cutTypes;
+
+    // Apply search filter
+    if (q) {
+      result = result.filter((ct) => ct.name.toLowerCase().includes(q));
+    }
+
+    // Apply status filter
+    if (statusFilter === 'active') {
+      result = result.filter((ct) => ct.status === 'Active');
+    } else if (statusFilter === 'inactive') {
+      result = result.filter((ct) => ct.status === 'Inactive');
+    }
+
+    // Apply sorting
+    const sorted = [...result];
+    switch (sortBy) {
+      case 'name-asc':
+        return sorted.sort((a, b) => a.name.localeCompare(b.name));
+      case 'name-desc':
+        return sorted.sort((a, b) => b.name.localeCompare(a.name));
+      case 'recent':
+      default:
+        return sorted.sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime());
+    }
+  }, [cutTypes, searchQuery, statusFilter, sortBy]);
 
   
 
@@ -355,13 +382,63 @@ export default function CutTypeSection({ openAdd, onAddClose, resetAdd }: CutTyp
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => setFilterOpen(true)}>
               <Filter className="w-4 h-4 mr-2" />
               Filters
             </Button>
           </div>
         </CardContent>
       </Card>
+
+      {/* Filter Dialog */}
+      <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Filter Cut Types</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="statusFilter">Status</Label>
+              <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+                <SelectTrigger id="statusFilter">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="sortBy">Sort By</Label>
+              <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+                <SelectTrigger id="sortBy">
+                  <SelectValue placeholder="Select sort option" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="recent">Recently Added</SelectItem>
+                  <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+                  <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setStatusFilter('all');
+                setSortBy('recent');
+              }}
+            >
+              Reset
+            </Button>
+            <Button onClick={() => setFilterOpen(false)}>Apply</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardHeader>
