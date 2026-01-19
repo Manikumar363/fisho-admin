@@ -2154,13 +2154,12 @@ export default function UserManagement() {
 
       {/* Deleted Users Modal */}
       <Dialog open={showDeletedUsersModal} onOpenChange={setShowDeletedUsersModal}>
-        <DialogContent className="max-w-3xl w-[90vw] max-h-[85vh] flex flex-col p-0 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 sm:max-w-6xl">
+        <DialogContent className="max-w-4xl sm:max-w-5xl w-[80vw] sm:w-[70vw] max-h-[70vh] flex flex-col p-0 overflow-hidden">
           <DialogHeader className="px-6 py-4 border-b bg-white">
             <DialogTitle>Deleted Users</DialogTitle>
           </DialogHeader>
           
-          <div className="flex-1 overflow-y-auto">
-            <div className="px-6 py-4">
+          <div className="flex-1 overflow-y-auto px-6 py-4">
               {deletedUsersLoading ? (
                 <div className="flex justify-center items-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -2203,7 +2202,6 @@ export default function UserManagement() {
                   </table>
                 </div>
               )}
-            </div>
           </div>
           
           <DialogFooter className="border-t px-6 py-4 flex items-center justify-between bg-white">

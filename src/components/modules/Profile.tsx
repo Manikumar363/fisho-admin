@@ -1,6 +1,6 @@
 // src/components/modules/Profile.tsx
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, User, Mail, Phone, MapPin, Shield, Calendar, Key, Edit2, Save, X, Upload, Camera } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, MapPin, Shield, Calendar, Key, Edit2, Save, X, Upload, Camera, Edit } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
@@ -297,14 +297,14 @@ export default function Profile() {
           <CardContent className="p-8 w-full">
             <div className="flex flex-col items-center">
               {/* Profile Image Container with Upload Button */}
-              <div className="relative mb-6">
+              <div className="relative mb-6 w-fit mx-auto">
                 {/* Profile Image */}
-                <div className="w-32 h-32 bg-gradient-to-br from-blue-100 to-blue-50 rounded-full flex items-center justify-center shadow-md border-4 border-white">
+                <div className="w-32 h-32 bg-gradient-to-br from-blue-100 to-blue-50 rounded-full flex items-center justify-center shadow-md border-4 border-white overflow-hidden">
                   {imagePreview ? (
                     <img 
                       src={imagePreview} 
                       alt="Profile" 
-                      className="w-32 h-32 rounded-full object-cover"
+                      className="w-full h-full rounded-full object-cover"
                     />
                   ) : (
                     <User className="w-16 h-16 text-blue-600" />
@@ -313,23 +313,25 @@ export default function Profile() {
 
                 {/* Upload Button - Circle positioned below right */}
                 {isEditing && (
-                  <label className="w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full cursor-pointer shadow-lg transition-all hover:scale-110 flex items-center justify-center absolute bottom-0 right-0 translate-y-1/2 border-4 border-white">
-                    <Camera className="w-5 h-5" />
+                  <div className="absolute -bottom-2 -right-2">
+                    <label
+                      htmlFor="profile-image-input"
+                      aria-label="Upload profile image"
+                      className="w-8 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg border-2 border-white flex items-center justify-center cursor-pointer"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </label>
                     <input
+                      id="profile-image-input"
                       type="file"
                       accept="image/*"
                       onChange={handleImageChange}
-                      className="hidden"
+                      style={{ display: 'none' }}
                       disabled={isSaving}
                     />
-                  </label>
+                  </div>
                 )}
               </div>
-
-              {/* Image Selected Indicator */}
-              {isEditing && selectedImage && (
-                <p className="text-xs text-green-600 font-medium mb-6">✓ Image selected</p>
-              )}
 
               {/* Name and Badge */}
               <h2 className="text-2xl font-bold text-gray-900 text-center mb-3">{adminData.name}</h2>
@@ -387,14 +389,14 @@ export default function Profile() {
                       className={isEditing ? '' : 'bg-gray-50'}
                     />
                   </div>
-                  <div className="space-y-2">
+                  {/* <div className="space-y-2"> 
                     <Label className="text-gray-600">Location</Label>
                     <Input
                       value={adminData.location || 'Not specified'}
                       disabled
                       className="bg-gray-50"
                     />
-                  </div>
+                  </div>*/}
                 </div>
 
                 {isEditing && (
