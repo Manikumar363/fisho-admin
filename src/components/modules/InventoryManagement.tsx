@@ -1968,6 +1968,9 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
     
     const prices = calculateVariantPrices(costPrice, defaultProfit, parseFloat(variantForm.discount) || defaultDiscount);
 
+    // Sort products alphabetically for dropdown display
+    const sortedProducts = [...variantProducts].sort((a, b) => a.name.localeCompare(b.name));
+
     return (
       <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto">
         <div className="grid grid-cols-2 gap-4">
@@ -2008,7 +2011,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                 <SelectValue placeholder="Choose product" />
               </SelectTrigger>
               <SelectContent className="max-h-80 overflow-y-scroll" style={{maxHeight: '320px'}}>
-                {variantProducts.map(p => (
+                {sortedProducts.map(p => (
                   <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                 ))}
               </SelectContent>
