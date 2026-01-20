@@ -8,7 +8,8 @@ import { Button } from '../../ui/button';
 import { Textarea } from '../../ui/textarea';
 import { Switch } from '../../ui/switch';
 import { apiFetch } from '../../../lib/api';
-import { toast } from 'react-toastify';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import MapSection from './MapSection';
 
 interface EditStoreProps {
@@ -413,6 +414,20 @@ export default function EditStore({ storeId, onBack, onStoreUpdated }: EditStore
           </form>
         </CardContent>
       </Card>
+
+      {/* Toast Notifications */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </div>
   );
 }

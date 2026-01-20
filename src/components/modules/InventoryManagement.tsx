@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Search, Filter, Edit, Trash2, ChevronRight, ToggleLeft, ToggleRight, ChevronUp, ChevronDown, GripVertical, Eye, Loader } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, ChevronRight, ToggleLeft, ToggleRight, ChevronUp, ChevronDown, GripVertical, Eye, Loader, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -2411,10 +2411,19 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <Input
                     placeholder="Search categories..."
-                    className="pl-10"
+                    className="pl-10 pr-10"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      title="Clear search"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -2567,10 +2576,19 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <Input
                     placeholder="Search products by name or species..."
-                    className="pl-10"
+                    className="pl-10 pr-10"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      title="Clear search"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  )}
                 </div>
                 <Select value={productSortOption} onValueChange={setProductSortOption}>
                   <SelectTrigger className="w-[220px]">
@@ -2798,10 +2816,19 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <Input
                     placeholder="Search variants..."
-                    className="pl-10"
+                    className="pl-10 pr-10"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      title="Clear search"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  )}
                 </div>
                 <Select value={variantSortOption} onValueChange={setVariantSortOption}>
                   <SelectTrigger className="w-[220px]">

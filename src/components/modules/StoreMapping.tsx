@@ -162,7 +162,18 @@ export default function StoreMapping() {
                 ) : (
                   filteredStores.map((store) => (
                     <tr key={store._id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-4 text-blue-600">{store._id}</td>
+                      <td className="py-3 px-4">
+                        <button
+                          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                          onClick={() => {
+                            navigator.clipboard.writeText(store._id);
+                            toast.success('Store ID copied to clipboard');
+                          }}
+                          title={`Click to copy: ${store._id}`}
+                        >
+                          {store._id.substring(0, 8)}...
+                        </button>
+                      </td>
                       <td className="py-3 px-4">{store.name}</td>
                       <td className="py-3 px-4">{store.address}</td>
                       <td className="py-3 px-4">{store.phone || '—'}</td>
