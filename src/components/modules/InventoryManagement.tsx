@@ -1391,10 +1391,6 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
         toast.error('Please select a product');
         return;
       }
-      if (!variantForm.variantName.trim()) {
-        toast.error('Variant name is required');
-        return;
-      }
       if (!editingVariantId && !variantForm.variantImage) {
         toast.error('Variant image is required');
         return;
@@ -2020,17 +2016,6 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
         </div>
 
         <div>
-          <Label htmlFor="variantName">Variant Name *</Label>
-          <Input
-            id="variantName"
-            value={variantForm.variantName}
-            onChange={(e) => setVariantForm({ ...variantForm, variantName: e.target.value })}
-            placeholder="e.g., Tiger Prawns - Whole Cleaned - 500g"
-            required
-          />
-        </div>
-
-        <div>
           <Label htmlFor="variantImage">Variant Image {!editingVariantId && '*'}</Label>
           <Input
             id="variantImage"
@@ -2188,7 +2173,6 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
     disabled={
       isSubmitting ||
       !variantForm.product ||
-      !variantForm.variantName.trim() ||
       !variantForm.cutType ||
       !variantForm.profit ||
       !variantForm.displayPrice ||

@@ -1,242 +1,397 @@
-import React, { useState } from 'react';
-import { Plus, Upload, Image as ImageIcon } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
-import { Input } from '../../ui/input';
-import { Label } from '../../ui/label';
-import { Button } from '../../ui/button';
-import { Textarea } from '../../ui/textarea';
-import { Switch } from '../../ui/switch';
-import { Checkbox } from '../../ui/checkbox';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
+import { Input } from '../../../components/ui/input';
+import { Label } from '../../../components/ui/label';
+import { Button } from '../../../components/ui/button';
+import { Textarea } from '../../../components/ui/textarea';
+import { Switch } from '../../../components/ui/switch';
+import { toast } from 'sonner';
+import { Plus } from 'lucide-react';
 
-export default function AddProductVariant() {
-  const [actualPrice, setActualPrice] = useState('');
-  const [discountPercent, setDiscountPercent] = useState('');
+interface AddProductVariantProps {
+  onBack?: () => void;
+}
 
-  const calculateDiscountedPrice = () => {
-    if (actualPrice && discountPercent) {
-      const price = parseFloat(actualPrice);
-      const discount = parseFloat(discountPercent);
-      return (price - (price * discount / 100)).toFixed(2);
+const DUMMY_SPECIES = [
+  { id: 'cat1', name: 'Prawns' },
+  { id: 'cat2', name: 'Fish' },
+  { id: 'cat3', name: 'Crab' },
+  { id: 'cat4', name: 'Lobster' },
+];
+
+const DUMMY_PRODUCTS = [
+  { id: 'prod1', name: 'Tiger Prawns', species: 'cat1', availableWeights: [250, 500, 1000] },
+  { id: 'prod2', name: 'Rohu', species: 'cat2', availableWeights: [500, 1000] },
+  { id: 'prod3', name: 'Blue Crab', species: 'cat3', availableWeights: [250, 500] },
+];
+
+const DUMMY_CUT_TYPES = [
+  { id: 'whole', name: 'Whole Cleaned' },
+  { id: 'curry', name: 'Curry Cut' },
+  { id: 'fillet', name: 'Fillet' },
+  { id: 'butterfly', name: 'Butterfly Cut' },
+];
+
+interface WeightOption {
+  id: string;
+  weight: string;
+  cutType: string;
+  costPricePerKg: string;
+  displayPrice: string;
+  sellingPrice: string;
+  profit: string;
+  discount: string;
+  weightNotes: string;
+  isActive: boolean;
+}
+
+const generateId = () => Math.random().toString(36).substring(2, 9);
+
+const createEmptyWeightOption = (weight?: number, cutType?: string): WeightOption => ({
+  id: generateId(),
+  weight: weight?.toString() || '',
+  cutType: cutType || '',
+  costPricePerKg: '',
+  displayPrice: '',
+  sellingPrice: '',
+  profit: '',
+  discount: '',
+  weightNotes: '',
+  isActive: true,
+});
+
+const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
+  const [species, setSpecies] = useState('');
+  const [product, setProduct] = useState('');
+  const [cutType, setCutType] = useState('');
+  const [variantName, setVariantName] = useState('');
+  const [variantImage, setVariantImage] = useState<File | null>(null);
+  const [notes, setNotes] = useState('');
+  const [featured, setFeatured] = useState(false);
+  const [bestSeller, setBestSeller] = useState(false);
+  const [availability, setAvailability] = useState(true);
+  const [weightOptions, setWeightOptions] = useState<WeightOption[]>([]);
+
+  // Get available weights for the selected product
+  const selectedProduct = DUMMY_PRODUCTS.find((p) => p.id === product);
+  const availableWeights = selectedProduct?.availableWeights || [];
+
+  // When product changes, reset weightOptions to match available weights
+  useEffect(() => {
+    if (availableWeights.length > 0) {
+      setWeightOptions(availableWeights.map((weight) => createEmptyWeightOption(weight)));
+    } else {
+      setWeightOptions([]);
     }
-    return '0.00';
+  }, [product, availableWeights.join(',')]);
+
+  // Handle field change for a specific weight
+  const handleWeightOptionChange = (
+    id: string,
+    field: keyof WeightOption,
+    value: string | boolean
+  ) => {
+    setWeightOptions((prev) =>
+      prev.map((opt) => {
+        if (opt.id !== id) return opt;
+
+        const updated = { ...opt, [field]: value };
+
+        // Auto-calculate profit when display or selling price changes
+        if (field === 'displayPrice' || field === 'sellingPrice') {
+          const displayPrice = parseFloat(
+            field === 'displayPrice' ? (value as string) : opt.displayPrice
+          );
+          const sellingPrice = parseFloat(
+            field === 'sellingPrice' ? (value as string) : opt.sellingPrice
+          );
+
+          if (!isNaN(displayPrice) && !isNaN(sellingPrice) && displayPrice > 0) {
+            const profitPercent = ((displayPrice - sellingPrice) / displayPrice) * 100;
+            updated.profit = profitPercent.toFixed(2);
+          }
+        }
+
+        return updated;
+      })
+    );
   };
+
+  // Add new weight option
+  const addWeightOption = () => {
+    setWeightOptions((prev) => [...prev, createEmptyWeightOption()]);
+  };
+
+  // Remove weight option
+  const removeWeightOption = (id: string) => {
+    setWeightOptions((prev) => prev.filter((opt) => opt.id !== id));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Validate and submit logic here
+    toast.success('Product variant added!');
+    if (onBack) onBack();
+  };
+
+  const [cutTypes, setCutTypes] = useState<string[]>(['Whole', 'Fillet']);
+  const [weights, setWeights] = useState<string[]>(['250', '500']);
+
+  // Add/Remove CutType/Weight
+  const addCutType = (val: string) => {
+    if (val && !cutTypes.includes(val)) setCutTypes([...cutTypes, val]);
+  };
+  const removeCutType = (val: string) => {
+    setCutTypes(cutTypes.filter(c => c !== val));
+  };
+  const addWeight = (val: string) => {
+    if (val && !weights.includes(val)) setWeights([...weights, val]);
+  };
+  const removeWeight = (val: string) => {
+    setWeights(weights.filter(w => w !== val));
+  };
+
+  // Generate all combinations for the table
+  const variantRows = cutTypes.flatMap(cutType =>
+    weights.map(weight => {
+      const found = weightOptions.find(opt => opt.weight === weight && opt.cutType === cutType);
+      return {
+        ...(found ? found : createEmptyWeightOption(Number(weight), cutType)),
+        cutType,
+        weight,
+      };
+    })
+  );
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="mb-2">Add Product Variant</h1>
-        <p className="text-gray-600">Create a new product variant with complete details</p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Form */}
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Product Details</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-4">
-                {/* Basic Info */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="species">Species Name</Label>
-                    <select
-                      id="species"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    >
-                      <option value="">Select Species</option>
-                      <option value="prawns">Prawns</option>
-                      <option value="fish">Fish</option>
-                      <option value="crab">Crab</option>
-                      <option value="lobster">Lobster</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="productName">Product Name</Label>
-                    <Input id="productName" placeholder="e.g., Tiger Prawns" />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="productImage">Product Image</Label>
-                  <div className="flex gap-2">
-                    <Input id="productImage" type="file" accept="image/*" />
-                    <Button type="button" variant="outline">
-                      <Upload className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Enter product description"
-                    rows={3}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="nutritional">Nutritional Facts</Label>
-                  <Textarea
-                    id="nutritional"
-                    placeholder="Enter nutritional information"
-                    rows={3}
-                  />
-                </div>
-
-                {/* Delivery Types */}
-                <div className="space-y-2">
-                  <Label>Delivery Types</Label>
-                  <div className="flex gap-4">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="nextDay" />
-                      <label htmlFor="nextDay">Next-Day Delivery</label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="express" />
-                      <label htmlFor="express">Express Delivery</label>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Features */}
-                <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="featured">Featured Product</Label>
-                    <Switch id="featured" />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="bestseller">Best Seller</Label>
-                    <Switch id="bestseller" />
-                  </div>
-                </div>
-
-                {/* Variant Details */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="cutType">Cut Type</Label>
-                    <select
-                      id="cutType"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    >
-                      <option value="">Select Cut Type</option>
-                      <option value="whole">Whole Cleaned</option>
-                      <option value="curry">Curry Cut</option>
-                      <option value="fillet">Fillet</option>
-                      <option value="butterfly">Butterfly Cut</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="netWeight">Net Weight</Label>
-                    <select
-                      id="netWeight"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    >
-                      <option value="">Select Weight</option>
-                      <option value="250">250g Pack</option>
-                      <option value="500">500g Pack</option>
-                      <option value="1000">1kg Pack</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Pricing */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="actualPrice">Actual Price (<span className="dirham-symbol">&#xea;</span>)</Label>
-                    <Input
-                      id="actualPrice"
-                      type="number"
-                      placeholder="0.00"
-                      value={actualPrice}
-                      onChange={(e) => setActualPrice(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="discount">Discount %</Label>
-                    <Input
-                      id="discount"
-                      type="number"
-                      placeholder="0"
-                      value={discountPercent}
-                      onChange={(e) => setDiscountPercent(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="discountedPrice">Discounted Price (<span className="dirham-symbol">&#xea;</span>)</Label>
-                    <Input
-                      id="discountedPrice"
-                      value={calculateDiscountedPrice()}
-                      readOnly
-                      className="bg-gray-50"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="quantity">Available Quantity (Admin Only)</Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    placeholder="Enter stock quantity"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <Label htmlFor="visibility">Visibility</Label>
-                    <p className="text-sm text-gray-600">Show this product to customers</p>
-                  </div>
-                  <Switch id="visibility" defaultChecked />
-                </div>
-
-                <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Product Variant
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Preview Panel */}
+      <div className="flex items-center justify-between">
         <div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Product Preview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                <div className="aspect-square bg-gray-100 flex items-center justify-center">
-                  <ImageIcon className="w-16 h-16 text-gray-400" />
-                </div>
-                <div className="p-4">
-                  <h3 className="mb-1">Product Name</h3>
-                  <p className="text-gray-600 text-sm mb-3">Species Name</p>
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-gray-400 line-through"><span className="dirham-symbol">&#xea;</span>{actualPrice || '0'}</span>
-                    <span className="text-green-600"><span className="dirham-symbol">&#xea;</span>{calculateDiscountedPrice()}</span>
-                    {discountPercent && (
-                      <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">
-                        {discountPercent}% OFF
-                      </span>
-                    )}
-                  </div>
-                  <Button className="w-full bg-blue-600 hover:bg-blue-700">
-                    Add to Cart
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <h1 className="mb-2">Add Product Variant</h1>
+          <p className="text-gray-600">Create a new product variant with complete details</p>
         </div>
+        {onBack && (
+          <Button variant="outline" onClick={onBack}>
+            Back
+          </Button>
+        )}
       </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Variant Details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="species">Species</Label>
+                <select
+                  id="species"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  value={species}
+                  onChange={e => setSpecies(e.target.value)}
+                  required
+                >
+                  <option value="">Select Species</option>
+                  {DUMMY_SPECIES.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label htmlFor="product">Product</Label>
+                <select
+                  id="product"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  value={product}
+                  onChange={e => setProduct(e.target.value)}
+                  required
+                  disabled={!species}
+                >
+                  <option value="">Select Product</option>
+                  {DUMMY_PRODUCTS.filter((p) => p.species === species).map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="variantImage">Variant Image</Label>
+              <Input
+                id="variantImage"
+                type="file"
+                accept="image/*"
+                onChange={e => setVariantImage(e.target.files?.[0] || null)}
+              />
+            </div>
+            <div className="mb-4">
+              <div className="mb-2 font-semibold">CutType</div>
+              <div className="flex gap-2 mb-2 flex-wrap">
+                {cutTypes.map(cut => (
+                  <span key={cut} className="inline-flex items-center bg-gray-200 rounded px-2 py-1 text-sm">
+                    {cut}
+                    <button type="button" className="ml-1 text-gray-500 hover:text-red-500" onClick={() => removeCutType(cut)}>×</button>
+                  </span>
+                ))}
+                <Input
+                  placeholder="Add CutType"
+                  className="w-24"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                      addCutType(e.currentTarget.value.trim());
+                      e.currentTarget.value = '';
+                    }
+                  }}
+                />
+              </div>
+              <div className="mb-2 font-semibold">Weight</div>
+              <div className="flex gap-2 flex-wrap">
+                {weights.map(w => (
+                  <span key={w} className="inline-flex items-center bg-gray-200 rounded px-2 py-1 text-sm">
+                    {w}
+                    <button type="button" className="ml-1 text-gray-500 hover:text-red-500" onClick={() => removeWeight(w)}>×</button>
+                  </span>
+                ))}
+                <Input
+                  placeholder="Add Weight"
+                  className="w-24"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                      addWeight(e.currentTarget.value.trim());
+                      e.currentTarget.value = '';
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Weight Options & Pricing</Label>
+              </div>
+              <div className="overflow-x-auto border border-border rounded-lg">
+                <table className="min-w-full bg-card">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="py-2 px-3 text-left text-sm font-medium">CutType</th>
+                      <th className="py-2 px-3 text-left text-sm font-medium">Weight (g)</th>
+                      <th className="py-2 px-3 text-left text-sm font-medium">Display Price</th>
+                      <th className="py-2 px-3 text-left text-sm font-medium">Selling Price</th>
+                      <th className="py-2 px-3 text-left text-sm font-medium">Profit %</th>
+                      <th className="py-2 px-3 text-left text-sm font-medium">Discount %</th>
+                      <th className="py-2 px-3 text-left text-sm font-medium">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {variantRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                          No variants. Add CutType and Weight options above.
+                        </td>
+                      </tr>
+                    ) : (
+                      variantRows.map((opt, idx) => (
+                        <tr key={opt.cutType + '-' + opt.weight} className="border-t border-border">
+                          <td className="py-2 px-3">{opt.cutType}</td>
+                          <td className="py-2 px-3">{opt.weight}</td>
+                          <td className="py-2 px-3">
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={opt.displayPrice}
+                              onChange={e => handleWeightOptionChange(opt.id, 'displayPrice', e.target.value)}
+                              placeholder="0.00"
+                              className="w-24"
+                            />
+                          </td>
+                          <td className="py-2 px-3">
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={opt.sellingPrice}
+                              onChange={e => handleWeightOptionChange(opt.id, 'sellingPrice', e.target.value)}
+                              placeholder="0.00"
+                              className="w-24"
+                            />
+                          </td>
+                          <td className="py-2 px-3">
+                            <Input
+                              type="number"
+                              min="0"
+                              value={opt.profit}
+                              readOnly
+                              placeholder="Auto"
+                              className="w-20 bg-muted/50"
+                              title="Auto-calculated from prices"
+                            />
+                          </td>
+                          <td className="py-2 px-3">
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={opt.discount}
+                              onChange={e => handleWeightOptionChange(opt.id, 'discount', e.target.value)}
+                              placeholder="%"
+                              className="w-20"
+                            />
+                          </td>
+                          <td className="py-2 px-3">
+                            <Input
+                              value={opt.weightNotes}
+                              onChange={e => handleWeightOptionChange(opt.id, 'weightNotes', e.target.value)}
+                              placeholder="Notes"
+                              className="w-28"
+                            />
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {weightOptions.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Profit % is auto-calculated based on display and selling prices.
+                </p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                placeholder="Enter any notes for this variant"
+                rows={2}
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="featured">Featured</Label>
+                <Switch id="featured" checked={featured} onCheckedChange={setFeatured} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="bestSeller">Best Seller</Label>
+                <Switch id="bestSeller" checked={bestSeller} onCheckedChange={setBestSeller} />
+              </div>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div>
+                <Label htmlFor="availability">Availability</Label>
+                <p className="text-sm text-gray-600">Show this variant to customers</p>
+              </div>
+              <Switch id="availability" checked={availability} onCheckedChange={setAvailability} />
+            </div>
+            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
+              Add Product Variant
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
-}
+};
+
+export default AddProductVariant;

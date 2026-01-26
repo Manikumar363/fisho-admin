@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import AddOffer from './offers/AddOffer';
 import EditOffer from './offers/EditOffer';
 import ViewOffer from './offers/ViewOffer';
+import AddProductVariantComponent from './inventory/AddProductVariant';
 
 interface Offer {
   id: string;
@@ -31,8 +32,9 @@ interface Offer {
   status: 'Active' | 'Expired';
 }
 
-export default function Offers() {
+const Offers: React.FC = () => {
   const [showAddOffer, setShowAddOffer] = useState(false);
+  const [showAddProductVariant, setShowAddProductVariant] = useState(false);
   const [editingOffer, setEditingOffer] = useState<Offer | null>(null);
   const [viewingOffer, setViewingOffer] = useState<Offer | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -177,6 +179,10 @@ export default function Offers() {
     return <AddOffer onBack={() => setShowAddOffer(false)} onSave={handleAddOffer} />;
   }
 
+  if (showAddProductVariant) {
+    return <AddProductVariantComponent  />;
+  }
+
   if (editingOffer) {
     return <EditOffer offer={editingOffer} onBack={() => setEditingOffer(null)} onSave={handleEditOffer} />;
   }
@@ -192,13 +198,22 @@ export default function Offers() {
           <h1 className="mb-2">Offers Management</h1>
           <p className="text-gray-600">Create and manage discount offers and coupons</p>
         </div>
-        <Button 
-          onClick={() => setShowAddOffer(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Offer
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={() => setShowAddProductVariant(true)}
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Product Variant
+          </Button>
+          <Button 
+            onClick={() => setShowAddOffer(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Offer
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -325,4 +340,20 @@ export default function Offers() {
       </AlertDialog>
     </div>
   );
+};
+
+interface AddProductVariantProps {
+  onBack?: () => void;
 }
+
+const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
+  return (
+    <div>
+      {/* Your existing AddProductVariant code here */}
+      {/* Example: Add a Back button if you want to use the onBack prop */}
+      {/* <button onClick={onBack}>Back</button> */}
+    </div>
+  );
+};
+
+export default Offers;
