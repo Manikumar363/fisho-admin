@@ -16,6 +16,7 @@ import { apiFetch } from '../../lib/api';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import CutTypeSection from './inventory/CutTypeSection';
+import AddProductVariant from './inventory/AddProductVariant';
 
 const IMAGE_BASE = ((import.meta as any).env?.VITE_IMAGE_BASE_URL || (import.meta as any).env?.VITE_BASE_URL) as string | undefined;
 
@@ -43,6 +44,7 @@ export default function InventoryManagement() {
   const [categoriesPage, setCategoriesPage] = useState(1);
   const [productsPage, setProductsPage] = useState(1);
   const [variantsPage, setVariantsPage] = useState(1);
+  const [showAddProductVariant, setShowAddProductVariant] = useState(false);
   const CATEGORIES_PAGE_SIZE = 20;
   const PRODUCTS_PAGE_SIZE = 20;
   const VARIANTS_PAGE_SIZE = 20;
@@ -2371,13 +2373,39 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
           <h1 className="mb-2">Inventory Management</h1>
           <p className="text-gray-600">Manage categories, products, variants, and cut types</p>
         </div>
-        <Button
-          className="bg-blue-600 hover:bg-blue-700"
-          onClick={handleOpenAddModal}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add
-        </Button>
+        <div className="flex gap-3">
+          {/* {activeTab === 'variants' && ( */}
+            {/*<Button
+              className="bg-green-600 hover:bg-green-700 flex items-center"
+              onClick={() => setShowAddProductVariant(true)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Product Variant
+            </Button> */}
+          {/* )} */}
+          <Button
+            className="bg-blue-600 hover:bg-blue-700"
+            onClick={handleOpenAddModal}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add
+          </Button>
+        </div>
+            {/* Add Product Variant Modal/Section */}
+            {showAddProductVariant && activeTab === 'variants' && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+                <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-3xl relative">
+                  <button
+                    className="absolute top-2 right-2 text-gray-500 hover:text-red-500 text-xl"
+                    onClick={() => setShowAddProductVariant(false)}
+                    aria-label="Close"
+                  >
+                    ×
+                  </button>
+                  <AddProductVariant onBack={() => setShowAddProductVariant(false)} />
+                </div>
+              </div>
+            )}
       </div>
 
       {/* Tabs */}
@@ -2854,7 +2882,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                       {/* <th className="text-left py-3 px-4">Reorder</th> */}
                       <th className="text-left py-3 px-4">Serial No</th>
                       <th className="text-left py-3 px-4">Image</th>
-                      <th className="text-left py-3 px-4">Variant Name</th>
+                      {/* <th className="text-left py-3 px-4">Variant Name</th> */}
                       <th className="text-left py-3 px-4">Product Name</th>
                       <th className="text-left py-3 px-4">Species</th>
                       <th className="text-left py-3 px-4">Cut Type</th>
@@ -2910,7 +2938,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                             <div className="w-12 h-12 rounded bg-gray-100 flex items-center justify-center text-gray-400 text-xs">No img</div>
                           )}
                         </td>
-                        <td className="py-3 px-4">{variant.variantName}</td>
+                        {/* <td className="py-3 px-4">{variant.variantName}</td> */}
                         <td className="py-3 px-4">{variant.product}</td>
                         <td className="py-3 px-4">{variant.species}</td>
                         <td className="py-3 px-4">

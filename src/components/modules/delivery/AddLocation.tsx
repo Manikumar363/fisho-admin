@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Loader } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
@@ -44,13 +44,30 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
     status: true
   });
 
-  const [deliveryTypes, setDeliveryTypes] = useState({
-    express: false,
-    nextDay: false
-  });
+  const [deliveryType, setDeliveryType] = useState<'express' | 'nextDay' | ''>('');
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [stores, setStores] = useState<{ _id: string; name: string }[]>([]);
+  const [storesLoading, setStoresLoading] = useState(false);
+
+  useEffect(() => {
+    setStoresLoading(true);
+    apiFetch<{ success: boolean; stores: { _id: string; name: string }[]; message?: string }>('/api/stores')
+      .then(res => {
+        if (res.success && Array.isArray(res.stores)) {
+          setStores(res.stores);
+        } else {
+          setStores([]);
+          toast.error(res.message || 'Failed to fetch stores');
+        }
+      })
+      .catch(() => {
+        setStores([]);
+        toast.error('Failed to fetch stores');
+      })
+      .finally(() => setStoresLoading(false));
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -68,7 +85,7 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
   };
 
   const handleDeliveryTypeChange = (type: 'express' | 'nextDay', checked: boolean) => {
-    setDeliveryTypes(prev => ({ ...prev, [type]: checked }));
+    setDeliveryType(checked ? type : '');
     if (errors.deliveryType) {
       setErrors(prev => ({ ...prev, deliveryType: '' }));
     }
@@ -80,9 +97,11 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
     if (!formData.locationName.trim()) {
       newErrors.locationName = 'Location name is required';
     }
-
-    if (!deliveryTypes.express) {
-      newErrors.deliveryType = 'Please select Express Delivery';
+    if (!deliveryType) {
+      newErrors.deliveryType = 'Please select a delivery type';
+    }
+    if (!formData.nearestStore) {
+      newErrors.nearestStore = 'Please select a store';
     }
 
     setErrors(newErrors);
@@ -99,14 +118,17 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
 
     setLoading(true);
     try {
-      const selectedTypes = [];
-      if (deliveryTypes.express) selectedTypes.push('Express Delivery');
-      if (deliveryTypes.nextDay) selectedTypes.push('Next Day Delivery');
+      const selectedTypes = deliveryType === 'express'
+        ? ['Express Delivery']
+        : deliveryType === 'nextDay'
+          ? ['Next Day Delivery']
+          : [];
 
       // Prepare the payload for the API
       const payload = {
         name: formData.locationName.trim(),
-        expressDelivery: deliveryTypes.express
+        expressDelivery: deliveryType === 'express',
+        nearByStore: formData.nearestStore 
       };
 
       console.log('Sending payload:', payload);
@@ -205,49 +227,43 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
               <Label>
                 Delivery Type <span className="text-red-500">*</span>
               </Label>
-              <div className="space-y-3">
-                <div className="flex items-center gap-4 border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-                  <Checkbox
-                    id="express"
-                    checked={deliveryTypes.express}
-                    onCheckedChange={(checked) => handleDeliveryTypeChange('express', checked as boolean)}
+              <div className="flex flex-col gap-3">
+                <label className="flex items-center gap-3 border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="deliveryType"
+                    value="express"
+                    checked={deliveryType === 'express'}
+                    onChange={() => setDeliveryType('express')}
                     disabled={loading}
+                    className="form-radio"
                   />
-                  <div className="flex-1">
-                    <label
-                      htmlFor="express"
-                      className="cursor-pointer"
-                    >
-                      <p className="text-sm pr-1">Express Delivery</p>
-                      <p className="text-xs text-gray-500">Same-day delivery service</p>
-                    </label>
+                  <div>
+                    <p className="text-sm pr-1">Express Delivery</p>
+                    <p className="text-xs text-gray-500">Same-day delivery service</p>
                   </div>
-                </div>
-
-                {/* <div className="flex items-center space-x-3 border border-gray-200 rounded-lg p-4 hover:bg-gray-50"> 
-                  <Checkbox
-                    id="nextDay"
-                    checked={deliveryTypes.nextDay}
-                    onCheckedChange={(checked) => handleDeliveryTypeChange('nextDay', checked as boolean)}
+                </label>
+                <label className="flex items-center gap-3 border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="deliveryType"
+                    value="nextDay"
+                    checked={deliveryType === 'nextDay'}
+                    onChange={() => setDeliveryType('nextDay')}
                     disabled={loading}
+                    className="form-radio"
                   />
-                  <div className="flex-1">
-                    <label
-                      htmlFor="nextDay"
-                      className="cursor-pointer"
-                    >
-                      <p className="text-sm">Next Day Delivery</p>
-                      <p className="text-xs text-gray-500">Delivery within 24 hours</p>
-                    </label>
+                  <div>
+                    <p className="text-sm">Next Day Delivery</p>
+                    <p className="text-xs text-gray-500">Delivery within 24 hours</p>
                   </div>
-                </div>*/}
+                </label>
               </div>
               {errors.deliveryType && (
                 <p className="text-sm text-red-600 font-medium">{errors.deliveryType}</p>
               )}
             </div>
-
-            {/* Nearest Store
+            {/* Nearest Store */}
             <div className="space-y-2">
               <Label htmlFor="nearestStore">
                 Select Nearest Store <span className="text-red-500">*</span>
@@ -255,15 +271,15 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
               <Select
                 value={formData.nearestStore}
                 onValueChange={handleStoreChange}
-                disabled={loading}
+                disabled={loading || storesLoading}
               >
                 <SelectTrigger className={errors.nearestStore ? 'border-red-500' : ''}>
-                  <SelectValue placeholder="Select a store" />
+                  <SelectValue placeholder={storesLoading ? "Loading stores..." : "Select a store"} />
                 </SelectTrigger>
                 <SelectContent>
                   {stores.map((store) => (
-                    <SelectItem key={store} value={store}>
-                      {store}
+                    <SelectItem key={store._id} value={store._id}>
+                      {store.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -271,7 +287,7 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
               {errors.nearestStore && (
                 <p className="text-sm text-red-500">{errors.nearestStore}</p>
               )}
-            </div>  */}
+            </div>  
 
             {/* Status Toggle 
             <div className="flex items-center justify-between border border-gray-200 rounded-lg p-4">

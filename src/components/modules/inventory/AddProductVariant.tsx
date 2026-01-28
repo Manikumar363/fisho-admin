@@ -6,7 +6,7 @@ import { Button } from '../../../components/ui/button';
 import { Textarea } from '../../../components/ui/textarea';
 import { Switch } from '../../../components/ui/switch';
 import { toast } from 'sonner';
-import { Plus } from 'lucide-react';
+import { Plus, Image as ImageIcon } from 'lucide-react';
 
 interface AddProductVariantProps {
   onBack?: () => void;
@@ -71,6 +71,8 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
   const [bestSeller, setBestSeller] = useState(false);
   const [availability, setAvailability] = useState(true);
   const [weightOptions, setWeightOptions] = useState<WeightOption[]>([]);
+  // New: Store image per cut type
+  const [cutTypeImages, setCutTypeImages] = useState<{ [cutType: string]: File | null }>({});
 
   // Get available weights for the selected product
   const selectedProduct = DUMMY_PRODUCTS.find((p) => p.id === product);
@@ -143,6 +145,11 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
   };
   const removeCutType = (val: string) => {
     setCutTypes(cutTypes.filter(c => c !== val));
+    setCutTypeImages(prev => {
+      const newObj = { ...prev };
+      delete newObj[val];
+      return newObj;
+    });
   };
   const addWeight = (val: string) => {
     if (val && !weights.includes(val)) setWeights([...weights, val]);
@@ -152,13 +159,16 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
   };
 
   // Generate all combinations for the table
+  // Also, for each cutType, mark the first weight row for image upload
   const variantRows = cutTypes.flatMap(cutType =>
-    weights.map(weight => {
+    weights.map((weight, idx) => {
       const found = weightOptions.find(opt => opt.weight === weight && opt.cutType === cutType);
       return {
         ...(found ? found : createEmptyWeightOption(Number(weight), cutType)),
         cutType,
         weight,
+        isFirstWeight: idx === 0,
+        weightCount: weights.length
       };
     })
   );
@@ -178,7 +188,7 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Variant Details</CardTitle>
+          <CardTitle className='font-semibold text-xl'>Variant Details</CardTitle>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit}>
@@ -215,15 +225,7 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
                 </select>
               </div>
             </div>
-            <div>
-              <Label htmlFor="variantImage">Variant Image</Label>
-              <Input
-                id="variantImage"
-                type="file"
-                accept="image/*"
-                onChange={e => setVariantImage(e.target.files?.[0] || null)}
-              />
-            </div>
+            {/* CutType and Weight input UI restored */}
             <div className="mb-4">
               <div className="mb-2 font-semibold">CutType</div>
               <div className="flex gap-2 mb-2 flex-wrap">
@@ -233,7 +235,7 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
                     <button type="button" className="ml-1 text-gray-500 hover:text-red-500" onClick={() => removeCutType(cut)}>×</button>
                   </span>
                 ))}
-                <Input
+                {/* <Input 
                   placeholder="Add CutType"
                   className="w-24"
                   onKeyDown={e => {
@@ -242,7 +244,7 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
                       e.currentTarget.value = '';
                     }
                   }}
-                />
+                />*/}
               </div>
               <div className="mb-2 font-semibold">Weight</div>
               <div className="flex gap-2 flex-wrap">
@@ -252,7 +254,7 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
                     <button type="button" className="ml-1 text-gray-500 hover:text-red-500" onClick={() => removeWeight(w)}>×</button>
                   </span>
                 ))}
-                <Input
+                {/* <Input 
                   placeholder="Add Weight"
                   className="w-24"
                   onKeyDown={e => {
@@ -261,7 +263,7 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
                       e.currentTarget.value = '';
                     }
                   }}
-                />
+                />*/}
               </div>
             </div>
             <div className="space-y-3">
@@ -273,6 +275,7 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
                   <thead className="bg-muted/50">
                     <tr>
                       <th className="py-2 px-3 text-left text-sm font-medium">CutType</th>
+                      <th className="py-2 px-3 text-left text-sm font-medium">Image</th>
                       <th className="py-2 px-3 text-left text-sm font-medium">Weight (g)</th>
                       <th className="py-2 px-3 text-left text-sm font-medium">Display Price</th>
                       <th className="py-2 px-3 text-left text-sm font-medium">Selling Price</th>
@@ -284,7 +287,7 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
                   <tbody>
                     {variantRows.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                        <td colSpan={8} className="py-8 text-center text-muted-foreground">
                           No variants. Add CutType and Weight options above.
                         </td>
                       </tr>
@@ -292,6 +295,43 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
                       variantRows.map((opt, idx) => (
                         <tr key={opt.cutType + '-' + opt.weight} className="border-t border-border">
                           <td className="py-2 px-3">{opt.cutType}</td>
+                          <td className="py-2 px-3">
+                            {opt.isFirstWeight ? (
+                              <div className="flex flex-col items-center">
+                                <label className="flex flex-col items-center cursor-pointer group">
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    style={{ display: 'none' }}
+                                    onChange={e => {
+                                      const file = e.target.files?.[0] || null;
+                                      setCutTypeImages(prev => ({ ...prev, [opt.cutType]: file }));
+                                    }}
+                                  />
+                                  <span className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs group-hover:underline">
+                                    <ImageIcon className="w-4 h-4" />
+                                  </span>
+                                </label>
+                                {cutTypeImages[opt.cutType] && (
+                                  <img
+                                    src={URL.createObjectURL(cutTypeImages[opt.cutType]!)}
+                                    alt={opt.cutType + ' preview'}
+                                    className="w-10 h-10 object-cover rounded border mt-1"
+                                  />
+                                )}
+                              </div>
+                            ) : (
+                              cutTypeImages[opt.cutType] ? (
+                                <img
+                                  src={URL.createObjectURL(cutTypeImages[opt.cutType]!)}
+                                  alt={opt.cutType + ' preview'}
+                                  className="w-10 h-10 object-cover rounded border"
+                                />
+                              ) : (
+                                <span className="text-xs text-gray-400">No image</span>
+                              )
+                            )}
+                          </td>
                           <td className="py-2 px-3">{opt.weight}</td>
                           <td className="py-2 px-3">
                             <Input

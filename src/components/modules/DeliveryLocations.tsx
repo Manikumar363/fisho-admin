@@ -37,6 +37,7 @@ interface ApiCommunity {
   name: string;
   expressDelivery: boolean;
   isActive: boolean;
+  nearByStore?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -66,6 +67,33 @@ export default function DeliveryLocations() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
 
+  // Store list of stores
+  const [stores, setStores] = useState<{ _id: string; name: string }[]>([]);
+  const [storesLoading, setStoresLoading] = useState(false);
+
+  // Store raw communities
+  const [communities, setCommunities] = useState<ApiCommunity[]>([]);
+
+  // Fetch stores
+  useEffect(() => {
+    setStoresLoading(true);
+    apiFetch<{ success: boolean; stores: { _id: string; name: string }[]; message?: string }>('/api/stores')
+      .then(res => {
+        if (res.success && Array.isArray(res.stores)) {
+          setStores(res.stores);
+        } else {
+          setStores([]);
+          toast.error(res.message || 'Failed to fetch stores');
+        }
+      })
+      .catch(() => {
+        setStores([]);
+        toast.error('Failed to fetch stores');
+      })
+      .finally(() => setStoresLoading(false));
+  }, []);
+
+  // Fetch communities
   useEffect(() => {
     let mounted = true;
     const load = async () => {
@@ -76,16 +104,7 @@ export default function DeliveryLocations() {
           '/api/community'
         );
         if (!mounted) return;
-        const mapped: DeliveryLocation[] = (data?.communities || []).map((c) => ({
-          id: `LOC-${String(c.id ?? c._id).padStart(3, '0')}`,
-          code: String(c._id || ''),
-          locationName: c.name,
-          deliveryType: c.expressDelivery ? ['Express Delivery'] : ['Next Day Delivery'],
-          nearestStore: '-',
-          ordersReceived: 0,
-          status: c.isActive ? 'Active' : 'Inactive',
-        }));
-        setLocations(mapped);
+        setCommunities(data?.communities || []);
       } catch (e: any) {
         if (!mounted) return;
         const status = e?.status;
@@ -104,6 +123,26 @@ export default function DeliveryLocations() {
       mounted = false;
     };
   }, [navigate]);
+
+  // Map communities to locations with store name
+  useEffect(() => {
+    const mapped: DeliveryLocation[] = (communities || []).map((c) => {
+      const storeObj = c.nearByStore
+        ? stores.find(s => s._id === c.nearByStore)
+        : null;
+      const storeName = storeObj ? storeObj.name : (typeof c.nearByStore === 'string' ? c.nearByStore : '-');
+      return {
+        id: `LOC-${String(c.id ?? c._id).padStart(3, '0')}`,
+        code: String(c._id || ''),
+        locationName: c.name,
+        deliveryType: c.expressDelivery ? ['Express Delivery'] : ['Next Day Delivery'],
+        nearestStore: storeName,
+        ordersReceived: 0,
+        status: c.isActive ? 'Active' : 'Inactive',
+      };
+    });
+    setLocations(mapped);
+  }, [communities, stores]);
 
   const handleAddLocation = (newLocation: {
     id: string;

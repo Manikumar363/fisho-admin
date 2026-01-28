@@ -94,6 +94,7 @@ export default function UserManagement() {
   const [deletedUsersError, setDeletedUsersError] = useState<string | null>(null);
   const [deletedUsersPage, setDeletedUsersPage] = useState(1);
   const [deletedUsersTotalPages, setDeletedUsersTotalPages] = useState(1);
+  const [deletedUsersTotalCount, setDeletedUsersTotalCount] = useState(0);
 
   // Vendors API integration
   const [vendors, setVendors] = useState<any[]>([]);
@@ -138,6 +139,7 @@ export default function UserManagement() {
   const fetchDeletedUsers = async () => {
     setDeletedUsersLoading(true);
     setDeletedUsersError(null);
+    
     try {
       const res = await apiFetch<{
         success: boolean;
@@ -150,6 +152,7 @@ export default function UserManagement() {
 
       setDeletedUsers(res.users || []);
       setDeletedUsersTotalPages(res.pagination?.totalPages || 1);
+      setDeletedUsersTotalCount(res.pagination?.totalItems || 0);
     } catch (e: any) {
       const msg = e?.message || 'Failed to load deleted users';
       setDeletedUsersError(msg);
@@ -431,6 +434,7 @@ export default function UserManagement() {
       const res = await apiFetch<{
         success: boolean;
         message?: string;
+        subadmin?: any;
       }>(`/api/subadmin/subadmin-by-id/${editingSubadminId}`, {
         method: 'PATCH',
         body: JSON.stringify({
@@ -1433,7 +1437,18 @@ export default function UserManagement() {
       </Tabs>
 
       {/* Add Vendor Modal */}
-      <Dialog open={showAddVendorModal} onOpenChange={setShowAddVendorModal}>
+      <Dialog open={showAddVendorModal} onOpenChange={(open) => {
+        setShowAddVendorModal(open);
+        if (open) {
+          setVendorForm({
+            vendorName: '',
+            companyName: '',
+            vatNumber: '',
+            email: '',
+            contactNumber: ''
+          });
+        }
+      }}>
         <DialogContent className="max-w-md" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Add New Vendor</DialogTitle>
@@ -1441,7 +1456,7 @@ export default function UserManagement() {
           <form onSubmit={handleAddVendor}>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="vendorName">Vendor Name</Label>
+                <Label htmlFor="vendorName">Vendor Name *</Label>
                 <Input
                   id="vendorName"
                   value={vendorForm.vendorName}
@@ -1452,7 +1467,7 @@ export default function UserManagement() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="companyName">Company Name</Label>
+                <Label htmlFor="companyName">Company Name *</Label>
                 <Input
                   id="companyName"
                   value={vendorForm.companyName}
@@ -1463,7 +1478,7 @@ export default function UserManagement() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="vatNumber">VAT Number</Label>
+                <Label htmlFor="vatNumber">VAT Number *</Label>
                 <Input
                   id="vatNumber"
                   value={vendorForm.vatNumber}
@@ -1474,7 +1489,7 @@ export default function UserManagement() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="email">Email ID</Label>
+                <Label htmlFor="email">Email ID *</Label>
                 <Input
                   id="email"
                   type="email"
@@ -1486,7 +1501,7 @@ export default function UserManagement() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="contactNumber">Contact Number</Label>
+                <Label htmlFor="contactNumber">Contact Number *</Label>
                 <Input
                   id="contactNumber"
                   type="tel"
@@ -1822,7 +1837,12 @@ export default function UserManagement() {
       </Dialog>
 
       {/* Add Subadmin Modal */}
-      <Dialog open={showAddSubadminModal} onOpenChange={setShowAddSubadminModal}>
+      <Dialog open={showAddSubadminModal} onOpenChange={(open) => {
+        setShowAddSubadminModal(open);
+        if (open) {
+          setSubadminForm({ name: '', email: '', phone: '' });
+        }
+      }}>
         <DialogContent className="max-w-md" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Add New Subadmin</DialogTitle>
@@ -1830,7 +1850,7 @@ export default function UserManagement() {
           <form onSubmit={handleAddSubadmin}>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="subadminName">Name</Label>
+                <Label htmlFor="subadminName">Name*</Label>
                 <Input
                   id="subadminName"
                   value={subadminForm.name}
@@ -1841,7 +1861,7 @@ export default function UserManagement() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="subadminEmail">Email ID</Label>
+                <Label htmlFor="subadminEmail">Email ID*</Label>
                 <Input
                   id="subadminEmail"
                   type="email"
@@ -1853,7 +1873,7 @@ export default function UserManagement() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="subadminPhone">Contact Number</Label>
+                <Label htmlFor="subadminPhone">Contact Number*</Label>
                 <Input
                   id="subadminPhone"
                   type="tel"
@@ -1956,7 +1976,8 @@ export default function UserManagement() {
                   (subadminForm.name === originalSubadminForm.name &&
                    subadminForm.email === originalSubadminForm.email &&
                    subadminForm.phone === originalSubadminForm.phone)
-                }>
+                }
+              >
                 Update Subadmin
               </Button>
             </DialogFooter>
