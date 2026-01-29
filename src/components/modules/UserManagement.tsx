@@ -1251,7 +1251,7 @@ export default function UserManagement() {
                           <td className="py-3 px-4">{manager.name}</td>
                           <td className="py-3 px-4">{manager.phone}</td>
                           <td className="py-3 px-4">{manager.email}</td>
-                          <td className="py-3 px-4 capitalize">{manager.role}</td>
+                          <td className="py-3 px-4 capitalize">{manager.role ? manager.role.charAt(0).toUpperCase() + manager.role.slice(1): ''}</td>
                           <td className="py-3 px-4">
                             <Badge variant={manager.isActive ? 'default' : 'secondary'}>
                               {manager.isActive ? 'Active' : 'Inactive'}
@@ -1507,7 +1507,7 @@ export default function UserManagement() {
                   type="tel"
                   value={vendorForm.contactNumber}
                   onChange={(e) => setVendorForm({ ...vendorForm, contactNumber: e.target.value })}
-                  placeholder="Enter contact number"
+                  placeholder="Enter 10-digit phone number"
                   required
                 />
               </div>
@@ -1599,7 +1599,7 @@ export default function UserManagement() {
                   type="tel"
                   value={vendorForm.contactNumber}
                   onChange={(e) => setVendorForm({ ...vendorForm, contactNumber: e.target.value })}
-                  placeholder="Enter contact number"
+                  placeholder="Enter 10 digit contact number"
                   required
                 />
               </div>
@@ -1884,7 +1884,7 @@ export default function UserManagement() {
 
                   } 
 
-                  placeholder="Enter contact number"
+                  placeholder="Enter 10-digit phone number"
                   required
                 />
               </div>
@@ -1955,7 +1955,7 @@ export default function UserManagement() {
                   type="tel"
                   value={subadminForm.phone}
                   onChange={(e) => setSubadminForm({ ...subadminForm, phone: e.target.value })}
-                  placeholder="Enter contact number"
+                  placeholder="Enter 10-digit phone number"
                   required
                 />
               </div>
@@ -2024,19 +2024,20 @@ export default function UserManagement() {
                       </div>
                       <div>
                         <Label className="text-gray-600">Role</Label>
-                        <p className="font-medium capitalize">{selectedItem.role || '—'}</p>
+                        <p className="font-medium capitalize">{selectedItem.role ? selectedItem.role.charAt(0).toUpperCase() + selectedItem.role.slice(1) : '—'}</p>
                       </div>
                       <div>
                         <Label className="text-gray-600">Verified</Label>
                         <p><Badge variant={selectedItem.isVerified ? 'default' : 'secondary'}>{selectedItem.isVerified ? 'Yes' : 'No'}</Badge></p>
                       </div>
-                      <div>
-                        <Label className="text-gray-600">Blocked</Label>
-                        <p><Badge variant={selectedItem.isBlocked ? 'destructive' : 'default'}>{selectedItem.isBlocked ? 'Yes' : 'No'}</Badge></p>
-                      </div>
+          
                       <div>
                         <Label className="text-gray-600">Status</Label>
                         <p><Badge variant={selectedItem.status === 'Active' ? 'default' : 'secondary'}>{selectedItem.status}</Badge></p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Created</Label>
+                        <p className="font-medium">{selectedItem.createdAt ? new Date(selectedItem.createdAt).toLocaleDateString() : '—'}</p>
                       </div>
                       {selectedItem.addresses && selectedItem.addresses.length > 0 && (
                         <div className="col-span-2">
@@ -2125,10 +2126,6 @@ export default function UserManagement() {
                         <Label className="text-gray-600">Created At</Label>
                         <p className="font-medium">{selectedItem.createdAt ? new Date(selectedItem.createdAt).toLocaleDateString() : '—'}</p>
                       </div>
-                      <div>
-                        <Label className="text-gray-600">Last Updated</Label>
-                        <p className="font-medium">{selectedItem.updatedAt ? new Date(selectedItem.updatedAt).toLocaleDateString() : '—'}</p>
-                      </div>
                     </>
                   )}
                   {selectedItem.type === 'vendor' && (
@@ -2160,6 +2157,10 @@ export default function UserManagement() {
                       <div>
                         <Label className="text-gray-600">Status</Label>
                         <p><Badge variant={selectedItem.status === 'Active' ? 'default' : 'secondary'}>{selectedItem.status}</Badge></p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Created</Label>
+                        <p>{selectedItem.createdAt ? new Date(selectedItem.createdAt).toLocaleDateString() : '—'}</p>
                       </div>
                     </>
                   )}

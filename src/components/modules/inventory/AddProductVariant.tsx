@@ -43,6 +43,11 @@ interface WeightOption {
   discount: string;
   weightNotes: string;
   isActive: boolean;
+  featured?: boolean;
+  bestSeller?: boolean;
+  expressDelivery?: boolean;
+  nextDayDelivery?: boolean;
+  festiveOffer?: boolean;
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -58,6 +63,11 @@ const createEmptyWeightOption = (weight?: number, cutType?: string): WeightOptio
   discount: '',
   weightNotes: '',
   isActive: true,
+  featured: false,
+  bestSeller: false,
+  expressDelivery: false,
+  nextDayDelivery: false,
+  festiveOffer: false,
 });
 
 const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
@@ -71,6 +81,10 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
   const [bestSeller, setBestSeller] = useState(false);
   const [availability, setAvailability] = useState(true);
   const [weightOptions, setWeightOptions] = useState<WeightOption[]>([]);
+  const [expressDelivery, setExpressDelivery] = useState(false);
+  const [nextDayDelivery, setNextDayDelivery] = useState(false);
+  const [festiveOffer, setFestiveOffer] = useState(false);
+
   // New: Store image per cut type
   const [cutTypeImages, setCutTypeImages] = useState<{ [cutType: string]: File | null }>({});
 
@@ -177,7 +191,7 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="mb-2">Add Product Variant</h1>
+          <h1 className="mb-2">Add Product and Variants</h1>
           <p className="text-gray-600">Create a new product variant with complete details</p>
         </div>
         {onBack && (
@@ -194,7 +208,7 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="species">Species</Label>
+                <Label htmlFor="species">Category</Label>
                 <select
                   id="species"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
@@ -209,61 +223,137 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
                 </select>
               </div>
               <div>
-                <Label htmlFor="product">Product</Label>
-                <select
-                  id="product"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  value={product}
-                  onChange={e => setProduct(e.target.value)}
+                <Label htmlFor="productName">Product Name</Label>
+                <Input
+                  id="productName"
+                  placeholder="Enter product name"
+                  value={variantName}
+                  onChange={e => setVariantName(e.target.value)}
                   required
-                  disabled={!species}
-                >
-                  <option value="">Select Product</option>
-                  {DUMMY_PRODUCTS.filter((p) => p.species === species).map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
+                />
               </div>
             </div>
-            {/* CutType and Weight input UI restored */}
-            <div className="mb-4">
-              <div className="mb-2 font-semibold">CutType</div>
-              <div className="flex gap-2 mb-2 flex-wrap">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="productImage">Product Image</Label>
+                <Input
+                  id="productImage"
+                  type="file"
+                  accept="image/*"
+                  onChange={e => setVariantImage(e.target.files?.[0] || null)}
+                />
+                {variantImage && (
+                  <img
+                    src={URL.createObjectURL(variantImage)}
+                    alt="Product preview"
+                    className="w-20 h-20 object-cover rounded mt-2 border"
+                  />
+                )}
+              </div>
+              <div>
+                <Label htmlFor="availableStock">Available Stock</Label>
+                <Input
+                  id="availableStock"
+                  type="number"
+                  min="0"
+                  placeholder="Enter available stock"
+                  // Add state and handler for available stock as needed
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                placeholder="Enter product description, origin, characteristics..."
+                // Add state and handler for description as needed
+              />
+            </div>
+            <div>
+              <Label htmlFor="nutrition">Nutrition Facts</Label>
+              <Textarea
+                id="nutrition"
+                placeholder="Enter nutritional information (e.g., Protein: 20g per 100g, Omega-3: 500mg...)"
+                // Add state and handler for nutrition as needed
+              />
+            </div>
+            <div>
+              <Label htmlFor="cutTypes">Available Cut Types</Label>
+              <div className="flex gap-2">
+                <select
+                  id="cutTypes"
+                  className="w-48 px-3 py-2 border border-gray-300 rounded-md"
+                  value={cutType}
+                  onChange={e => setCutType(e.target.value)}
+                >
+                  <option value="">Select cut type</option>
+                  {DUMMY_CUT_TYPES.map((c) => (
+                    !cutTypes.includes(c.name) && (
+                      <option key={c.id} value={c.name}>{c.name}</option>
+                    )
+                  ))}
+                </select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    if (cutType && !cutTypes.includes(cutType)) {
+                      setCutTypes([...cutTypes, cutType]);
+                      setCutType('');
+                    }
+                  }}
+                  disabled={!cutType}
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="flex gap-2 flex-wrap mt-2">
                 {cutTypes.map(cut => (
                   <span key={cut} className="inline-flex items-center bg-gray-200 rounded px-2 py-1 text-sm">
                     {cut}
-                    <button type="button" className="ml-1 text-gray-500 hover:text-red-500" onClick={() => removeCutType(cut)}>×</button>
+                    <button
+                      type="button"
+                      className="ml-1 text-gray-500 hover:text-red-500"
+                      onClick={() => removeCutType(cut)}
+                    >×</button>
                   </span>
                 ))}
-                {/* <Input 
-                  placeholder="Add CutType"
-                  className="w-24"
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                      addCutType(e.currentTarget.value.trim());
-                      e.currentTarget.value = '';
-                    }
-                  }}
-                />*/}
               </div>
-              <div className="mb-2 font-semibold">Weight</div>
-              <div className="flex gap-2 flex-wrap">
+            </div>
+            <div>
+              <Label htmlFor="weights">Available Weights (in grams)</Label>
+              <div className="flex gap-2 flex-wrap mt-1">
                 {weights.map(w => (
                   <span key={w} className="inline-flex items-center bg-gray-200 rounded px-2 py-1 text-sm">
                     {w}
                     <button type="button" className="ml-1 text-gray-500 hover:text-red-500" onClick={() => removeWeight(w)}>×</button>
                   </span>
                 ))}
-                {/* <Input 
-                  placeholder="Add Weight"
-                  className="w-24"
+                <Input
+                  id="weights"
+                  placeholder="Enter weight (e.g., 250, 500, 1000)"
+                  className="w-40"
                   onKeyDown={e => {
                     if (e.key === 'Enter' && e.currentTarget.value.trim()) {
                       addWeight(e.currentTarget.value.trim());
                       e.currentTarget.value = '';
                     }
                   }}
-                />*/}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    const input = document.getElementById('weights') as HTMLInputElement;
+                    if (input && input.value.trim()) {
+                      addWeight(input.value.trim());
+                      input.value = '';
+                    }
+                  }}
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
               </div>
             </div>
             <div className="space-y-3">
@@ -277,17 +367,23 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
                       <th className="py-2 px-3 text-left text-sm font-medium">CutType</th>
                       <th className="py-2 px-3 text-left text-sm font-medium">Image</th>
                       <th className="py-2 px-3 text-left text-sm font-medium">Weight (g)</th>
+                      <th className="py-2 px-3 text-left text-sm font-medium">Cost Price / KG</th>
                       <th className="py-2 px-3 text-left text-sm font-medium">Display Price</th>
                       <th className="py-2 px-3 text-left text-sm font-medium">Selling Price</th>
                       <th className="py-2 px-3 text-left text-sm font-medium">Profit %</th>
                       <th className="py-2 px-3 text-left text-sm font-medium">Discount %</th>
                       <th className="py-2 px-3 text-left text-sm font-medium">Notes</th>
+                      <th className="py-2 px-3 text-left text-sm font-medium">Featured</th>
+                      <th className="py-2 px-3 text-left text-sm font-medium">Best Seller</th>
+                      <th className="py-2 px-3 text-left text-sm font-medium">Express Delivery</th>
+                      <th className="py-2 px-3 text-left text-sm font-medium">Next Day Delivery</th>
+                      <th className="py-2 px-3 text-left text-sm font-medium">Festive Offer</th>
                     </tr>
                   </thead>
                   <tbody>
                     {variantRows.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="py-8 text-center text-muted-foreground">
+                        <td colSpan={14} className="py-8 text-center text-muted-foreground">
                           No variants. Add CutType and Weight options above.
                         </td>
                       </tr>
@@ -333,6 +429,17 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
                             )}
                           </td>
                           <td className="py-2 px-3">{opt.weight}</td>
+                          <td className="py-2 px-3">
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={opt.costPricePerKg}
+                              onChange={e => handleWeightOptionChange(opt.id, 'costPricePerKg', e.target.value)}
+                              placeholder="0.00"
+                              className="w-24"
+                            />
+                          </td>
                           <td className="py-2 px-3">
                             <Input
                               type="number"
@@ -385,6 +492,36 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
                               className="w-28"
                             />
                           </td>
+                          <td className="py-2 px-3">
+                            <Switch
+                              checked={!!opt.featured}
+                              onCheckedChange={val => handleWeightOptionChange(opt.id, 'featured', val)}
+                            />
+                          </td>
+                          <td className="py-2 px-3">
+                            <Switch
+                              checked={!!opt.bestSeller}
+                              onCheckedChange={val => handleWeightOptionChange(opt.id, 'bestSeller', val)}
+                            />
+                          </td>
+                          <td className="py-2 px-3">
+                            <Switch
+                              checked={!!opt.expressDelivery}
+                              onCheckedChange={val => handleWeightOptionChange(opt.id, 'expressDelivery', val)}
+                            />
+                          </td>
+                          <td className="py-2 px-3">
+                            <Switch
+                              checked={!!opt.nextDayDelivery}
+                              onCheckedChange={val => handleWeightOptionChange(opt.id, 'nextDayDelivery', val)}
+                            />
+                          </td>
+                          <td className="py-2 px-3">
+                            <Switch
+                              checked={!!opt.festiveOffer}
+                              onCheckedChange={val => handleWeightOptionChange(opt.id, 'festiveOffer', val)}
+                            />
+                          </td>
                         </tr>
                       ))
                     )}
@@ -396,26 +533,6 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
                   Profit % is auto-calculated based on display and selling prices.
                 </p>
               )}
-            </div>
-            <div>
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                placeholder="Enter any notes for this variant"
-                rows={2}
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="featured">Featured</Label>
-                <Switch id="featured" checked={featured} onCheckedChange={setFeatured} />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="bestSeller">Best Seller</Label>
-                <Switch id="bestSeller" checked={bestSeller} onCheckedChange={setBestSeller} />
-              </div>
             </div>
             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
               <div>
