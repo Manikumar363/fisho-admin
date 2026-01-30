@@ -1506,7 +1506,10 @@ export default function UserManagement() {
                   id="contactNumber"
                   type="tel"
                   value={vendorForm.contactNumber}
-                  onChange={(e) => setVendorForm({ ...vendorForm, contactNumber: e.target.value })}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9]/g, '');
+                    setVendorForm({ ...vendorForm, contactNumber: value });
+                  }}
                   placeholder="Enter 10-digit phone number"
                   required
                 />
@@ -1535,10 +1538,10 @@ export default function UserManagement() {
 
       {/* Edit Vendor Modal */}
       <Dialog open={showEditVendorModal} onOpenChange={(open) => {
-  // Only close if the user explicitly closes it (open === false from close button)
-  // Prevent closing on outside click by not calling setShowXModal
-  if (!open) return;
-}}>
+        if (!open) {
+          setShowEditVendorModal(false);
+        }
+      }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Vendor</DialogTitle>
@@ -1916,9 +1919,10 @@ export default function UserManagement() {
 
       {/* Edit Subadmin Modal */}
       <Dialog open={showEditSubadminModal} onOpenChange={(open) => {
- 
-  if (!open) return;
-}}>
+        if (!open) {
+          setShowEditSubadminModal(false);
+        }
+      }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Subadmin</DialogTitle>
@@ -2264,12 +2268,12 @@ export default function UserManagement() {
           
           <DialogFooter className="border-t px-6 py-4 flex items-center justify-between bg-white">
             <div className="text-sm text-gray-600">
-              {getFilteredDeletedUsers().length > 0 ? (
+              {deletedUsersTotalCount > 0 ? (
                 <>
-                  Showing {getFilteredDeletedUsers().length} of {deletedUsers.length} deleted users
+                  Showing {(deletedUsersPage - 1) * 10 + 1} to {Math.min(deletedUsersPage * 10, deletedUsersTotalCount)} of {deletedUsersTotalCount} deleted users
                 </>
               ) : (
-                <span>Page {deletedUsersPage} of {deletedUsersTotalPages}</span>
+                <span>No deleted users found</span>
               )}
             </div>
             <div className="flex gap-2">

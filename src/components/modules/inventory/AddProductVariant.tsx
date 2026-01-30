@@ -110,25 +110,7 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
     setWeightOptions((prev) =>
       prev.map((opt) => {
         if (opt.id !== id) return opt;
-
-        const updated = { ...opt, [field]: value };
-
-        // Auto-calculate profit when display or selling price changes
-        if (field === 'displayPrice' || field === 'sellingPrice') {
-          const displayPrice = parseFloat(
-            field === 'displayPrice' ? (value as string) : opt.displayPrice
-          );
-          const sellingPrice = parseFloat(
-            field === 'sellingPrice' ? (value as string) : opt.sellingPrice
-          );
-
-          if (!isNaN(displayPrice) && !isNaN(sellingPrice) && displayPrice > 0) {
-            const profitPercent = ((displayPrice - sellingPrice) / displayPrice) * 100;
-            updated.profit = profitPercent.toFixed(2);
-          }
-        }
-
-        return updated;
+        return { ...opt, [field]: value };
       })
     );
   };
@@ -202,7 +184,7 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
       </div>
       <Card>
         <CardHeader>
-          <CardTitle className='font-semibold text-xl'>Variant Details</CardTitle>
+          <CardTitle className='font-semibold text-xl'>Add product and variants</CardTitle>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit}>
@@ -467,10 +449,10 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
                               type="number"
                               min="0"
                               value={opt.profit}
-                              readOnly
-                              placeholder="Auto"
-                              className="w-20 bg-muted/50"
-                              title="Auto-calculated from prices"
+                              onChange={e => handleWeightOptionChange(opt.id, 'profit', e.target.value)}
+                              placeholder="%"
+                              className="w-20"
+                              title="Enter profit percent"
                             />
                           </td>
                           <td className="py-2 px-3">
@@ -530,7 +512,7 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
               </div>
               {weightOptions.length > 0 && (
                 <p className="text-xs text-muted-foreground">
-                  Profit % is auto-calculated based on display and selling prices.
+                  Enter profit % manually for each variant.
                 </p>
               )}
             </div>
