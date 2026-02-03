@@ -5,18 +5,12 @@ import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { Textarea } from '../../ui/textarea';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
+import { apiFetch } from '../../../lib/api';
 
 interface AddOfferProps {
   onBack: () => void;
-  onSave: (offer: {
-    couponName: string;
-    couponDescription: string;
-    discountPercentage: number;
-    minOrderValue: number;
-    expiryDate: string;
-    usageLimit: number;
-  }) => void;
+  onSave: (offer: any) => void;
 }
 
 export default function AddOffer({ onBack, onSave }: AddOfferProps) {
@@ -24,12 +18,14 @@ export default function AddOffer({ onBack, onSave }: AddOfferProps) {
     couponName: '',
     couponDescription: '',
     discountPercentage: '',
-    minOrderValue: '',
+    minimumOrderValue: '',
     expiryDate: '',
-    usageLimit: ''
+    usageLimitPerUser: '',
+    totalUsageLimit: ''
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -56,10 +52,10 @@ export default function AddOffer({ onBack, onSave }: AddOfferProps) {
       newErrors.discountPercentage = 'Discount must be between 1 and 100';
     }
 
-    if (!formData.minOrderValue) {
-      newErrors.minOrderValue = 'Minimum order value is required';
-    } else if (Number(formData.minOrderValue) < 0) {
-      newErrors.minOrderValue = 'Minimum order value must be positive';
+    if (!formData.minimumOrderValue) {
+      newErrors.minimumOrderValue = 'Minimum order value is required';
+    } else if (Number(formData.minimumOrderValue) < 0) {
+      newErrors.minimumOrderValue = 'Minimum order value must be positive';
     }
 
     if (!formData.expiryDate) {
@@ -68,17 +64,23 @@ export default function AddOffer({ onBack, onSave }: AddOfferProps) {
       newErrors.expiryDate = 'Expiry date must be in the future';
     }
 
-    if (!formData.usageLimit) {
-      newErrors.usageLimit = 'Usage limit is required';
-    } else if (Number(formData.usageLimit) <= 0) {
-      newErrors.usageLimit = 'Usage limit must be greater than 0';
+    if (!formData.usageLimitPerUser) {
+      newErrors.usageLimitPerUser = 'Usage limit per user is required';
+    } else if (Number(formData.usageLimitPerUser) <= 0) {
+      newErrors.usageLimitPerUser = 'Usage limit must be greater than 0';
+    }
+
+    if (!formData.totalUsageLimit) {
+      newErrors.totalUsageLimit = 'Total usage limit is required';
+    } else if (Number(formData.totalUsageLimit) <= 0) {
+      newErrors.totalUsageLimit = 'Total usage limit must be greater than 0';
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!validateForm()) {
@@ -86,14 +88,41 @@ export default function AddOffer({ onBack, onSave }: AddOfferProps) {
       return;
     }
 
-    onSave({
-      couponName: formData.couponName.trim(),
-      couponDescription: formData.couponDescription.trim(),
-      discountPercentage: Number(formData.discountPercentage),
-      minOrderValue: Number(formData.minOrderValue),
-      expiryDate: formData.expiryDate,
-      usageLimit: Number(formData.usageLimit)
-    });
+    setIsSubmitting(true);
+
+    try {
+      // Convert date to ISO format with time set to end of day
+      const expiryDate = new Date(formData.expiryDate);
+      expiryDate.setHours(23, 59, 59, 0);
+      const formattedExpiryDate = expiryDate.toISOString();
+
+      const payload = {
+        couponName: formData.couponName.trim(),
+        couponDescription: formData.couponDescription.trim(),
+        discountPercentage: Number(formData.discountPercentage),
+        minimumOrderValue: Number(formData.minimumOrderValue),
+        expiryDate: formattedExpiryDate,
+        usageLimitPerUser: Number(formData.usageLimitPerUser),
+        totalUsageLimit: Number(formData.totalUsageLimit)
+      };
+
+      const response = await apiFetch<any>('/api/coupons/create-coupon', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+
+      if (response.success) {
+        toast.success('Coupon created successfully');
+        onSave(response.coupon);
+      } else {
+        toast.error(response.message || 'Failed to create coupon');
+      }
+    } catch (error: any) {
+      console.error('Error creating coupon:', error);
+      toast.error(error.message || 'Failed to create coupon');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -157,21 +186,21 @@ export default function AddOffer({ onBack, onSave }: AddOfferProps) {
 
               {/* Minimum Order Value */}
               <div className="space-y-2">
-                <Label htmlFor="minOrderValue">
+                <Label htmlFor="minimumOrderValue">
                   Minimum Order Value (₹) <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  id="minOrderValue"
-                  name="minOrderValue"
+                  id="minimumOrderValue"
+                  name="minimumOrderValue"
                   type="number"
                   placeholder="e.g., 500"
                   min="0"
-                  value={formData.minOrderValue}
+                  value={formData.minimumOrderValue}
                   onChange={handleChange}
-                  className={errors.minOrderValue ? 'border-red-500' : ''}
+                  className={errors.minimumOrderValue ? 'border-red-500' : ''}
                 />
-                {errors.minOrderValue && (
-                  <p className="text-sm text-red-500">{errors.minOrderValue}</p>
+                {errors.minimumOrderValue && (
+                  <p className="text-sm text-red-500">{errors.minimumOrderValue}</p>
                 )}
               </div>
 
@@ -195,21 +224,21 @@ export default function AddOffer({ onBack, onSave }: AddOfferProps) {
 
               {/* Usage Limit per User */}
               <div className="space-y-2">
-                <Label htmlFor="usageLimit">
+                <Label htmlFor="usageLimitPerUser">
                   Usage Limit per User <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  id="usageLimit"
-                  name="usageLimit"
+                  id="usageLimitPerUser"
+                  name="usageLimitPerUser"
                   type="number"
                   placeholder="e.g., 3"
                   min="1"
-                  value={formData.usageLimit}
+                  value={formData.usageLimitPerUser}
                   onChange={handleChange}
-                  className={errors.usageLimit ? 'border-red-500' : ''}
+                  className={errors.usageLimitPerUser ? 'border-red-500' : ''}
                 />
-                {errors.usageLimit && (
-                  <p className="text-sm text-red-500">{errors.usageLimit}</p>
+                {errors.usageLimitPerUser && (
+                  <p className="text-sm text-red-500">{errors.usageLimitPerUser}</p>
                 )}
               </div>
             </div>
@@ -233,13 +262,33 @@ export default function AddOffer({ onBack, onSave }: AddOfferProps) {
               )}
             </div>
 
+            {/* Total Usage Limit */}
+            <div className="space-y-2">
+              <Label htmlFor="totalUsageLimit">
+                Total Usage Limit <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="totalUsageLimit"
+                name="totalUsageLimit"
+                type="number"
+                placeholder="e.g., 1000"
+                min="1"
+                value={formData.totalUsageLimit}
+                onChange={handleChange}
+                className={errors.totalUsageLimit ? 'border-red-500' : ''}
+              />
+              {errors.totalUsageLimit && (
+                <p className="text-sm text-red-500">{errors.totalUsageLimit}</p>
+              )}
+            </div>
+
             {/* Action Buttons */}
             <div className="flex justify-end gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={onBack}>
+              <Button type="button" variant="outline" onClick={onBack} disabled={isSubmitting}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-                Save Offer
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={isSubmitting}>
+                {isSubmitting ? 'Creating...' : 'Save Offer'}
               </Button>
             </div>
           </form>

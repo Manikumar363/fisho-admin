@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Plus, Edit, Eye, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '../ui/card';
 import { Input } from '../ui/input';
@@ -14,22 +14,50 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 import AddOffer from './offers/AddOffer';
 import EditOffer from './offers/EditOffer';
 import ViewOffer from './offers/ViewOffer';
-import AddProductVariantComponent from './inventory/AddProductVariant';
+import { apiFetch } from '../../lib/api';
 
 interface Offer {
-  id: string;
+  _id: string;
+  id?: string;
   couponName: string;
   couponDescription: string;
   discountPercentage: number;
-  minOrderValue: number;
+  minimumOrderValue: number;
+  minOrderValue?: number;
   expiryDate: string;
-  usageLimit: number;
-  totalUsersAvailed: number;
-  status: 'Active' | 'Expired';
+  usageLimitPerUser: number;
+  usageLimit?: number;
+  totalUsageLimit: number;
+  currentUsageCount: number;
+  totalUsersAvailed?: number;
+  status: 'active' | 'inactive' | 'expired';
+  applicableCategories: string[];
+  excludedProducts: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface CouponsResponse {
+  success: boolean;
+  coupons: Offer[];
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalCoupons: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
+  stats: {
+    activeCoupons: number;
+    expiredCoupons: number;
+    inactiveCoupons: number;
+    totalCoupons: number;
+  };
+  message: string;
 }
 
 const Offers: React.FC = () => {
@@ -40,119 +68,54 @@ const Offers: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [offerToDelete, setOfferToDelete] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [offers, setOffers] = useState<Offer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    activeCoupons: 0,
+    expiredCoupons: 0,
+    inactiveCoupons: 0,
+    totalCoupons: 0
+  });
 
-  const [offers, setOffers] = useState<Offer[]>([
-    {
-      id: 'OFF-001',
-      couponName: 'FISHO50',
-      couponDescription: 'Get 50% off on your first order',
-      discountPercentage: 50,
-      minOrderValue: 500,
-      expiryDate: '2025-12-31',
-      usageLimit: 1,
-      totalUsersAvailed: 234,
-      status: 'Active'
-    },
-    {
-      id: 'OFF-002',
-      couponName: 'WELCOME20',
-      couponDescription: 'Welcome bonus - 20% off on orders above ₹1000',
-      discountPercentage: 20,
-      minOrderValue: 1000,
-      expiryDate: '2025-06-30',
-      usageLimit: 3,
-      totalUsersAvailed: 567,
-      status: 'Active'
-    },
-    {
-      id: 'OFF-003',
-      couponName: 'BULK15',
-      couponDescription: 'Bulk order discount - 15% off on orders above ₹5000',
-      discountPercentage: 15,
-      minOrderValue: 5000,
-      expiryDate: '2025-12-31',
-      usageLimit: 5,
-      totalUsersAvailed: 89,
-      status: 'Active'
-    },
-    {
-      id: 'OFF-004',
-      couponName: 'NEWYEAR25',
-      couponDescription: 'New Year Special - 25% off on all orders',
-      discountPercentage: 25,
-      minOrderValue: 750,
-      expiryDate: '2025-01-15',
-      usageLimit: 2,
-      totalUsersAvailed: 1023,
-      status: 'Expired'
-    },
-    {
-      id: 'OFF-005',
-      couponName: 'SEAFOOD30',
-      couponDescription: 'Premium seafood - 30% off on orders above ₹2000',
-      discountPercentage: 30,
-      minOrderValue: 2000,
-      expiryDate: '2025-12-31',
-      usageLimit: 3,
-      totalUsersAvailed: 456,
-      status: 'Active'
-    },
-    {
-      id: 'OFF-006',
-      couponName: 'FLASH40',
-      couponDescription: 'Flash sale - 40% off for limited time',
-      discountPercentage: 40,
-      minOrderValue: 1500,
-      expiryDate: '2025-03-31',
-      usageLimit: 1,
-      totalUsersAvailed: 789,
-      status: 'Active'
-    },
-    {
-      id: 'OFF-007',
-      couponName: 'LOYALTY10',
-      couponDescription: 'Loyalty reward - 10% off on all orders',
-      discountPercentage: 10,
-      minOrderValue: 300,
-      expiryDate: '2025-12-31',
-      usageLimit: 10,
-      totalUsersAvailed: 1834,
-      status: 'Active'
-    },
-    {
-      id: 'OFF-008',
-      couponName: 'SUMMER35',
-      couponDescription: 'Summer special - 35% off on fresh catch',
-      discountPercentage: 35,
-      minOrderValue: 1200,
-      expiryDate: '2024-12-31',
-      usageLimit: 2,
-      totalUsersAvailed: 345,
-      status: 'Expired'
+  useEffect(() => {
+    fetchCoupons();
+  }, []);
+
+  const fetchCoupons = async () => {
+    try {
+      setLoading(true);
+      const response = await apiFetch<CouponsResponse>('/api/coupons/get-all');
+      if (response.success) {
+        setOffers(response.coupons);
+        setStats(response.stats);
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to fetch coupons');
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
 
-  const handleAddOffer = (newOffer: Omit<Offer, 'id' | 'totalUsersAvailed' | 'status'>) => {
-    const offer: Offer = {
-      id: `OFF-${String(offers.length + 1).padStart(3, '0')}`,
-      ...newOffer,
-      totalUsersAvailed: 0,
-      status: new Date(newOffer.expiryDate) > new Date() ? 'Active' : 'Expired'
-    };
-    setOffers([...offers, offer]);
+  const handleAddOffer = (newOffer: {
+    couponName: string;
+    couponDescription: string;
+    discountPercentage: number;
+    minOrderValue: number;
+    expiryDate: string;
+    usageLimit: number;
+  }) => {
+    // This will be implemented when you add the create API
+    fetchCoupons();
     setShowAddOffer(false);
     toast.success('Offer created successfully');
   };
 
-  const handleEditOffer = (updatedOffer: Offer) => {
-    setOffers(offers.map(offer => 
-      offer.id === updatedOffer.id ? {
-        ...updatedOffer,
-        status: new Date(updatedOffer.expiryDate) > new Date() ? 'Active' : 'Expired'
-      } : offer
-    ));
+  const handleEditOffer = (updatedOffer: Offer): void => {
+    // Update the local state with the updated offer
+    setOffers(offers.map(o => o._id === updatedOffer._id ? updatedOffer : o));
     setEditingOffer(null);
-    toast.success('Offer updated successfully');
+    // Refresh the list to get latest stats
+    fetchCoupons();
   };
 
   const handleDeleteOffer = (offerId: string) => {
@@ -160,10 +123,28 @@ const Offers: React.FC = () => {
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (offerToDelete) {
-      setOffers(offers.filter(offer => offer.id !== offerToDelete));
-      toast.success('Offer deleted successfully');
+      try {
+        const response = await apiFetch<{
+          success: boolean;
+          message: string;
+        }>(`/api/coupons/delete-coupon/${offerToDelete}`, { 
+          method: 'DELETE' 
+        });
+
+        if (response.success) {
+          setOffers(offers.filter(offer => offer._id !== offerToDelete));
+          toast.success(response.message || 'Offer deleted successfully');
+          // Refresh stats after deletion
+          fetchCoupons();
+        } else {
+          toast.error('Failed to delete offer');
+        }
+      } catch (error: any) {
+        console.error('Error deleting offer:', error);
+        toast.error(error.message || 'Failed to delete offer');
+      }
     }
     setDeleteDialogOpen(false);
     setOfferToDelete(null);
@@ -172,16 +153,30 @@ const Offers: React.FC = () => {
   const filteredOffers = offers.filter(offer =>
     offer.couponName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     offer.couponDescription.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    offer.id.toLowerCase().includes(searchQuery.toLowerCase())
+    offer._id.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const getStatusBadgeClass = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'active':
+        return 'bg-green-100 text-green-700 hover:bg-green-100';
+      case 'expired':
+        return 'bg-red-100 text-red-700 hover:bg-red-100';
+      case 'inactive':
+        return 'bg-gray-100 text-gray-700 hover:bg-gray-100';
+      default:
+        return 'bg-gray-100 text-gray-700 hover:bg-gray-100';
+    }
+  };
+
+  const capitalizeFirstLetter = (text: string) => {
+    return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+  };
 
   if (showAddOffer) {
     return <AddOffer onBack={() => setShowAddOffer(false)} onSave={handleAddOffer} />;
   }
 
-  if (showAddProductVariant) {
-    return <AddProductVariantComponent  />;
-  }
 
   if (editingOffer) {
     return <EditOffer offer={editingOffer} onBack={() => setEditingOffer(null)} onSave={handleEditOffer} />;
@@ -200,13 +195,6 @@ const Offers: React.FC = () => {
         </div>
         <div className="flex gap-2">
           <Button 
-            onClick={() => setShowAddProductVariant(true)}
-            className="bg-green-600 hover:bg-green-700 text-white"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Product Variant
-          </Button>
-          <Button 
             onClick={() => setShowAddOffer(true)}
             className="bg-blue-600 hover:bg-blue-700 text-white"
           >
@@ -214,6 +202,34 @@ const Offers: React.FC = () => {
             Add Offer
           </Button>
         </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-sm text-gray-600">Total Coupons</div>
+            <div className="text-2xl font-bold">{stats.totalCoupons}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-sm text-gray-600">Active Coupons</div>
+            <div className="text-2xl font-bold text-green-600">{stats.activeCoupons}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-sm text-gray-600">Expired Coupons</div>
+            <div className="text-2xl font-bold text-red-600">{stats.expiredCoupons}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-sm text-gray-600">Inactive Coupons</div>
+            <div className="text-2xl font-bold text-gray-600">{stats.inactiveCoupons}</div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Search */}
@@ -234,87 +250,89 @@ const Offers: React.FC = () => {
       {/* Offers Table */}
       <Card>
         <CardContent className="p-6">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4">Offer ID</th>
-                  <th className="text-left py-3 px-4">Coupon Name</th>
-                  <th className="text-left py-3 px-4">Discount %</th>
-                  <th className="text-left py-3 px-4">Min Order Value</th>
-                  <th className="text-left py-3 px-4">Expiry Date</th>
-                  <th className="text-left py-3 px-4">Usage Limit</th>
-                  <th className="text-left py-3 px-4">Total Users Availed</th>
-                  <th className="text-left py-3 px-4">Status</th>
-                  <th className="text-left py-3 px-4">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredOffers.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="text-center py-8 text-gray-500">
-                      No offers found
-                    </td>
+          {loading ? (
+            <div className="text-center py-8 text-gray-500">Loading coupons...</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-3 px-4">Coupon Name</th>
+                    <th className="text-left py-3 px-4">Description</th>
+                    <th className="text-left py-3 px-4">Discount %</th>
+                    <th className="text-left py-3 px-4">Min Order Value</th>
+                    <th className="text-left py-3 px-4">Expiry Date</th>
+                    <th className="text-left py-3 px-4">Usage Limit/User</th>
+                    <th className="text-left py-3 px-4">Total Limit</th>
+                    <th className="text-left py-3 px-4">Current Usage</th>
+                    <th className="text-left py-3 px-4">Status</th>
+                    <th className="text-left py-3 px-4">Actions</th>
                   </tr>
-                ) : (
-                  filteredOffers.map((offer) => (
-                    <tr key={offer.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-4">{offer.id}</td>
-                      <td className="py-3 px-4">{offer.couponName}</td>
-                      <td className="py-3 px-4">{offer.discountPercentage}%</td>
-                      <td className="py-3 px-4"><span className="dirham-symbol mr-2">&#xea;</span>{offer.minOrderValue}</td>
-                      <td className="py-3 px-4">
-                        {new Date(offer.expiryDate).toLocaleDateString('en-IN', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric'
-                        })}
-                      </td>
-                      <td className="py-3 px-4">{offer.usageLimit}</td>
-                      <td className="py-3 px-4">{offer.totalUsersAvailed}</td>
-                      <td className="py-3 px-4">
-                        <Badge
-                          variant={offer.status === 'Active' ? 'default' : 'secondary'}
-                          className={
-                            offer.status === 'Active'
-                              ? 'bg-green-100 text-green-700 hover:bg-green-100'
-                              : 'bg-gray-100 text-gray-700 hover:bg-gray-100'
-                          }
-                        >
-                          {offer.status}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setViewingOffer(offer)}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setEditingOffer(offer)}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteOffer(offer.id)}
-                          >
-                            <Trash2 className="w-4 h-4 text-red-600" />
-                          </Button>
-                        </div>
+                </thead>
+                <tbody>
+                  {filteredOffers.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="text-center py-8 text-gray-500">
+                        No offers found
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ) : (
+                    filteredOffers.map((offer) => (
+                      <tr key={offer._id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-3 px-4 font-medium">{offer.couponName}</td>
+                        <td className="py-3 px-4 max-w-xs truncate">{offer.couponDescription}</td>
+                        <td className="py-3 px-4">{offer.discountPercentage}%</td>
+                        <td className="py-3 px-4">
+                          <span className="dirham-symbol mr-2">&#xea;</span>
+                          {offer.minimumOrderValue}
+                        </td>
+                        <td className="py-3 px-4">
+                          {new Date(offer.expiryDate).toLocaleDateString('en-IN', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric'
+                          })}
+                        </td>
+                        <td className="py-3 px-4">{offer.usageLimitPerUser}</td>
+                        <td className="py-3 px-4">{offer.totalUsageLimit}</td>
+                        <td className="py-3 px-4">{offer.currentUsageCount}</td>
+                        <td className="py-3 px-4">
+                          <Badge className={getStatusBadgeClass(offer.status)}>
+                            {capitalizeFirstLetter(offer.status)}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setViewingOffer(offer)}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditingOffer(offer)}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteOffer(offer._id)}
+                            >
+                              <Trash2 className="w-4 h-4 text-red-600" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
 

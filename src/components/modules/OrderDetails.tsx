@@ -31,6 +31,7 @@ interface Order {
     tax: string;
     discount: string;
     shipping: string;
+    loyaltyPoints: string;
   };
   shippingAddress: {
     name: string;
@@ -270,7 +271,19 @@ export default function OrderDetails() {
                   <span>Discount</span>
                   <span>-<span className="dirham-symbol mr-2">&#xea;</span>{order.pricing?.discount || '0'}</span>
                 </div>
-                <div className="flex justify-between pt-2 border-t border-gray-200">
+                <div className="flex justify-between ">
+                  <span>Loyalty Points</span>
+                  <span>-<span className="dirham-symbol mr-2">&#xea;</span>{order.pricing?.loyaltyPoints || '0'}</span>
+                </div>
+                <div className="flex justify-between ">
+                  <span>Tax</span>
+                  <span>-<span className="dirham-symbol mr-2">&#xea;</span>{order.pricing?.tax || '0'}</span>
+                </div>
+                <div className="flex justify-between ">
+                  <span>Shipping</span>
+                  <span>-<span className="dirham-symbol mr-2">&#xea;</span>{order.pricing?.shipping || '0'}</span>
+                </div>
+                <div className="flex justify-between font-semibold pt-2 border-t border-gray-200">
                   <span>Total Amount</span>
                   <span><span className="dirham-symbol mr-2">&#xea;</span>{order.pricing?.grandTotal || '0'}</span>
                 </div>
@@ -364,7 +377,7 @@ export default function OrderDetails() {
               <div>
                 <p className="text-sm font-semibold text-gray-800">Payment Status</p>
                 <Badge
-                  className={`px-4 py-2 font-semibold border ${
+                  className={`px-4 py-2 mt-2 font-semibold border ${
                     order.payment?.status === 'paid'
                       ? 'bg-green-100 text-green-700 border-green-200'
                       : order.payment?.status === 'pending'

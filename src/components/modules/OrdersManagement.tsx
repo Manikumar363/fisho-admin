@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-// Import your apiFetch utility
 import { apiFetch } from '../../lib/api';
+import { toast } from 'sonner';
 
 interface Order {
   _id: string;
@@ -18,6 +18,9 @@ interface Order {
   payment: { method: string; status: string };
   orderType: string;
   status: string;
+  deliveryType?: string;
+  store?: any;
+  storeId?: string;
 }
 
 export default function OrdersManagement() {
@@ -34,6 +37,8 @@ export default function OrdersManagement() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalOrders, setTotalOrders] = useState(0);
   const [search, setSearch] = useState('');
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
 
   // Filter state
   useEffect(() => {
@@ -107,12 +112,80 @@ export default function OrdersManagement() {
     return date.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
-  const getStatusBadgeVariant = (status: string) => {
+  const capitalize = (str: string) => {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  };
+
+  const getStatusBadgeClass = (status: string) => {
     const statusLower = status.toLowerCase();
-    if (statusLower === 'delivered') return 'default';
-    if (statusLower === 'processing' || statusLower === 'pending') return 'secondary';
-    if (statusLower === 'cancelled' || statusLower === 'failed') return 'destructive';
-    return 'outline';
+    if (statusLower === 'pending') return 'bg-orange-100 text-orange-700 border border-orange-300';
+    if (statusLower === 'accepted' || statusLower === 'accept') return 'bg-green-100 text-green-700 border border-green-300';
+    if (statusLower === 'rejected' || statusLower === 'cancelled') return 'bg-red-100 text-red-700 border border-red-300';
+    if (statusLower === 'delivered') return 'bg-blue-100 text-blue-700 border border-blue-300';
+    return 'bg-gray-100 text-gray-700 border border-gray-300';
+  };
+
+  const getStoreId = (order: Order) =>
+    (order as any).store?._id || (order as any).store?.id || (order as any).storeId;
+
+  const handleAcceptOrder = async (order: Order) => {
+    const storeId = getStoreId(order);
+    if (!storeId) {
+      toast.error('Store ID not found for this order');
+      return;
+    }
+    setAcceptingId(order._id);
+    try {
+      const res = await apiFetch<{ success: boolean; data?: Order; message?: string }>(
+        '/api/order/accept-order',
+        {
+          method: 'POST',
+          body: JSON.stringify({ orderId: order._id, storeId }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+      if (!res.success) throw new Error(res.message || 'Failed to accept order');
+      if (res.data) {
+        setOrders((prev) => prev.map((o) => (o._id === order._id ? res.data! : o)));
+      } else {
+        setOrders((prev) => prev.map((o) => (o._id === order._id ? { ...o, status: 'accepted' } : o)));
+      }
+      toast.success(res.message || 'Order accepted successfully');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to accept order');
+    } finally {
+      setAcceptingId(null);
+    }
+  };
+
+  const handleRejectOrder = async (order: Order) => {
+    const storeId = getStoreId(order);
+    if (!storeId) {
+      toast.error('Store ID not found for this order');
+      return;
+    }
+    setRejectingId(order._id);
+    try {
+      const res = await apiFetch<{ success: boolean; data?: Order; message?: string }>(
+        '/api/order/reject-order',
+        {
+          method: 'POST',
+          body: JSON.stringify({ orderId: order._id, storeId }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+      if (!res.success) throw new Error(res.message || 'Failed to cancel order');
+      if (res.data) {
+        setOrders((prev) => prev.map((o) => (o._id === order._id ? res.data! : o)));
+      } else {
+        setOrders((prev) => prev.map((o) => (o._id === order._id ? { ...o, status: 'cancelled' } : o)));
+      }
+      toast.success(res.message || 'Order cancelled successfully');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to cancel order');
+    } finally {
+      setRejectingId(null);
+    }
   };
 
   return (
@@ -235,6 +308,7 @@ export default function OrdersManagement() {
                   <th className="text-left py-3 px-4">Items</th>
                   <th className="text-left py-3 px-4">Amount</th>
                   <th className="text-left py-3 px-4">Status</th>
+                  <th className="text-left py-3 px-4">Delivery Type</th>
                   <th className="text-left py-3 px-4">Date</th>
                   <th className="text-left py-3 px-4">Actions</th>
                 </tr>
@@ -242,39 +316,73 @@ export default function OrdersManagement() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="py-4 px-4 text-center text-gray-600">Loading orders...</td>
+                    <td colSpan={8} className="py-4 px-4 text-center text-gray-600">Loading orders...</td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan={7} className="py-4 px-4 text-center text-red-600">{error}</td>
+                    <td colSpan={8} className="py-4 px-4 text-center text-red-600">{error}</td>
                   </tr>
                 ) : orders.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-4 px-4 text-center text-gray-500">No orders found</td>
+                    <td colSpan={8} className="py-4 px-4 text-center text-gray-500">No orders found</td>
                   </tr>
                 ) : (
-                  orders.map((order) => (
-                    <tr key={order._id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-4 text-blue-600">{order.invoiceNo || order._id}</td>
-                      <td className="py-3 px-4">{order.shippingAddress?.name || '—'}</td>
-                      <td className="py-3 px-4">{order.items?.length || 0}</td>
-                      <td className="py-3 px-4"><span className="dirham-symbol mr-1">&#xea;</span>{order.pricing?.grandTotal || '0'}</td>
-                      <td className="py-3 px-4">
-                        <Badge variant={getStatusBadgeVariant(order.status)}>
-                          {order.status}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-4">{formatDate(order.createdAt)}</td>
-                      <td className="py-3 px-4">
-                        <button 
-                          className="p-1 hover:bg-gray-100 rounded"
-                          onClick={() => navigate(`/orders/${order._id}`)}
-                        >
-                          <Eye className="w-4 h-4 text-blue-600" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  orders.map((order) => {
+                    const isPending = order.status?.toLowerCase() === 'pending';
+                    return (
+                      <tr key={order._id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-3 px-4 text-blue-600">{order.invoiceNo || order._id}</td>
+                        <td className="py-3 px-4">{order.shippingAddress?.name || '—'}</td>
+                        <td className="py-3 px-4">{order.items?.length || 0}</td>
+                        <td className="py-3 px-4"><span className="dirham-symbol mr-1">&#xea;</span>{parseFloat(order.pricing?.grandTotal || '0').toFixed(2)}</td>
+                        <td className="py-3 px-4">
+                          <Badge className={getStatusBadgeClass(order.status)}>
+                            {capitalize(order.status)}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4">
+                          {order.deliveryType ? (
+                            <Badge className={order.deliveryType?.toLowerCase() === 'express' ? 'bg-purple-100 text-purple-700 border border-purple-300' : 'bg-blue-100 text-blue-700 border border-blue-300'}>
+                              {capitalize(order.deliveryType)}
+                            </Badge>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">{formatDate(order.createdAt)}</td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2">
+                            {isPending && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  className="border-2 border-green-600 bg-green-600 text-white hover:bg-green-700"
+                                  onClick={() => handleAcceptOrder(order)}
+                                  disabled={acceptingId === order._id || rejectingId === order._id}
+                                >
+                                  {acceptingId === order._id ? 'Accepting...' : 'Accept'}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => handleRejectOrder(order)}
+                                  disabled={acceptingId === order._id || rejectingId === order._id}
+                                >
+                                  {rejectingId === order._id ? 'Rejecting...' : 'Reject'}
+                                </Button>
+                              </>
+                            )}
+                            <button
+                              className="p-1 hover:bg-gray-100 rounded"
+                              onClick={() => navigate(`/orders/${order._id}`)}
+                            >
+                              <Eye className="w-4 h-4 text-blue-600" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

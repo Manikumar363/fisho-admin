@@ -84,6 +84,9 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
   const [expressDelivery, setExpressDelivery] = useState(false);
   const [nextDayDelivery, setNextDayDelivery] = useState(false);
   const [festiveOffer, setFestiveOffer] = useState(false);
+  const [defaultCostPerKg, setDefaultCostPerKg] = useState('');
+  const [defaultDiscount, setDefaultDiscount] = useState('');
+  const [defaultProfit, setDefaultProfit] = useState('');
 
   // New: Store image per cut type
   const [cutTypeImages, setCutTypeImages] = useState<{ [cutType: string]: File | null }>({});
@@ -258,6 +261,45 @@ const AddProductVariant: React.FC<AddProductVariantProps> = ({ onBack }) => {
                 placeholder="Enter nutritional information (e.g., Protein: 20g per 100g, Omega-3: 500mg...)"
                 // Add state and handler for nutrition as needed
               />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="defaultCostPerKg">Default Cost Per KG</Label>
+                <Input
+                  id="defaultCostPerKg"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Enter default cost per kg"
+                  value={defaultCostPerKg}
+                  onChange={e => setDefaultCostPerKg(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="defaultDiscount">Default Discount %</Label>
+                <Input
+                  id="defaultDiscount"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  placeholder="Enter default discount %"
+                  value={defaultDiscount}
+                  onChange={e => setDefaultDiscount(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="defaultProfit">Default Profit %</Label>
+                <Input
+                  id="defaultProfit"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Enter default profit %"
+                  value={defaultProfit}
+                  onChange={e => setDefaultProfit(e.target.value)}
+                />
+              </div>
             </div>
             <div>
               <Label htmlFor="cutTypes">Available Cut Types</Label>

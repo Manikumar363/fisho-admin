@@ -5,18 +5,25 @@ import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { Textarea } from '../../ui/textarea';
-import { toast } from 'sonner';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
+import { toast } from 'react-toastify';
+import { apiFetch } from '../../../lib/api';
 
 interface Offer {
-  id: string;
+  _id: string;
   couponName: string;
   couponDescription: string;
   discountPercentage: number;
-  minOrderValue: number;
+  minimumOrderValue: number;
   expiryDate: string;
-  usageLimit: number;
-  totalUsersAvailed: number;
-  status: 'Active' | 'Expired';
+  usageLimitPerUser: number;
+  totalUsageLimit: number;
+  currentUsageCount: number;
+  status: 'active' | 'inactive' | 'expired';
+  applicableCategories: string[];
+  excludedProducts: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface EditOfferProps {
@@ -30,12 +37,15 @@ export default function EditOffer({ offer, onBack, onSave }: EditOfferProps) {
     couponName: offer.couponName,
     couponDescription: offer.couponDescription,
     discountPercentage: String(offer.discountPercentage),
-    minOrderValue: String(offer.minOrderValue),
-    expiryDate: offer.expiryDate,
-    usageLimit: String(offer.usageLimit)
+    minimumOrderValue: String(offer.minimumOrderValue),
+    expiryDate: offer.expiryDate.split('T')[0], // Format to YYYY-MM-DD
+    usageLimitPerUser: String(offer.usageLimitPerUser),
+    totalUsageLimit: String(offer.totalUsageLimit),
+    status: offer.status
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -62,27 +72,33 @@ export default function EditOffer({ offer, onBack, onSave }: EditOfferProps) {
       newErrors.discountPercentage = 'Discount must be between 1 and 100';
     }
 
-    if (!formData.minOrderValue) {
-      newErrors.minOrderValue = 'Minimum order value is required';
-    } else if (Number(formData.minOrderValue) < 0) {
-      newErrors.minOrderValue = 'Minimum order value must be positive';
+    if (!formData.minimumOrderValue) {
+      newErrors.minimumOrderValue = 'Minimum order value is required';
+    } else if (Number(formData.minimumOrderValue) < 0) {
+      newErrors.minimumOrderValue = 'Minimum order value must be positive';
     }
 
     if (!formData.expiryDate) {
       newErrors.expiryDate = 'Expiry date is required';
     }
 
-    if (!formData.usageLimit) {
-      newErrors.usageLimit = 'Usage limit is required';
-    } else if (Number(formData.usageLimit) <= 0) {
-      newErrors.usageLimit = 'Usage limit must be greater than 0';
+    if (!formData.usageLimitPerUser) {
+      newErrors.usageLimitPerUser = 'Usage limit per user is required';
+    } else if (Number(formData.usageLimitPerUser) <= 0) {
+      newErrors.usageLimitPerUser = 'Usage limit must be greater than 0';
+    }
+
+    if (!formData.totalUsageLimit) {
+      newErrors.totalUsageLimit = 'Total usage limit is required';
+    } else if (Number(formData.totalUsageLimit) <= 0) {
+      newErrors.totalUsageLimit = 'Total usage limit must be greater than 0';
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!validateForm()) {
@@ -90,15 +106,40 @@ export default function EditOffer({ offer, onBack, onSave }: EditOfferProps) {
       return;
     }
 
-    onSave({
-      ...offer,
-      couponName: formData.couponName.trim(),
-      couponDescription: formData.couponDescription.trim(),
-      discountPercentage: Number(formData.discountPercentage),
-      minOrderValue: Number(formData.minOrderValue),
-      expiryDate: formData.expiryDate,
-      usageLimit: Number(formData.usageLimit)
-    });
+    setIsSubmitting(true);
+    try {
+      const updateData = {
+        couponName: formData.couponName.trim(),
+        couponDescription: formData.couponDescription.trim(),
+        discountPercentage: Number(formData.discountPercentage),
+        minimumOrderValue: Number(formData.minimumOrderValue),
+        expiryDate: formData.expiryDate,
+        usageLimitPerUser: Number(formData.usageLimitPerUser),
+        totalUsageLimit: Number(formData.totalUsageLimit),
+        status: formData.status
+      };
+
+      const response = await apiFetch<{
+        success: boolean;
+        coupon: Offer;
+        message: string;
+      }>(`/api/coupons/update-coupon/${offer._id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updateData)
+      });
+
+      if (response.success) {
+        toast.success(response.message || 'Offer updated successfully');
+        onSave(response.coupon);
+      } else {
+        toast.error('Failed to update offer');
+      }
+    } catch (error: any) {
+      console.error('Error updating offer:', error);
+      toast.error(error.message || 'Failed to update offer');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -110,7 +151,7 @@ export default function EditOffer({ offer, onBack, onSave }: EditOfferProps) {
         </Button>
         <div>
           <h1 className="mb-1">Edit Offer</h1>
-          <p className="text-gray-600">Update offer details - {offer.id}</p>
+          <p className="text-gray-600">Update offer details - {offer.couponName}</p>
         </div>
       </div>
 
@@ -133,6 +174,7 @@ export default function EditOffer({ offer, onBack, onSave }: EditOfferProps) {
                   value={formData.couponName}
                   onChange={handleChange}
                   className={errors.couponName ? 'border-red-500' : ''}
+                  disabled={isSubmitting}
                 />
                 {errors.couponName && (
                   <p className="text-sm text-red-500">{errors.couponName}</p>
@@ -154,6 +196,7 @@ export default function EditOffer({ offer, onBack, onSave }: EditOfferProps) {
                   value={formData.discountPercentage}
                   onChange={handleChange}
                   className={errors.discountPercentage ? 'border-red-500' : ''}
+                  disabled={isSubmitting}
                 />
                 {errors.discountPercentage && (
                   <p className="text-sm text-red-500">{errors.discountPercentage}</p>
@@ -162,21 +205,22 @@ export default function EditOffer({ offer, onBack, onSave }: EditOfferProps) {
 
               {/* Minimum Order Value */}
               <div className="space-y-2">
-                <Label htmlFor="minOrderValue">
-                  Minimum Order Value (₹) <span className="text-red-500">*</span>
+                <Label htmlFor="minimumOrderValue">
+                  Minimum Order Value (<span className="dirham-symbol">&#xea;</span>) <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  id="minOrderValue"
-                  name="minOrderValue"
+                  id="minimumOrderValue"
+                  name="minimumOrderValue"
                   type="number"
                   placeholder="e.g., 500"
                   min="0"
-                  value={formData.minOrderValue}
+                  value={formData.minimumOrderValue}
                   onChange={handleChange}
-                  className={errors.minOrderValue ? 'border-red-500' : ''}
+                  className={errors.minimumOrderValue ? 'border-red-500' : ''}
+                  disabled={isSubmitting}
                 />
-                {errors.minOrderValue && (
-                  <p className="text-sm text-red-500">{errors.minOrderValue}</p>
+                {errors.minimumOrderValue && (
+                  <p className="text-sm text-red-500">{errors.minimumOrderValue}</p>
                 )}
               </div>
 
@@ -192,6 +236,7 @@ export default function EditOffer({ offer, onBack, onSave }: EditOfferProps) {
                   value={formData.expiryDate}
                   onChange={handleChange}
                   className={errors.expiryDate ? 'border-red-500' : ''}
+                  disabled={isSubmitting}
                 />
                 {errors.expiryDate && (
                   <p className="text-sm text-red-500">{errors.expiryDate}</p>
@@ -200,33 +245,75 @@ export default function EditOffer({ offer, onBack, onSave }: EditOfferProps) {
 
               {/* Usage Limit per User */}
               <div className="space-y-2">
-                <Label htmlFor="usageLimit">
+                <Label htmlFor="usageLimitPerUser">
                   Usage Limit per User <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  id="usageLimit"
-                  name="usageLimit"
+                  id="usageLimitPerUser"
+                  name="usageLimitPerUser"
                   type="number"
                   placeholder="e.g., 3"
                   min="1"
-                  value={formData.usageLimit}
+                  value={formData.usageLimitPerUser}
                   onChange={handleChange}
-                  className={errors.usageLimit ? 'border-red-500' : ''}
+                  className={errors.usageLimitPerUser ? 'border-red-500' : ''}
+                  disabled={isSubmitting}
                 />
-                {errors.usageLimit && (
-                  <p className="text-sm text-red-500">{errors.usageLimit}</p>
+                {errors.usageLimitPerUser && (
+                  <p className="text-sm text-red-500">{errors.usageLimitPerUser}</p>
                 )}
               </div>
 
-              {/* Total Users Availed (Read-only) */}
+              {/* Total Usage Limit */}
               <div className="space-y-2">
-                <Label htmlFor="totalUsersAvailed">Total Users Availed</Label>
+                <Label htmlFor="totalUsageLimit">
+                  Total Usage Limit <span className="text-red-500">*</span>
+                </Label>
                 <Input
-                  id="totalUsersAvailed"
-                  value={offer.totalUsersAvailed}
+                  id="totalUsageLimit"
+                  name="totalUsageLimit"
+                  type="number"
+                  placeholder="e.g., 1000"
+                  min="1"
+                  value={formData.totalUsageLimit}
+                  onChange={handleChange}
+                  className={errors.totalUsageLimit ? 'border-red-500' : ''}
+                  disabled={isSubmitting}
+                />
+                {errors.totalUsageLimit && (
+                  <p className="text-sm text-red-500">{errors.totalUsageLimit}</p>
+                )}
+              </div>
+
+              {/* Current Usage Count (Read-only) */}
+              <div className="space-y-2">
+                <Label htmlFor="currentUsageCount">Current Usage Count</Label>
+                <Input
+                  id="currentUsageCount"
+                  value={offer.currentUsageCount}
                   disabled
                   className="bg-gray-50"
                 />
+              </div>
+
+              {/* Status */}
+              <div className="space-y-2">
+                <Label htmlFor="status">
+                  Status <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as 'active' | 'inactive' }))}
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -243,6 +330,7 @@ export default function EditOffer({ offer, onBack, onSave }: EditOfferProps) {
                 onChange={handleChange}
                 rows={4}
                 className={errors.couponDescription ? 'border-red-500' : ''}
+                disabled={isSubmitting}
               />
               {errors.couponDescription && (
                 <p className="text-sm text-red-500">{errors.couponDescription}</p>
@@ -251,11 +339,11 @@ export default function EditOffer({ offer, onBack, onSave }: EditOfferProps) {
 
             {/* Action Buttons */}
             <div className="flex justify-end gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={onBack}>
+              <Button type="button" variant="outline" onClick={onBack} disabled={isSubmitting}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-                Update Offer
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={isSubmitting}>
+                {isSubmitting ? 'Updating...' : 'Update Offer'}
               </Button>
             </div>
           </form>

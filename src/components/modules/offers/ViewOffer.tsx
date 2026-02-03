@@ -1,19 +1,26 @@
-import React from 'react';
-import { ArrowLeft, Calendar, Percent, IndianRupee, Users, Tag, Clock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Calendar, Percent, IndianRupee, Users, Tag, Clock, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
+import { toast } from 'react-toastify';
+import { apiFetch } from '../../../lib/api';
 
 interface Offer {
-  id: string;
+  _id: string;
   couponName: string;
   couponDescription: string;
   discountPercentage: number;
-  minOrderValue: number;
+  minimumOrderValue: number;
   expiryDate: string;
-  usageLimit: number;
-  totalUsersAvailed: number;
-  status: 'Active' | 'Expired';
+  usageLimitPerUser: number;
+  totalUsageLimit: number;
+  currentUsageCount: number;
+  status: 'active' | 'inactive' | 'expired';
+  applicableCategories: string[];
+  excludedProducts: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface ViewOfferProps {
@@ -21,34 +28,111 @@ interface ViewOfferProps {
   onBack: () => void;
 }
 
-// Mock data for users who availed the offer
-const generateMockUsers = (count: number) => {
-  const users = [];
-  const names = ['Rajesh Kumar', 'Priya Sharma', 'Mohammed Ali', 'Anjali Patel', 'Suresh Nair', 
-                 'Deepika Singh', 'Arjun Reddy', 'Meera Krishnan', 'Vikram Mehta', 'Pooja Desai'];
-  
-  for (let i = 0; i < Math.min(count, 20); i++) {
-    const date = new Date();
-    date.setDate(date.getDate() - Math.floor(Math.random() * 30));
-    
-    users.push({
-      id: `USR-${String(i + 1).padStart(4, '0')}`,
-      name: names[i % names.length],
-      orderId: `ORD-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
-      date: date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-      amount: `<span className="dirham-symbol">&#xea;</span>${Math.floor(Math.random() * 5000) + 500}`
-    });
-  }
-  
-  return users;
-};
-
 export default function ViewOffer({ offer, onBack }: ViewOfferProps) {
-  const users = generateMockUsers(offer.totalUsersAvailed);
-  
-  const expiryDate = new Date(offer.expiryDate);
+  const [couponData, setCouponData] = useState<Offer>(offer);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchCouponDetails();
+  }, [offer._id]);
+
+  const fetchCouponDetails = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await apiFetch<{
+        success: boolean;
+        coupon: Offer;
+        message: string;
+      }>(`/api/coupons/get-coupon/${offer._id}`);
+
+      if (response.success) {
+        setCouponData(response.coupon);
+      } else {
+        setError('Failed to fetch coupon details');
+        toast.error('Failed to fetch coupon details');
+      }
+    } catch (err: any) {
+      console.error('Error fetching coupon:', err);
+      setError(err.message || 'Failed to fetch coupon details');
+      toast.error(err.message || 'Failed to fetch coupon details');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const expiryDate = new Date(couponData.expiryDate);
   const today = new Date();
   const daysUntilExpiry = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+  const getStatusBadgeClass = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'active':
+        return 'bg-green-100 text-green-700 hover:bg-green-100 px-4 py-2';
+      case 'expired':
+        return 'bg-red-100 text-red-700 hover:bg-red-100 px-4 py-2';
+      case 'inactive':
+        return 'bg-gray-100 text-gray-700 hover:bg-gray-100 px-4 py-2';
+      default:
+        return 'bg-gray-100 text-gray-700 hover:bg-gray-100 px-4 py-2';
+    }
+  };
+
+  const capitalizeFirstLetter = (text: string) => {
+    return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+  };
+
+  const usagePercentage = couponData.totalUsageLimit > 0 
+    ? ((couponData.currentUsageCount / couponData.totalUsageLimit) * 100).toFixed(1)
+    : '0';
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+          <div className="flex-1">
+            <h1 className="mb-1">Offer Details</h1>
+            <p className="text-gray-600">Loading offer information...</p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="p-12 text-center">
+            <div className="text-gray-500">Loading coupon details...</div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+          <div className="flex-1">
+            <h1 className="mb-1">Offer Details</h1>
+            <p className="text-gray-600">Error loading offer</p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="p-12 text-center">
+            <div className="text-red-500">{error}</div>
+            <Button onClick={fetchCouponDetails} className="mt-4">
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -61,16 +145,52 @@ export default function ViewOffer({ offer, onBack }: ViewOfferProps) {
           <h1 className="mb-1">Offer Details</h1>
           <p className="text-gray-600">View complete offer information and usage statistics</p>
         </div>
-        <Badge
-          variant={offer.status === 'Active' ? 'default' : 'secondary'}
-          className={
-            offer.status === 'Active'
-              ? 'bg-green-100 text-green-700 hover:bg-green-100 px-4 py-2'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-100 px-4 py-2'
-          }
-        >
-          {offer.status}
+        <Badge className={getStatusBadgeClass(couponData.status)}>
+          {capitalizeFirstLetter(couponData.status)}
         </Badge>
+      </div>
+
+      {/* Usage Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Users className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <div className="text-sm text-gray-600">Current Usage</div>
+                <div className="text-2xl font-bold">{couponData.currentUsageCount}</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <TrendingUp className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <div className="text-sm text-gray-600">Total Limit</div>
+                <div className="text-2xl font-bold">{couponData.totalUsageLimit}</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <Percent className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <div className="text-sm text-gray-600">Usage Rate</div>
+                <div className="text-2xl font-bold">{usagePercentage}%</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Offer Information Card */}
@@ -86,8 +206,8 @@ export default function ViewOffer({ offer, onBack }: ViewOfferProps) {
                   <Tag className="w-5 h-5 text-blue-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-gray-600 mb-1">Offer ID</p>
-                  <p>{offer.id}</p>
+                  <p className="text-sm text-gray-600 mb-1">Coupon ID</p>
+                  <p className="font-mono text-sm">{couponData._id}</p>
                 </div>
               </div>
 
@@ -97,7 +217,7 @@ export default function ViewOffer({ offer, onBack }: ViewOfferProps) {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-600 mb-1">Coupon Name</p>
-                  <p>{offer.couponName}</p>
+                  <p className="font-semibold">{couponData.couponName}</p>
                 </div>
               </div>
 
@@ -107,7 +227,7 @@ export default function ViewOffer({ offer, onBack }: ViewOfferProps) {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-600 mb-1">Discount Percentage</p>
-                  <p>{offer.discountPercentage}%</p>
+                  <p className="font-semibold">{couponData.discountPercentage}%</p>
                 </div>
               </div>
 
@@ -117,7 +237,9 @@ export default function ViewOffer({ offer, onBack }: ViewOfferProps) {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-600 mb-1">Minimum Order Value</p>
-                  <p><span className="dirham-symbol">&#xea;</span>{offer.minOrderValue}</p>
+                  <p className="font-semibold">
+                    <span className="dirham-symbol">&#xea;</span>{couponData.minimumOrderValue}
+                  </p>
                 </div>
               </div>
             </div>
@@ -129,14 +251,14 @@ export default function ViewOffer({ offer, onBack }: ViewOfferProps) {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-600 mb-1">Expiry Date</p>
-                  <p>
+                  <p className="font-semibold">
                     {expiryDate.toLocaleDateString('en-IN', {
                       day: '2-digit',
                       month: 'long',
                       year: 'numeric'
                     })}
                   </p>
-                  {offer.status === 'Active' && daysUntilExpiry > 0 && (
+                  {couponData.status === 'active' && daysUntilExpiry > 0 && (
                     <p className="text-sm text-gray-500 mt-1">
                       {daysUntilExpiry} days remaining
                     </p>
@@ -150,7 +272,9 @@ export default function ViewOffer({ offer, onBack }: ViewOfferProps) {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-600 mb-1">Usage Limit per User</p>
-                  <p>{offer.usageLimit} {offer.usageLimit === 1 ? 'time' : 'times'}</p>
+                  <p className="font-semibold">
+                    {couponData.usageLimitPerUser} {couponData.usageLimitPerUser === 1 ? 'time' : 'times'}
+                  </p>
                 </div>
               </div>
 
@@ -159,8 +283,24 @@ export default function ViewOffer({ offer, onBack }: ViewOfferProps) {
                   <Users className="w-5 h-5 text-indigo-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-gray-600 mb-1">Total Users Availed</p>
-                  <p>{offer.totalUsersAvailed} users</p>
+                  <p className="text-sm text-gray-600 mb-1">Total Usage Limit</p>
+                  <p className="font-semibold">{couponData.totalUsageLimit} uses</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-teal-100 rounded-lg">
+                  <Calendar className="w-5 h-5 text-teal-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-600 mb-1">Created At</p>
+                  <p className="font-semibold">
+                    {new Date(couponData.createdAt).toLocaleDateString('en-IN', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric'
+                    })}
+                  </p>
                 </div>
               </div>
             </div>
@@ -168,56 +308,32 @@ export default function ViewOffer({ offer, onBack }: ViewOfferProps) {
 
           <div className="mt-6 pt-6 border-t border-gray-200">
             <p className="text-sm text-gray-600 mb-2">Description</p>
-            <p className="text-gray-800">{offer.couponDescription}</p>
+            <p className="text-gray-800">{couponData.couponDescription}</p>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Usage Statistics Card */}
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>Usage Statistics</CardTitle>
-            <Badge variant="outline" className="text-blue-600 border-blue-600">
-              {offer.totalUsersAvailed} Total Users
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {offer.totalUsersAvailed === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <Users className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-              <p>No users have availed this offer yet</p>
+          {couponData.applicableCategories.length > 0 && (
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <p className="text-sm text-gray-600 mb-2">Applicable Categories</p>
+              <div className="flex flex-wrap gap-2">
+                {couponData.applicableCategories.map((category, index) => (
+                  <Badge key={index} variant="outline" className="text-blue-600 border-blue-600">
+                    {category}
+                  </Badge>
+                ))}
+              </div>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-4">User ID</th>
-                    <th className="text-left py-3 px-4">User Name</th>
-                    <th className="text-left py-3 px-4">Order ID</th>
-                    <th className="text-left py-3 px-4">Order Amount</th>
-                    <th className="text-left py-3 px-4">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((user) => (
-                    <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-4">{user.id}</td>
-                      <td className="py-3 px-4">{user.name}</td>
-                      <td className="py-3 px-4">{user.orderId}</td>
-                      <td className="py-3 px-4">{user.amount}</td>
-                      <td className="py-3 px-4">{user.date}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {offer.totalUsersAvailed > 20 && (
-                <div className="mt-4 text-center text-sm text-gray-600">
-                  Showing 20 of {offer.totalUsersAvailed} users
-                </div>
-              )}
+          )}
+
+          {couponData.excludedProducts.length > 0 && (
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <p className="text-sm text-gray-600 mb-2">Excluded Products</p>
+              <div className="flex flex-wrap gap-2">
+                {couponData.excludedProducts.map((product, index) => (
+                  <Badge key={index} variant="outline" className="text-red-600 border-red-600">
+                    {product}
+                  </Badge>
+                ))}
+              </div>
             </div>
           )}
         </CardContent>

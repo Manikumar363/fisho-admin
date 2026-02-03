@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Search, Filter, Edit, Trash2, ChevronRight, ToggleLeft, ToggleRight, ChevronUp, ChevronDown, GripVertical, Eye, Loader, X } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, ChevronRight, ToggleLeft, ToggleRight, ChevronUp, ChevronDown, GripVertical, Eye, Loader, X, Image as ImageIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -12,7 +12,7 @@ import { Switch } from '../ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { ImageWithFallback } from '../ui/ImageWithFallback';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
-import { apiFetch } from '../../lib/api';
+import { apiFetch, API_BASE_URL } from '../../lib/api';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import CutTypeSection from './inventory/CutTypeSection';
@@ -45,6 +45,24 @@ export default function InventoryManagement() {
   const [productsPage, setProductsPage] = useState(1);
   const [variantsPage, setVariantsPage] = useState(1);
   const [showAddProductVariant, setShowAddProductVariant] = useState(false);
+  const [productCutTypeImages, setProductCutTypeImages] = useState<{ [cutType: string]: File | null }>({});
+  const [existingCutTypeImages, setExistingCutTypeImages] = useState<{ [cutType: string]: string }>({});
+  const [existingVariantIds, setExistingVariantIds] = useState<{ [key: string]: string }>({});
+  const [productVariantRows, setProductVariantRows] = useState<{
+    [key: string]: {
+      costPricePerKg: string;
+      profitPercent: string;
+      displayPrice: string;
+      discountPercent: string;
+      sellingPrice: string;
+      featured: boolean;
+      bestSeller: boolean;
+      expressDelivery: boolean;
+      nextDayDelivery: boolean;
+      festivOffer: boolean;
+      notes: string;
+    }
+  }>({});
   const CATEGORIES_PAGE_SIZE = 20;
   const PRODUCTS_PAGE_SIZE = 20;
   const VARIANTS_PAGE_SIZE = 20;
@@ -115,12 +133,16 @@ const [originalProductForm, setOriginalProductForm] = useState({
 const [originalVariantForm, setOriginalVariantForm] = useState({
   species: '',
   product: '',
-  variantName: '',
+  productName: '',
   variantImage: null as File | null,
   existingImage: '',
   cutType: '',
   featured: false,
   bestSeller: false,
+  isExpressDelivery: false,
+  isNextDayDelivery: false,
+  isSpecial: false,
+  costPrice: '',
   profit: '',
   displayPrice: '',
   discount: '',
@@ -160,13 +182,18 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
   const [variantForm, setVariantForm] = useState({
     species: '',
     product: '',
-    variantName: '',
+    productName: '',
     variantImage: null as File | null,
     existingImage: '',
     existingImageUrl: '',
     cutType: '',
+    weight: '',
     featured: false,
     bestSeller: false,
+    isExpressDelivery: false,
+    isNextDayDelivery: false,
+    isSpecial: false,
+    costPrice: '',
     profit: '',
     displayPrice: '',
     discount: '',
@@ -289,6 +316,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
   useEffect(() => {
     if (activeTab === 'products') {
       fetchProducts();
+      fetchVariants(); // Also fetch variants so we can populate pricing table on edit
     }
   }, [activeTab]);
 
@@ -296,6 +324,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
   useEffect(() => {
     if (activeTab === 'variants') {
       fetchVariants();
+      fetchProducts(); // Also fetch products so we have data when editing variants
     }
   }, [activeTab]);
 
@@ -324,10 +353,15 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
           bestSeller: boolean;
           notes?: string;
           profit: number;
+          weight?: number;
+          costPrice?: number;
           discount: number;
           displayPrice: number;
           sellingPrice: number;
           isActive: boolean;
+          isExpressDelivery?: boolean;
+          isNextDayDelivery?: boolean;
+          special?: boolean;
           createdAt: string;
           updatedAt: string;
         }>;
@@ -344,23 +378,35 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
           species = catAny.name || '—';
         }
 
+        // Extract the raw image path (strip IMAGE_BASE if present)
+        let rawImagePath = v.image || '';
+        if (rawImagePath && IMAGE_BASE && rawImagePath.startsWith(IMAGE_BASE)) {
+          rawImagePath = rawImagePath.substring(IMAGE_BASE.length);
+        }
+
         return {
           id: v._id,
           variantName: v.name,
           product: v.product?.name || '—',
           species,
           cutType: v.cutType?.name || '—',
+          cutTypeId: v.cutType?._id,
           featured: v.featured || false,
           bestSeller: v.bestSeller || false,
-          costPrice: v.product?.cost || 0,
+          isExpressDelivery: v.isExpressDelivery || false,
+          isNextDayDelivery: v.isNextDayDelivery || false,
+          special: v.special || false,
+          costPrice: v.costPrice || 0,
           profit: v.profit || 0,
           discount: v.discount || 0,
           displayPrice: v.displayPrice || 0,
           sellingPrice: v.sellingPrice || 0,
           notes: v.notes,
-          image: v.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${v.image}` : v.image) : undefined,
+          image: v.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${rawImagePath}` : v.image) : undefined,
+          imagePath: rawImagePath || undefined,
           status: v.isActive ? 'Active' : 'Inactive',
           lastUpdated: new Date(v.updatedAt).toISOString().split('T')[0],
+          weight: v.weight || 0,
         };
       });
       setVariants(mapped);
@@ -517,8 +563,13 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
     product: string;
     species: string;
     cutType: string;
+    cutTypeId?: string;
+    weight: number;
     featured: boolean;
     bestSeller: boolean;
+    isExpressDelivery: boolean;
+    isNextDayDelivery: boolean;
+    special: boolean;
     costPrice: number;
     profit: number;
     discount: number;
@@ -528,6 +579,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
     status: string;
     lastUpdated: string;
     image?: string;
+    imagePath?: string;
   }>>([]);
   const [variantsLoading, setVariantsLoading] = useState(false);
   const [variantsError, setVariantsError] = useState<string | null>(null);
@@ -696,58 +748,243 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
     })();
   };
 
-  const moveVariant = (index: number, direction: 'up' | 'down') => {
-    const newVariants = [...variants];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    
-    if (targetIndex < 0 || targetIndex >= newVariants.length) return;
-    
-    [newVariants[index], newVariants[targetIndex]] = [newVariants[targetIndex], newVariants[index]];
-    setVariants(newVariants);
-  };
+const moveVariant = (index: number, direction: 'up' | 'down') => {
+  const newVariants = [...variants];
+  const targetIndex = direction === 'up' ? index - 1 : index + 1;
   
-  const handleAddCutType = (cutTypeId: string) => {
-    if (!cutTypeId) return;
-    setProductForm((prev) => {
-      if (prev.cutTypes.includes(cutTypeId)) return { ...prev, currentCutType: '' };
-      return {
-        ...prev,
-        cutTypes: [...prev.cutTypes, cutTypeId],
-        currentCutType: '' // Reset after add
-      };
-    });
-  };
+  if (targetIndex < 0 || targetIndex >= newVariants.length) return;
+  
+  [newVariants[index], newVariants[targetIndex]] = [newVariants[targetIndex], newVariants[index]];
+  setVariants(newVariants);
+};
 
-  const handleRemoveCutType = (cutTypeId: string) => {
-    setProductForm((prev) => ({
-      ...prev,
-      cutTypes: prev.cutTypes.filter((id) => id !== cutTypeId),
-    }));
-  };
-
-  const handleAddWeight = () => {
-    const weight = parseFloat(productForm.currentWeight);
-    if (!isNaN(weight) && weight > 0 && !productForm.availableWeights.includes(weight)) {
-      setProductForm({
-        ...productForm,
-        availableWeights: [...productForm.availableWeights, weight],
-        currentWeight: ''
-      });
+const handleAddCutType = (cutTypeId: string) => {
+  if (!cutTypeId) return;
+  setProductForm((prev) => {
+    if (prev.cutTypes.includes(cutTypeId)) return { ...prev, currentCutType: '' };
+    
+    // Auto-populate cost price for all weights with this new cut type
+    if (prev.costPricePerKg) {
+      const costPerKg = parseFloat(prev.costPricePerKg);
+      if (!isNaN(costPerKg) && costPerKg > 0) {
+        setProductVariantRows(prevRows => {
+          const newRows = { ...prevRows };
+          prev.availableWeights.forEach(weight => {
+            const rowKey = getVariantRowKey(cutTypeId, weight);
+            const costPriceForWeight = (costPerKg * weight / 1000).toFixed(2);
+            const profit = parseFloat(prev.defaultProfit) || 0;
+            const discount = parseFloat(prev.defaultDiscount) || 0;
+            const prices = calculateVariantPrices(parseFloat(costPriceForWeight), profit, discount);
+            
+            newRows[rowKey] = {
+              costPricePerKg: costPriceForWeight,
+              profitPercent: String(profit),
+              displayPrice: prices.displayPrice,
+              discountPercent: String(discount),
+              sellingPrice: prices.sellingPrice,
+              featured: false,
+              bestSeller: false,
+              expressDelivery: false,
+              nextDayDelivery: false,
+              festivOffer: false,
+              notes: ''
+            };
+          });
+          return newRows;
+        });
+      }
     }
-  };
+    
+    return {
+      ...prev,
+      cutTypes: [...prev.cutTypes, cutTypeId],
+      currentCutType: ''
+    };
+  });
+};
 
-  const handleRemoveWeight = (weight: number) => {
-    setProductForm({
-      ...productForm,
-      availableWeights: productForm.availableWeights.filter(w => w !== weight)
+const handleRemoveCutType = (cutTypeId: string) => {
+  setProductForm((prev) => ({
+    ...prev,
+    cutTypes: prev.cutTypes.filter((id) => id !== cutTypeId),
+  }));
+  
+  // Remove variant rows for this cut type
+  setProductVariantRows(prevRows => {
+    const newRows = { ...prevRows };
+    productForm.availableWeights.forEach(weight => {
+      const rowKey = getVariantRowKey(cutTypeId, weight);
+      delete newRows[rowKey];
     });
-  };
+    return newRows;
+  });
+};
 
-  // Auto-calculate variant prices
+const handleAddWeight = () => {
+  const weight = parseFloat(productForm.currentWeight);
+  if (!isNaN(weight) && weight > 0 && !productForm.availableWeights.includes(weight)) {
+    setProductForm(prev => ({
+      ...prev,
+      availableWeights: [...prev.availableWeights, weight],
+      currentWeight: ''
+    }));
+    
+    // Auto-populate cost price for all cut types with this new weight
+    if (productForm.costPricePerKg) {
+      const costPerKg = parseFloat(productForm.costPricePerKg);
+      if (!isNaN(costPerKg) && costPerKg > 0) {
+        setProductVariantRows(prevRows => {
+          const newRows = { ...prevRows };
+          productForm.cutTypes.forEach(cutTypeId => {
+            const rowKey = getVariantRowKey(cutTypeId, weight);
+            const costPriceForWeight = (costPerKg * weight / 1000).toFixed(2);
+            const profit = parseFloat(productForm.defaultProfit) || 0;
+            const discount = parseFloat(productForm.defaultDiscount) || 0;
+            const prices = calculateVariantPrices(parseFloat(costPriceForWeight), profit, discount);
+            
+            newRows[rowKey] = {
+              costPricePerKg: costPriceForWeight,
+              profitPercent: String(profit),
+              displayPrice: prices.displayPrice,
+              discountPercent: String(discount),
+              sellingPrice: prices.sellingPrice,
+              featured: false,
+              bestSeller: false,
+              expressDelivery: false,
+              nextDayDelivery: false,
+              festivOffer: false,
+              notes: ''
+            };
+          });
+          return newRows;
+        });
+      }
+    }
+  }
+};
+
+const handleRemoveWeight = (weight: number) => {
+  setProductForm(prev => ({
+    ...prev,
+    availableWeights: prev.availableWeights.filter(w => w !== weight)
+  }));
+  
+  // Remove variant rows for this weight
+  setProductVariantRows(prevRows => {
+    const newRows = { ...prevRows };
+    productForm.cutTypes.forEach(cutTypeId => {
+      const rowKey = getVariantRowKey(cutTypeId, weight);
+      delete newRows[rowKey];
+    });
+    return newRows;
+  });
+};
+
+  // Get unique key for variant row
+  const getVariantRowKey = (cutTypeId: string, weight: number) => `${cutTypeId}-${weight}`;
+
+  // Auto-calculate variant prices based on formula: CP + P% = DP, DP - D% = SP
   const calculateVariantPrices = (costPrice: number, profit: number, discount: number) => {
     const displayPrice = costPrice + (costPrice * profit / 100);
     const sellingPrice = displayPrice - (displayPrice * discount / 100);
     return { displayPrice: displayPrice.toFixed(2), sellingPrice: sellingPrice.toFixed(2) };
+  };
+
+  // Handle product variant row field changes
+  const handleProductVariantRowChange = (rowKey: string, field: string, value: string | boolean) => {
+    setProductVariantRows(prev => {
+      const current = prev[rowKey] || { 
+        costPricePerKg: '', 
+        profitPercent: '', 
+        displayPrice: '', 
+        discountPercent: '', 
+        sellingPrice: '',
+        featured: false,
+        bestSeller: false,
+        expressDelivery: false,
+        nextDayDelivery: false,
+        festivOffer: false,
+        notes: ''
+      };
+      const updated = { ...current, [field]: value };
+
+      // Auto-calculate based on which field changes
+      if (field === 'costPricePerKg' || field === 'profitPercent' || field === 'discountPercent') {
+        // Calculate forward: CP + Profit% = DP, DP - Discount% = SP
+        const cp = parseFloat(String(updated.costPricePerKg)) || 0;
+        const p = parseFloat(String(updated.profitPercent)) || 0;
+        const d = parseFloat(String(updated.discountPercent)) || 0;
+
+        if (cp > 0) {
+          const dp = cp + (cp * p / 100);
+          const sp = dp - (dp * d / 100);
+          updated.displayPrice = dp.toFixed(2);
+          updated.sellingPrice = sp.toFixed(2);
+        }
+      } else if (field === 'displayPrice') {
+        // Display price manually changed: recalculate profit% and selling price
+        const cp = parseFloat(String(updated.costPricePerKg)) || 0;
+        const dp = parseFloat(String(updated.displayPrice)) || 0;
+        const d = parseFloat(String(updated.discountPercent)) || 0;
+
+        if (cp > 0 && dp > 0) {
+          // Calculate profit percentage from cost price and display price
+          const profitPercent = ((dp - cp) / cp) * 100;
+          updated.profitPercent = profitPercent.toFixed(2);
+          
+          // Calculate selling price from display price and discount
+          const sp = dp - (dp * d / 100);
+          updated.sellingPrice = sp.toFixed(2);
+        }
+      } else if (field === 'sellingPrice') {
+        // Selling price manually changed: recalculate discount%
+        const dp = parseFloat(String(updated.displayPrice)) || 0;
+        const sp = parseFloat(String(updated.sellingPrice)) || 0;
+
+        if (dp > 0 && sp > 0) {
+          // Calculate discount percentage from display price and selling price
+          const discountPercent = ((dp - sp) / dp) * 100;
+          updated.discountPercent = discountPercent.toFixed(2);
+        }
+      }
+
+      return { ...prev, [rowKey]: updated };
+    });
+  };
+
+  // Upload image using /api/upload-image endpoint
+  const uploadImage = async (file: File): Promise<string> => {
+    console.log('uploadImage called with file:', file.name, file.size, file.type);
+    const uploadFormData = new FormData();
+    uploadFormData.append('image', file);
+
+    try {
+      console.log('Sending upload request to /api/upload-image with URL:', `${API_BASE_URL}/api/upload-image`);
+      const res = await apiFetch<{
+        message?: string;
+        location?: string;
+      }>('/api/upload-image', {
+        method: 'POST',
+        body: uploadFormData,
+      });
+
+      console.log('Upload response received:', res);
+      if (!res.location) {
+        console.error('No location in response:', res);
+        throw new Error(res.message || 'Failed to upload image - no location in response');
+      }
+
+      console.log('Image uploaded successfully, location:', res.location);
+      return res.location;
+    } catch (error: any) {
+      console.error('Image upload error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        status: error.status,
+        stack: error.stack
+      });
+      throw error;
+    }
   };
 
   const handleEditCategory = (category: any) => {
@@ -1005,11 +1242,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
   };
 
   const handleEditVariant = async (variantId: string) => {
-    // Find variant in list
-    const variant = variants.find(v => v.id === variantId);
-    if (!variant) return;
-
-    // Fetch full variant details from API to get product and category IDs
+    // Fetch variant details and populate form for editing
     try {
       const res = await apiFetch<{
         success: boolean;
@@ -1021,12 +1254,12 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
             _id: string;
             name: string;
             category?: string | { _id: string; name: string };
-            cost?: number;
           };
           cutType: {
             _id: string;
             name: string;
           };
+          weight?: number;
           featured: boolean;
           bestSeller: boolean;
           notes?: string;
@@ -1034,7 +1267,10 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
           discount: number;
           displayPrice: number;
           sellingPrice: number;
+          costPrice?: number;
           isActive: boolean;
+          isExpressDelivery?: boolean;
+          isNextDayDelivery?: boolean;
         };
         message?: string;
       }>(`/api/variants/${variantId}`);
@@ -1046,26 +1282,79 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
 
       const v = res.variant;
       
-      // Extract category ID from product
-      let categoryId = '';
+      console.log('Editing variant:', v);
+      console.log('Product category:', v.product?.category);
+      console.log('Available categories:', categories);
+      
+      // Extract category ID from product and match with categories
+      let speciesId = '';
       if (v.product?.category) {
         if (typeof v.product.category === 'object') {
-          categoryId = v.product.category._id;
+          speciesId = v.product.category._id;
+          console.log('Category from object:', speciesId);
         } else {
-          categoryId = v.product.category;
+          // If it's a string, try to match with category name or use it as ID
+          speciesId = String(v.product.category);
+          console.log('Category string:', speciesId);
+          const matchedCategory = categories.find(cat => cat.id === speciesId || cat.name === speciesId);
+          if (matchedCategory) {
+            speciesId = matchedCategory.id;
+            console.log('Matched category:', matchedCategory);
+          } else {
+            console.warn('No matching category found for:', speciesId);
+          }
         }
       }
 
+      console.log('Final speciesId:', speciesId);
+
+      // Fetch products for this category before opening the form
+      if (speciesId) {
+        setLoadingVariantProducts(true);
+        try {
+          console.log('Fetching products for category:', speciesId);
+          const productsRes = await apiFetch<{
+            success: boolean;
+            products?: Array<{ _id: string; name: string; cost?: number; defaultProfit?: number; defaultDiscount?: number; availableCutTypes?: Array<{ _id: string; name: string }> }>;
+          }>(`/api/products/category/${speciesId}`);
+
+          console.log('Products response:', productsRes);
+
+          if (productsRes.success && productsRes.products) {
+            const prods = productsRes.products.map(p => ({
+              id: p._id,
+              name: p.name,
+              costPrice: p.cost,
+              profit: p.defaultProfit,
+              discount: p.defaultDiscount,
+              cutTypeIds: (p.availableCutTypes || []).map(ct => ct._id)
+            }));
+            console.log('Mapped products:', prods);
+            setVariantProducts(prods);
+          }
+        } catch (e: any) {
+          console.error('Failed to fetch products for category:', e);
+        } finally {
+          setLoadingVariantProducts(false);
+        }
+      }
+
+      // Populate variant form for editing
       const formData = {
-        species: categoryId,
-        product: v.product._id,
-        variantName: v.name,
+        species: speciesId,
+        product: v.product?._id || '',
+        productName: v.product?.name || '',
         variantImage: null as File | null,
         existingImage: v.image || '',
         existingImageUrl: v.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${v.image}` : v.image) : '',
-        cutType: v.cutType._id,
+        cutType: v.cutType?._id || '',
+        weight: String(v.weight || ''),
         featured: v.featured,
         bestSeller: v.bestSeller,
+        isExpressDelivery: v.isExpressDelivery || false,
+        isNextDayDelivery: v.isNextDayDelivery || false,
+        isSpecial: (v as any).special || false,
+        costPrice: String(v.costPrice || ''),
         profit: String(v.profit),
         displayPrice: String(v.displayPrice),
         discount: String(v.discount),
@@ -1074,29 +1363,14 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
         availability: v.isActive
       };
 
-      setEditingVariantId(variantId);
+      console.log('Setting variant form:', formData);
       setVariantForm(formData);
-      setOriginalVariantForm({
-        species: formData.species,
-        product: formData.product,
-        variantName: formData.variantName,
-        variantImage: null,
-        existingImage: formData.existingImage,
-        cutType: formData.cutType,
-        featured: formData.featured,
-        bestSeller: formData.bestSeller,
-        profit: formData.profit,
-        displayPrice: formData.displayPrice,
-        discount: formData.discount,
-        sellingPrice: formData.sellingPrice,
-        notes: formData.notes,
-        availability: formData.availability
-      });
+
+      setEditingVariantId(variantId);
       setShowAddModal(true);
     } catch (e: any) {
-      const msg = e?.message || 'Failed to load variant details';
-      console.error('Edit variant error:', e);
-      toast.error(msg);
+      console.error('Failed to load variant for editing:', e);
+      toast.error('Failed to load variant details');
     }
   };
 
@@ -1132,16 +1406,25 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
       bestseller: false,
       isExpressDelivery: false
     });
+    setProductCutTypeImages({});
+    setExistingCutTypeImages({});
+    setProductVariantRows({});
+    setExistingVariantIds({});
     setVariantForm({
       species: '',
       product: '',
-      variantName: '',
+      productName: '',
       variantImage: null,
       existingImage: '',
       existingImageUrl: '',
       cutType: '',
+      weight: '',
       featured: false,
       bestSeller: false,
+      isExpressDelivery: false,
+      isNextDayDelivery: false,
+      isSpecial: false,
+      costPrice: '',
       profit: '',
       displayPrice: '',
       discount: '',
@@ -1254,47 +1537,155 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
 
       setIsSubmitting(true);
       try {
-        const endpoint = editingProductId ? `/api/products/${editingProductId}` : '/api/products';
-        const method = editingProductId ? 'PUT' : 'POST';
+        // Build variants array from productVariantRows
+        const isEdit = editingProductId !== null;
+        const variants = productForm.cutTypes.flatMap(cutTypeId =>
+          productForm.availableWeights.map(weight => {
+            const rowKey = getVariantRowKey(cutTypeId, weight);
+            const rowData = productVariantRows[rowKey] || { 
+              costPricePerKg: '', 
+              profitPercent: '', 
+              displayPrice: '', 
+              discountPercent: '', 
+              sellingPrice: '',
+              featured: false,
+              bestSeller: false,
+              expressDelivery: false,
+              nextDayDelivery: false,
+              festivOffer: false,
+              notes: ''
+            };
+            
+            // Use existing image URL if available, will be overwritten if new image is uploaded
+            const variantImage = existingCutTypeImages[cutTypeId] || '';
+            
+            const variant: any = {
+              cutType: cutTypeId,
+              weight: weight,
+              costPrice: parseFloat(String(rowData.costPricePerKg)) || 0,
+              profit: parseFloat(String(rowData.profitPercent)) || 0,
+              discount: parseFloat(String(rowData.discountPercent)) || 0,
+              displayPrice: parseFloat(String(rowData.displayPrice)) || 0,
+              sellingPrice: parseFloat(String(rowData.sellingPrice)) || 0,
+              featured: rowData.featured,
+              bestSeller: rowData.bestSeller,
+              special: rowData.festivOffer,
+              isExpressDelivery: rowData.expressDelivery,
+              isNextDayDelivery: rowData.nextDayDelivery,
+              isActive: productForm.availability,
+              notes: rowData.notes,
+              image: variantImage
+            };
+            
+            // Include variant _id when editing
+            if (isEdit && existingVariantIds[rowKey]) {
+              variant._id = existingVariantIds[rowKey];
+            }
+            
+            return variant;
+          })
+        );
 
-        // Always use FormData for both POST and PUT to match backend
-        // behavior (works in Postman with multipart/form-data).
-        const formData = new FormData();
-        formData.append('name', productForm.productName.trim());
-        formData.append('description', productForm.description.trim());
-        formData.append('nutritionFacts', productForm.nutritionFacts.trim());
-        formData.append('category', productForm.category);
-        formData.append('stock', productForm.availableStock);
-        formData.append('cost', productForm.costPricePerKg);
-        formData.append('defaultProfit', productForm.defaultProfit);
-        formData.append('defaultDiscount', productForm.defaultDiscount);
-        formData.append('isActive', String(productForm.availability));
-        formData.append('featured', String(productForm.featured));
-        formData.append('bestSeller', String(productForm.bestseller));
-        formData.append('isExpressDelivery', String(productForm.isExpressDelivery));
+        // Upload product image if available, or use existing image when editing
+        let productImageLocation = '';
         if (productForm.productImage) {
-          formData.append('image', productForm.productImage);
-        } else if (productForm.existingImage) {
-          // Preserve existing image on edit when no new file is provided
-          formData.append('existingImage', productForm.existingImage);
+          try {
+            console.log('Starting product image upload:', productForm.productImage.name);
+            productImageLocation = await uploadImage(productForm.productImage);
+            console.log('Product image uploaded successfully:', productImageLocation);
+          } catch (err: any) {
+            console.error('Product image upload failed:', err);
+            throw new Error(`Failed to upload product image: ${err.message}`);
+          }
+        } else if (editingProductId && productForm.existingImage) {
+          // When editing and no new image uploaded, use the existing image path
+          productImageLocation = productForm.existingImage;
         }
-        productForm.cutTypes.forEach((cutTypeId) => {
-          formData.append('availableCutTypes[]', cutTypeId);
+
+        // Upload variant images if available
+        const variantImageLocations: { [cutTypeId: string]: string } = {};
+        console.log('Starting variant image uploads. productCutTypeImages:', productCutTypeImages);
+        for (const [cutTypeId, imageFile] of Object.entries(productCutTypeImages)) {
+          if (imageFile) {
+            try {
+              console.log('Starting variant image upload for cutType:', cutTypeId, 'file:', imageFile.name);
+              variantImageLocations[cutTypeId] = await uploadImage(imageFile);
+              console.log('Variant image uploaded successfully for cutType:', cutTypeId, 'location:', variantImageLocations[cutTypeId]);
+            } catch (err: any) {
+              console.error('Variant image upload failed for cutType:', cutTypeId, err);
+              throw new Error(`Failed to upload variant image for cut type ${cutTypeId}: ${err.message}`);
+            }
+          }
+        }
+
+        // Add variant images to variants array
+        variants.forEach(variant => {
+          if (variantImageLocations[variant.cutType]) {
+            variant.image = variantImageLocations[variant.cutType];
+          }
         });
-        productForm.availableWeights.forEach((weight) => {
-          formData.append('availableWeights[]', String(weight));
+
+        // Build FormData with product and variants
+        // Build the JSON payload in the exact format the backend expects
+        const payload = {
+          product: {
+            name: productForm.productName.trim(),
+            description: productForm.description.trim(),
+            nutritionFacts: productForm.nutritionFacts.trim(),
+            category: productForm.category,
+            availableCutTypes: productForm.cutTypes,
+            cost: parseFloat(productForm.costPricePerKg),
+            defaultProfit: parseFloat(productForm.defaultProfit),
+            defaultDiscount: parseFloat(productForm.defaultDiscount),
+            availableWeights: productForm.availableWeights,
+            stock: parseFloat(productForm.availableStock),
+            isActive: productForm.availability,
+            featured: productForm.featured,
+            bestSeller: productForm.bestseller,
+            special: false,
+            isExpressDelivery: productForm.isExpressDelivery,
+            isNextDayDelivery: false,
+            order: 1,
+            image: productImageLocation
+          },
+          variants: variants
+        };
+
+        console.log('Building JSON payload for product submission');
+        console.log('Final payload:', payload);
+        console.log('Sending to /api/products/product-with-variant');
+        
+        const endpoint = isEdit ? `/api/products/update-product-with-variant/${editingProductId}` : '/api/products/product-with-variant';
+        const method = isEdit ? 'PUT' : 'POST';
+        
+        const res = await apiFetch<{ 
+          success: boolean; 
+          message?: string;
+          data?: {
+            product: any;
+            variants: any[];
+            summary: any;
+          }
+        }>(endpoint, {
+          method: method,
+          body: JSON.stringify(payload),
         });
-        const requestInit: RequestInit = { method, body: formData };
+        
+        console.log('Response from backend:', res);
 
-        const res = await apiFetch<{ success: boolean; product?: any; message?: string }>(endpoint, requestInit);
+        if (!res.success) {
+          console.error('Backend error response:', res);
+          throw new Error(res.message || 'Failed to create product with variants');
+        }
+        if (!res.data?.product) {
+          console.error('No product data in response:', res);
+          throw new Error('No product data in response');
+        }
 
-        if (!res.success) throw new Error(res.message || (editingProductId ? 'Failed to update product' : 'Failed to add product'));
-        if (!res.product) throw new Error('No product data in response');
-
-        toast.success(res.message || (editingProductId ? 'Product updated successfully' : 'Product added successfully'));
+        toast.success(res.message || 'Product and variants created successfully');
         setShowAddModal(false);
 
-        // Reset form
+        // Reset form and state
         setProductForm({
           category: '',
           productName: '',
@@ -1316,13 +1707,14 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
           bestseller: false,
           isExpressDelivery: false
         });
+        setProductVariantRows({});
+        setProductCutTypeImages({});
+        setExistingVariantIds({});
         setEditingProductId(null);
         
-        // Update local products list: append new product to end on create,
-        // replace existing item on edit. This preserves the UI order so
-        // newly added items appear at the last (highest serial no).
+        // Update local products list with the newly created product
         try {
-          const p = res.product;
+          const p = res.data.product;
           if (p) {
             const raw = p.image || '';
             const image = raw ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${raw}` : raw) : '';
@@ -1345,16 +1737,16 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
               categoryId: (p.category && typeof p.category === 'object' && p.category._id) ? p.category._id : (p.category || undefined),
               cutTypes,
               cutTypeIds,
-              stock: typeof p.stock === 'number' ? p.stock : parseFloat(productForm.availableStock || '0'),
-              costPrice: p.cost || parseFloat(productForm.costPricePerKg || '0'),
-              profit: p.defaultProfit || parseFloat(productForm.defaultProfit || '0'),
-              discount: p.defaultDiscount || parseFloat(productForm.defaultDiscount || '0'),
+              stock: p.stock || 0,
+              costPrice: p.cost || 0,
+              profit: p.defaultProfit || 0,
+              discount: p.defaultDiscount || 0,
               status: p.isActive ? 'Active' : 'Inactive',
               lastUpdated: new Date(p.updatedAt || p.createdAt || Date.now()).toISOString().split('T')[0],
               description: p.description,
               nutritionFacts: p.nutritionFacts,
               availability: p.isActive,
-              weightUnit: p.weightUnit,
+              weightUnit: p.weightUnit || 'g',
               availableWeights: p.availableWeights || [],
               featured: p.featured || false,
               bestseller: p.bestSeller || false,
@@ -1362,27 +1754,49 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
             };
 
             setProducts((prev) => {
-              if (editingProductId) {
-                return prev.map((pp) => (pp.id === mapped.id ? mapped : pp));
-              }
-              // append new product to end and mark inserted id; push to last page
               const next = [...prev, mapped];
               setInsertedProductId(mapped.id);
               const nextPage = Math.ceil(next.length / PRODUCTS_PAGE_SIZE) || 1;
               setProductsPage(nextPage);
               return next;
             });
+
+            // Also update variants list
+            if (res.data.variants && res.data.variants.length > 0) {
+              const mappedVariants = res.data.variants.map((v: any) => ({
+                id: v._id,
+                variantName: v.name,
+                product: v.product?.name || '—',
+                species: (v.product && v.product.category && typeof v.product.category === 'object') ? v.product.category.name || '—' : '—',
+                cutType: v.cutType?.name || '—',
+                weight: v.weight || 0,
+                featured: v.featured || false,
+                bestSeller: v.bestSeller || false,
+                isExpressDelivery: v.isExpressDelivery || false,
+                isNextDayDelivery: v.isNextDayDelivery || false,
+                special: v.special || false,
+                costPrice: v.costPrice || 0,
+                profit: v.profit || 0,
+                discount: v.discount || 0,
+                displayPrice: v.displayPrice || 0,
+                sellingPrice: v.sellingPrice || 0,
+                notes: v.notes,
+                image: v.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${v.image}` : v.image) : undefined,
+                status: v.isActive ? 'Active' : 'Inactive',
+                lastUpdated: new Date(v.updatedAt || v.createdAt || Date.now()).toISOString().split('T')[0],
+              }));
+
+              setVariants((prev) => [...prev, ...mappedVariants]);
+            }
           } else {
-            // Fallback: refresh from server if response lacks product payload
             fetchProducts();
           }
         } catch (e) {
-          // If mapping fails, fallback to fetching fresh list
           fetchProducts();
         }
       } catch (e: any) {
-        const msg = e?.message || (editingProductId ? 'Failed to update product' : 'Failed to add product');
-        console.error('Add product error:', e);
+        const msg = e?.message || 'Failed to create product with variants';
+        console.error('Create product with variants error:', e);
         toast.error(msg);
       } finally {
         setIsSubmitting(false);
@@ -1393,12 +1807,16 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
         toast.error('Please select a product');
         return;
       }
-      if (!editingVariantId && !variantForm.variantImage) {
-        toast.error('Variant image is required');
-        return;
-      }
       if (!variantForm.cutType) {
         toast.error('Please select a cut type');
+        return;
+      }
+      if (!variantForm.weight || parseFloat(variantForm.weight) <= 0) {
+        toast.error('Valid weight is required');
+        return;
+      }
+      if (!variantForm.costPrice || parseFloat(variantForm.costPrice) <= 0) {
+        toast.error('Valid cost price is required');
         return;
       }
       if (!variantForm.profit || parseFloat(variantForm.profit) < 0) {
@@ -1421,53 +1839,112 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
         const selling = display - (display * discountPct / 100);
 
         const isEdit = editingVariantId !== null;
-        const endpoint = isEdit ? `/api/variants/${editingVariantId}` : '/api/variants';
-        const method = isEdit ? 'PUT' : 'POST';
 
-        const formData = new FormData();
-        formData.append('name', variantForm.variantName.trim());
+        // Upload variant image if available
+        let variantImageLocation = '';
         if (variantForm.variantImage) {
-          formData.append('image', variantForm.variantImage);
-        } else if (variantForm.existingImage) {
-          // Preserve existing image on edit when no new file is provided
-          formData.append('existingImage', variantForm.existingImage);
+          try {
+            variantImageLocation = await uploadImage(variantForm.variantImage);
+          } catch (err: any) {
+            throw new Error(`Failed to upload variant image: ${err.message}`);
+          }
+        } else if (isEdit && variantForm.existingImage) {
+          // Preserve existing image when editing without new file
+          variantImageLocation = variantForm.existingImage;
         }
-        formData.append('product', variantForm.product); // product id
-        formData.append('cutType', variantForm.cutType); // cut type id
-        formData.append('profit', variantForm.profit);
-        formData.append('discount', variantForm.discount);
-        formData.append('notes', variantForm.notes.trim());
-        formData.append('featured', String(variantForm.featured));
-        formData.append('bestSeller', String(variantForm.bestSeller));
-        formData.append('displayPrice', String(display));
-        formData.append('sellingPrice', String(selling));
-        formData.append('isActive', String(variantForm.availability));
 
+        // Build variant payload
+        const variant: any = {
+          product: variantForm.product,
+          cutType: variantForm.cutType,
+          weight: parseFloat(variantForm.weight),
+          costPrice: parseFloat(variantForm.costPrice) || 0,
+          profit: parseFloat(variantForm.profit),
+          discount: parseFloat(variantForm.discount),
+          displayPrice: display,
+          sellingPrice: selling,
+          featured: variantForm.featured,
+          bestSeller: variantForm.bestSeller,
+          isExpressDelivery: variantForm.isExpressDelivery,
+          isNextDayDelivery: variantForm.isNextDayDelivery,
+          notes: variantForm.notes.trim(),
+          isActive: variantForm.availability,
+          image: variantImageLocation
+        };
+
+        if (isEdit) {
+          variant._id = editingVariantId;
+        }
+
+        // Get the product by ID from the variant form
+        const product = products.find(p => p.id === variantForm.product);
+
+        if (!product) {
+          console.error('Unable to find product with ID:', variantForm.product);
+          console.error('Available products:', products.map(p => ({ id: p.id, name: p.name })));
+          throw new Error('Unable to find associated product');
+        }
+
+        // Build payload in same format as product creation
+        const payload = {
+          product: {
+            name: product.name,
+            description: product.description || '',
+            nutritionFacts: product.nutritionFacts || '',
+            category: product.categoryId || '',
+            availableCutTypes: product.cutTypeIds || [],
+            cost: product.costPrice,
+            defaultProfit: product.profit,
+            defaultDiscount: product.discount,
+            availableWeights: product.availableWeights || [],
+            stock: product.stock,
+            isActive: product.availability,
+            featured: product.featured || false,
+            bestSeller: product.bestseller || false,
+            special: false,
+            isExpressDelivery: product.isExpressDelivery || false,
+            isNextDayDelivery: false,
+            order: 1,
+            image: product.imagePath || ''
+          },
+          variants: [variant]
+        };
+
+        const endpoint = `/api/products/update-product-with-variant/${product.id}`;
+        
         const res = await apiFetch<{
           success: boolean;
-          variant?: any;
           message?: string;
+          data?: {
+            product: any;
+            variants: any[];
+          };
         }>(endpoint, {
-          method,
-          body: formData,
+          method: 'PUT',
+          body: JSON.stringify(payload),
         });
 
-        if (!res.success) throw new Error(res.message || (isEdit ? 'Failed to update variant' : 'Failed to create variant'));
+        if (!res.success) throw new Error(res.message || 'Failed to update variant');
 
-        toast.success(res.message || (isEdit ? 'Variant updated successfully' : 'Variant created successfully'));
+        toast.success(res.message || 'Variant updated successfully');
         setShowAddModal(false);
 
         // Reset form
         setVariantForm({
           species: '',
           product: '',
-          variantName: '',
+          productName: '',
           variantImage: null,
           existingImage: '',
           existingImageUrl: '',
           cutType: '',
+          weight: '',
           featured: false,
           bestSeller: false,
+          isExpressDelivery: false,
+          isNextDayDelivery: false,
+          isSpecial: false,
+          costPrice: '',
           profit: '',
           displayPrice: '',
           discount: '',
@@ -1477,10 +1954,9 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
         });
         setEditingVariantId(null);
 
-        // Update local variants list: append new variant to end on create,
-        // replace existing on edit. Falls back to fetching if response missing.
+        // Update local variants list
         try {
-          const v = res.variant;
+          const v = res.data?.variants?.[0];
           if (v) {
             const mapped = {
               id: v._id || v.id || cryptoRandomId(),
@@ -1488,29 +1964,25 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
               product: v.product?.name || '—',
               species: (v.product && v.product.category && typeof v.product.category === 'object') ? v.product.category.name || '—' : '—',
               cutType: v.cutType?.name || '—',
+              weight: v.weight || 0,
               featured: v.featured || false,
               bestSeller: v.bestSeller || false,
-              costPrice: v.product?.cost || 0,
+              isExpressDelivery: v.isExpressDelivery || false,
+              isNextDayDelivery: v.isNextDayDelivery || false,
+              special: v.special || false,
+              costPrice: v.costPrice || 0,
               profit: v.profit || 0,
               discount: v.discount || 0,
               displayPrice: v.displayPrice || 0,
               sellingPrice: v.sellingPrice || 0,
               notes: v.notes,
               image: v.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${v.image}` : v.image) : undefined,
+              imagePath: v.image,
               status: v.isActive ? 'Active' : 'Inactive',
               lastUpdated: new Date(v.updatedAt || v.createdAt || Date.now()).toISOString().split('T')[0],
             };
 
-            setVariants((prev) => {
-              if (editingVariantId) {
-                return prev.map((pv) => (pv.id === mapped.id ? mapped : pv));
-              }
-              const next = [...prev, mapped];
-              setInsertedVariantId(mapped.id);
-              const nextPage = Math.ceil(next.length / VARIANTS_PAGE_SIZE) || 1;
-              setVariantsPage(nextPage);
-              return next;
-            });
+            setVariants((prev) => prev.map((pv) => (pv.id === mapped.id ? mapped : pv)));
           } else {
             fetchVariants();
           }
@@ -1518,8 +1990,8 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
           fetchVariants();
         }
       } catch (e: any) {
-        const msg = e?.message || (editingVariantId ? 'Failed to update variant' : 'Failed to create variant');
-        console.error(editingVariantId ? 'Update variant error:' : 'Create variant error:', e);
+        const msg = e?.message || 'Failed to update variant';
+        console.error('Update variant error:', e);
         toast.error(msg);
       } finally {
         setIsSubmitting(false);
@@ -1635,280 +2107,503 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
 
   const renderProductModal = () => (
     <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="category">Select Category *</Label>
-          <Select 
-            value={productForm.category} 
-            onValueChange={(value: string) => setProductForm({ ...productForm, category: value })}
-            disabled={isSubmitting || categoriesLoading}
+          <Label htmlFor="category">Category</Label>
+          <select
+            id="category"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            value={productForm.category}
+            onChange={e => setProductForm({ ...productForm, category: e.target.value })}
+            required
+            disabled={isSubmitting}
           >
-            <SelectTrigger>
-              <SelectValue placeholder="Choose category" />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map((cat) => (
-                <SelectItem key={cat.id} value={cat.id}>
-                  {cat.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <option value="">Select Category</option>
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.id}>{cat.name}</option>
+            ))}
+          </select>
         </div>
-
         <div>
-          <Label htmlFor="productName">Product Name *</Label>
+          <Label htmlFor="productName">Product Name</Label>
           <Input
             id="productName"
+            placeholder="Enter product name"
             value={productForm.productName}
-            onChange={(e) => setProductForm({ ...productForm, productName: e.target.value })}
-            placeholder="e.g., Tiger Prawns"
+            onChange={e => setProductForm({ ...productForm, productName: e.target.value })}
             required
             disabled={isSubmitting}
           />
         </div>
       </div>
 
-      <div>
-        <Label htmlFor="productImage">Product Image {!editingProductId && '*'}</Label>
-        <Input
-          id="productImage"
-          type="file"
-          accept="image/*"
-          onChange={(e) => setProductForm({ ...productForm, productImage: e.target.files?.[0] || null })}
-          required={!editingProductId}
-          disabled={isSubmitting}
-        />
-        {productForm.existingImageUrl && !productForm.productImage && (
-          <div className="mt-2 text-sm text-gray-600 flex items-center gap-3">
-            <ImageWithFallback
-              src={productForm.existingImageUrl}
-              alt={productForm.productName || 'Current product image'}
-              className="w-14 h-14 rounded object-cover border"
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="productImage">Product Image</Label>
+          <Input
+            id="productImage"
+            type="file"
+            accept="image/*"
+            onChange={e => setProductForm({ ...productForm, productImage: e.target.files?.[0] || null })}
+            disabled={isSubmitting}
+          />
+          {productForm.productImage && (
+            <img
+              src={URL.createObjectURL(productForm.productImage)}
+              alt="Product preview"
+              className="w-20 h-20 object-cover rounded mt-2 border"
             />
-            <span>Current image will be kept unless you upload a new one.</span>
-          </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-3 gap-4">
-        <div className="flex items-center justify-between p-3 border rounded-lg">
-          <Label htmlFor="featured" className="cursor-pointer">Featured</Label>
-          <Switch
-            id="featured"
-            checked={productForm.featured}
-            onCheckedChange={(checked) => setProductForm({ ...productForm, featured: checked })}
-            disabled={isSubmitting}
-          />
-        </div>
-        <div className="flex items-center justify-between p-3 border rounded-lg">
-          <Label htmlFor="bestseller" className="cursor-pointer">Best Seller</Label>
-          <Switch
-            id="bestseller"
-            checked={productForm.bestseller}
-            onCheckedChange={(checked) => setProductForm({ ...productForm, bestseller: checked })}
-            disabled={isSubmitting}
-          />
-        </div>
-        <div className="flex items-center justify-between p-3 border rounded-lg">
-          <Label htmlFor="isExpressDelivery" className="cursor-pointer">Express Delivery</Label>
-          <Switch
-            id="isExpressDelivery"
-            checked={productForm.isExpressDelivery}
-            onCheckedChange={(checked) => setProductForm({ ...productForm, isExpressDelivery: checked })}
-            disabled={isSubmitting}
-          />
-        </div>
-      </div>
-
-      <div>
-        <Label htmlFor="description">Description *</Label>
-        <Textarea
-          id="description"
-          value={productForm.description}
-          onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
-          placeholder="Enter product description, origin, characteristics..."
-          rows={3}
-          required
-          disabled={isSubmitting}
-        />
-      </div>
-
-      <div>
-        <Label htmlFor="nutritionFacts">Nutrition Facts *</Label>
-        <Textarea
-          id="nutritionFacts"
-          value={productForm.nutritionFacts}
-          onChange={(e) => setProductForm({ ...productForm, nutritionFacts: e.target.value })}
-          placeholder="Enter nutritional information (e.g., Protein: 20g per 100g, Omega-3: 500mg...)"
-          rows={3}
-          required
-          disabled={isSubmitting}
-        />
-      </div>
-
-      <div>
-        <Label>Available Cut Types *</Label>
-        <div className="space-y-2">
-          <Select
-            value={productForm.currentCutType}
-            onValueChange={(value) => {
-              // Single functional update to avoid overwriting state
-              setProductForm((prev) => {
-                if (!value || value === '__empty__' || prev.cutTypes.includes(value)) {
-                  return { ...prev, currentCutType: '' };
-                }
-                return {
-                  ...prev,
-                  cutTypes: [...prev.cutTypes, value],
-                  currentCutType: ''
-                };
-              });
-            }}
-            disabled={isSubmitting || loadingCutTypes}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select cut types to add" />
-            </SelectTrigger>
-            <SelectContent>
-                  {cutTypesData.length === 0 ? (
-                    <SelectItem value="__empty__" disabled>
-                      No cut types found
-                    </SelectItem>
-                  ) : (
-                    cutTypesData.map((ct) => (
-                      <SelectItem 
-                        key={ct._id} 
-                        value={ct._id}
-                        disabled={productForm.cutTypes.includes(ct._id)}
-                      >
-                        {ct.name}
-                      </SelectItem>
-                    ))
-                  )}
-            </SelectContent>
-          </Select>
-          {productForm.cutTypes.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {productForm.cutTypes.map((cutTypeId: string) => {
-                const cutType = cutTypesData.find(ct => ct._id === cutTypeId);
-                return (
-                  <Badge key={cutTypeId} variant="secondary" className="flex items-center gap-1">
-                    {cutType?.name || cutTypeId}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveCutType(cutTypeId)}
-                      className="ml-1 hover:text-red-600"
-                      disabled={isSubmitting}
-                    >
-                      ×
-                    </button>
-                  </Badge>
-                );
-              })}
-            </div>
+          )}
+          {productForm.existingImageUrl && !productForm.productImage && (
+            <img
+              src={productForm.existingImageUrl}
+              alt="Current product image"
+              className="w-20 h-20 object-cover rounded mt-2 border"
+            />
           )}
         </div>
-      </div>
-      <div>
-        <Label htmlFor="availableWeights">Available Weights (in grams) *</Label>
-        <div className="flex gap-2 mb-2">
-          <Input
-            value={productForm.currentWeight}
-            onChange={(e) => setProductForm({ ...productForm, currentWeight: e.target.value })}
-            placeholder="Enter weight (e.g., 250, 500, 1000)"
-            type="number"
-            onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddWeight())}
-            disabled={isSubmitting}
-          />
-          <Button type="button" onClick={handleAddWeight} variant="outline" disabled={isSubmitting}>
-            <Plus className="w-4 h-4" />
-          </Button>
-        </div>
-        {productForm.availableWeights.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {productForm.availableWeights.map((weight: number) => (
-              <Badge key={weight} variant="secondary" className="flex items-center gap-1">
-                {weight}g
-                <button
-                  type="button"
-                  onClick={() => handleRemoveWeight(weight)}
-                  className="ml-1 hover:text-red-600"
-                  disabled={isSubmitting}
-                >
-                  ×
-                </button>
-              </Badge>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="availableStock">Available Stock (KG) *</Label>
+          <Label htmlFor="availableStock">Available Stock</Label>
           <Input
             id="availableStock"
             type="number"
+            min="0"
+            placeholder="Enter available stock"
             value={productForm.availableStock}
-            onChange={(e) => setProductForm({ ...productForm, availableStock: e.target.value })}
-            placeholder="Enter stock in kilograms"
-            required
-            disabled={isSubmitting}
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="costPricePerKg">Cost Price Per KG (<span className="dirham-symbol">&#xea;</span>) *</Label>
-          <Input
-            id="costPricePerKg"
-            type="number"
-            value={productForm.costPricePerKg}
-            onChange={(e) => setProductForm({ ...productForm, costPricePerKg: e.target.value })}
-            placeholder="Enter cost price"
-            required
+            onChange={e => setProductForm({ ...productForm, availableStock: e.target.value })}
             disabled={isSubmitting}
           />
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div>
+        <Label htmlFor="description">Description</Label>
+        <Textarea
+          id="description"
+          placeholder="Enter product description, origin, characteristics..."
+          value={productForm.description}
+          onChange={e => setProductForm({ ...productForm, description: e.target.value })}
+          disabled={isSubmitting}
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="nutrition">Nutrition Facts</Label>
+        <Textarea
+          id="nutrition"
+          placeholder="Enter nutritional information (e.g., Protein: 20g per 100g, Omega-3: 500mg...)"
+          value={productForm.nutritionFacts}
+          onChange={e => setProductForm({ ...productForm, nutritionFacts: e.target.value })}
+          disabled={isSubmitting}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <Label htmlFor="defaultProfit">Default Profit % *</Label>
+          <Label htmlFor="costPricePerKg">Cost Price Per KG</Label>
           <Input
-            id="defaultProfit"
+            id="costPricePerKg"
             type="number"
-            value={productForm.defaultProfit}
-            onChange={(e) => setProductForm({ ...productForm, defaultProfit: e.target.value })}
-            placeholder="e.g., 15"
-            required
+            min="0"
+            step="0.01"
+            placeholder="Enter cost price per kg"
+            value={productForm.costPricePerKg}
+            onChange={e => {
+              const newCostPerKg = e.target.value;
+              setProductForm({ ...productForm, costPricePerKg: newCostPerKg });
+              
+              // Auto-update cost price for all existing variant rows
+              const costPerKg = parseFloat(newCostPerKg);
+              if (!isNaN(costPerKg) && costPerKg > 0) {
+                setProductVariantRows(prevRows => {
+                  const newRows = { ...prevRows };
+                  productForm.cutTypes.forEach(cutTypeId => {
+                    productForm.availableWeights.forEach(weight => {
+                      const rowKey = getVariantRowKey(cutTypeId, weight);
+                      const weightInKg = weight / 1000;
+                      const calculatedCost = (costPerKg * weightInKg).toFixed(2);
+                      
+                      const currentRow = newRows[rowKey] || {
+                        costPricePerKg: '',
+                        profitPercent: productForm.defaultProfit || '',
+                        displayPrice: '',
+                        discountPercent: productForm.defaultDiscount || '',
+                        sellingPrice: '',
+                        featured: false,
+                        bestSeller: false,
+                        expressDelivery: false,
+                        nextDayDelivery: false,
+                        festivOffer: false,
+                        notes: ''
+                      };
+                      
+                      // Update cost price and recalculate prices
+                      const profitPct = parseFloat(String(currentRow.profitPercent)) || parseFloat(productForm.defaultProfit) || 0;
+                      const discountPct = parseFloat(String(currentRow.discountPercent)) || parseFloat(productForm.defaultDiscount) || 0;
+                      const cp = parseFloat(calculatedCost);
+                      const displayPrice = cp + (cp * profitPct / 100);
+                      const sellingPrice = displayPrice - (displayPrice * discountPct / 100);
+                      
+                      newRows[rowKey] = {
+                        ...currentRow,
+                        costPricePerKg: calculatedCost,
+                        displayPrice: displayPrice.toFixed(2),
+                        sellingPrice: sellingPrice.toFixed(2)
+                      };
+                    });
+                  });
+                  return newRows;
+                });
+              }
+            }}
             disabled={isSubmitting}
           />
         </div>
-
         <div>
-          <Label htmlFor="defaultDiscount">Default Discount % *</Label>
+          <Label htmlFor="defaultDiscount">Default Discount %</Label>
           <Input
             id="defaultDiscount"
             type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            placeholder="Enter default discount %"
             value={productForm.defaultDiscount}
-            onChange={(e) => setProductForm({ ...productForm, defaultDiscount: e.target.value })}
-            placeholder="e.g., 10"
-            required
+            onChange={e => setProductForm({ ...productForm, defaultDiscount: e.target.value })}
             disabled={isSubmitting}
           />
         </div>
+        <div>
+          <Label htmlFor="defaultProfit">Default Profit %</Label>
+          <Input
+            id="defaultProfit"
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="Enter default profit %"
+            value={productForm.defaultProfit}
+            onChange={e => setProductForm({ ...productForm, defaultProfit: e.target.value })}
+            disabled={isSubmitting}
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="cutTypes">Available Cut Types</Label>
+        <div className="flex gap-2">
+          <select
+            id="cutTypes"
+            className="w-48 px-3 py-2 border border-gray-300 rounded-md"
+            value={productForm.currentCutType}
+            onChange={e => setProductForm({ ...productForm, currentCutType: e.target.value })}
+            disabled={isSubmitting || loadingCutTypes}
+          >
+            <option value="">Select cut type</option>
+            {cutTypesData.map((c) => (
+              !productForm.cutTypes.includes(c._id) && (
+                <option key={c._id} value={c._id}>{c.name}</option>
+              )
+            ))}
+          </select>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              if (productForm.currentCutType && !productForm.cutTypes.includes(productForm.currentCutType)) {
+                setProductForm({ ...productForm, cutTypes: [...productForm.cutTypes, productForm.currentCutType], currentCutType: '' });
+              }
+            }}
+            disabled={!productForm.currentCutType || isSubmitting}
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
+        </div>
+        <div className="flex gap-2 flex-wrap mt-2">
+          {productForm.cutTypes.map(cutTypeId => {
+            const cutType = cutTypesData.find(c => c._id === cutTypeId);
+            return (
+              <span key={cutTypeId} className="inline-flex items-center bg-gray-200 rounded px-2 py-1 text-sm">
+                {cutType?.name || cutTypeId}
+                <button
+                  type="button"
+                  className="ml-1 text-gray-500 hover:text-red-500"
+                  onClick={() => handleRemoveCutType(cutTypeId)}
+                  disabled={isSubmitting}
+                >×</button>
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="weights">Available Weights (in grams)</Label>
+        <div className="flex gap-2 flex-wrap mt-1">
+          {productForm.availableWeights.map(w => (
+            <span key={w} className="inline-flex items-center bg-gray-200 rounded px-2 py-1 text-sm">
+              {w}
+              <button type="button" className="ml-1 text-gray-500 hover:text-red-500" onClick={() => handleRemoveWeight(w)} disabled={isSubmitting}>×</button>
+            </span>
+          ))}
+          <Input
+            id="weights"
+            placeholder="Enter weight (e.g., 250, 500, 1000)"
+            className="w-40"
+            value={productForm.currentWeight}
+            onChange={e => setProductForm({ ...productForm, currentWeight: e.target.value })}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                if ((e.target as HTMLInputElement).value.trim()) {
+                  handleAddWeight();
+                }
+              }
+            }}
+            disabled={isSubmitting}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={handleAddWeight}
+            disabled={!productForm.currentWeight || isSubmitting}
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label>Weight Options & Pricing</Label>
+        </div>
+        <div className="overflow-x-auto border border-border rounded-lg">
+          <table className="min-w-full bg-card">
+            <thead className="bg-muted/50">
+              <tr>
+                <th className="py-2 px-3 text-left text-sm font-medium">Cut Type</th>
+                <th className="py-2 px-3 text-left text-sm font-medium">Image</th>
+                <th className="py-2 px-3 text-left text-sm font-medium">Weight (g)</th>
+                <th className="py-2 px-3 text-left text-sm font-medium">Cost Price </th>
+                <th className="py-2 px-3 text-left text-sm font-medium">Display Price</th>
+                <th className="py-2 px-3 text-left text-sm font-medium">Selling Price</th>
+                <th className="py-2 px-3 text-left text-sm font-medium">Profit %</th>
+                <th className="py-2 px-3 text-left text-sm font-medium">Discount %</th>
+                <th className="py-2 px-3 text-left text-sm font-medium">Featured</th>
+                <th className="py-2 px-3 text-left text-sm font-medium">Best Seller</th>
+                <th className="py-2 px-3 text-left text-sm font-medium">Express Delivery</th>
+                <th className="py-2 px-3 text-left text-sm font-medium">Next Day Delivery</th>
+                <th className="py-2 px-3 text-left text-sm font-medium">Festive Offer</th>
+                <th className="py-2 px-3 text-left text-sm font-medium">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {productForm.cutTypes.length === 0 || productForm.availableWeights.length === 0 ? (
+                <tr>
+                  <td colSpan={14} className="py-8 text-center text-muted-foreground">
+                    No variants. Add Cut Types and Weights above.
+                  </td>
+                </tr>
+              ) : (
+                productForm.cutTypes.flatMap((cutTypeId, cutTypeIdx) => 
+                  productForm.availableWeights.map((weight, weightIdx) => {
+                    const cutType = cutTypesData.find(c => c._id === cutTypeId);
+                    const isFirstWeight = weightIdx === 0;
+                    const rowKey = getVariantRowKey(cutTypeId, weight);
+                    const rowData = productVariantRows[rowKey] || { 
+                      costPricePerKg: '', 
+                      profitPercent: '', 
+                      displayPrice: '', 
+                      discountPercent: '', 
+                      sellingPrice: '',
+                      featured: false,
+                      bestSeller: false,
+                      expressDelivery: false,
+                      nextDayDelivery: false,
+                      festivOffer: false,
+                      notes: ''
+                    };
+                    return (
+                      <tr key={rowKey} className="border-t border-border">
+                        <td className="py-2 px-3">{cutType?.name || cutTypeId}</td>
+                        <td className="py-2 px-3">
+                          {isFirstWeight ? (
+                            <div className="flex flex-col items-center">
+                              <label className="flex flex-col items-center cursor-pointer group">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  style={{ display: 'none' }}
+                                  onChange={e => {
+                                    const file = e.target.files?.[0] || null;
+                                    setProductCutTypeImages(prev => ({ ...prev, [cutTypeId]: file }));
+                                  }}
+                                />
+                                <span className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs group-hover:underline">
+                                  <ImageIcon className="w-4 h-4" />
+                                </span>
+                              </label>
+                              {productCutTypeImages[cutTypeId] ? (
+                                <img
+                                  src={URL.createObjectURL(productCutTypeImages[cutTypeId]!)}
+                                  alt={`${cutType?.name || cutTypeId} preview`}
+                                  className="w-10 h-10 object-cover rounded border mt-1"
+                                />
+                              ) : existingCutTypeImages[cutTypeId] ? (
+                                <img
+                                  src={existingCutTypeImages[cutTypeId]}
+                                  alt={`${cutType?.name || cutTypeId} preview`}
+                                  className="w-10 h-10 object-cover rounded border mt-1"
+                                />
+                              ) : null}
+                            </div>
+                          ) : productCutTypeImages[cutTypeId] ? (
+                            <img
+                              src={URL.createObjectURL(productCutTypeImages[cutTypeId]!)}
+                              alt={`${cutType?.name || cutTypeId} preview`}
+                              className="w-10 h-10 object-cover rounded border"
+                            />
+                          ) : existingCutTypeImages[cutTypeId] ? (
+                            <img
+                              src={existingCutTypeImages[cutTypeId]}
+                              alt={`${cutType?.name || cutTypeId} preview`}
+                              className="w-10 h-10 object-cover rounded border"
+                            />
+                          ) : (
+                            <span className="text-xs text-gray-400">No image</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3">{weight}</td>
+                        <td className="py-2 px-3">
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={rowData.costPricePerKg}
+                            onChange={e => handleProductVariantRowChange(rowKey, 'costPricePerKg', e.target.value)}
+                            className="w-24"
+                            disabled={isSubmitting}
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={rowData.displayPrice}
+                            onChange={e => handleProductVariantRowChange(rowKey, 'displayPrice', e.target.value)}
+                            className="w-24"
+                            disabled={isSubmitting}
+                            title="Display Price (editable)"
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={rowData.sellingPrice}
+                            onChange={e => handleProductVariantRowChange(rowKey, 'sellingPrice', e.target.value)}
+                            className="w-24"
+                            disabled={isSubmitting}
+                            title="Selling Price (editable)"
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="%"
+                            value={rowData.profitPercent}
+                            onChange={e => handleProductVariantRowChange(rowKey, 'profitPercent', e.target.value)}
+                            className="w-20"
+                            disabled={isSubmitting}
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            placeholder="%"
+                            value={rowData.discountPercent}
+                            onChange={e => handleProductVariantRowChange(rowKey, 'discountPercent', e.target.value)}
+                            className="w-20"
+                            disabled={isSubmitting}
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <Switch 
+                            checked={rowData.featured}
+                            onCheckedChange={(checked) => handleProductVariantRowChange(rowKey, 'featured', checked)}
+                            disabled={isSubmitting}
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <Switch 
+                            checked={rowData.bestSeller}
+                            onCheckedChange={(checked) => handleProductVariantRowChange(rowKey, 'bestSeller', checked)}
+                            disabled={isSubmitting}
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <Switch 
+                            checked={rowData.expressDelivery}
+                            onCheckedChange={(checked) => handleProductVariantRowChange(rowKey, 'expressDelivery', checked)}
+                            disabled={isSubmitting}
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <Switch 
+                            checked={rowData.nextDayDelivery}
+                            onCheckedChange={(checked) => handleProductVariantRowChange(rowKey, 'nextDayDelivery', checked)}
+                            disabled={isSubmitting}
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <Switch 
+                            checked={rowData.festivOffer}
+                            onCheckedChange={(checked) => handleProductVariantRowChange(rowKey, 'festivOffer', checked)}
+                            disabled={isSubmitting}
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <Input
+                            type="text"
+                            placeholder="e.g., Fresh catch"
+                            value={rowData.notes}
+                            onChange={e => handleProductVariantRowChange(rowKey, 'notes', e.target.value)}
+                            className="w-32"
+                            disabled={isSubmitting}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })
+                )
+              )}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Weight options table shows all combinations of cut types and weights. Details will be managed at the variant level.
+        </p>
       </div>
 
       <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
         <div>
-          <Label htmlFor="productAvailability">Availability</Label>
-          <p className="text-sm text-gray-600">Make this product available to users</p>
+          <Label htmlFor="availability">Availability</Label>
+          <p className="text-sm text-gray-600">Show this product to customers</p>
         </div>
-        <Switch
-          id="productAvailability"
-          checked={productForm.availability}
-          onCheckedChange={(checked: boolean) => setProductForm({ ...productForm, availability: checked })}
+        <Switch 
+          id="availability" 
+          checked={productForm.availability} 
+          onCheckedChange={checked => setProductForm({ ...productForm, availability: checked })}
           disabled={isSubmitting}
         />
       </div>
@@ -1922,33 +2617,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
           className="bg-blue-600 cursor-pointer hover:bg-blue-700" 
           disabled={
             isSubmitting ||
-            !productForm.category ||
-            !productForm.productName.trim() ||
-            !productForm.description.trim() ||
-            !productForm.nutritionFacts.trim() ||
-            productForm.cutTypes.length === 0 ||
-            productForm.availableWeights.length === 0 ||
-            !productForm.availableStock ||
-            !productForm.costPricePerKg ||
-            !productForm.defaultProfit ||
-            !productForm.defaultDiscount ||
-            (!!editingProductId &&
-             productForm.category === originalProductForm.category &&
-             productForm.productName === originalProductForm.productName &&
-             !productForm.productImage &&
-             productForm.existingImage === originalProductForm.existingImage &&
-             productForm.description === originalProductForm.description &&
-             productForm.nutritionFacts === originalProductForm.nutritionFacts &&
-             JSON.stringify(productForm.cutTypes) === JSON.stringify(originalProductForm.cutTypes) &&
-             JSON.stringify(productForm.availableWeights) === JSON.stringify(originalProductForm.availableWeights) &&
-             productForm.availableStock === originalProductForm.availableStock &&
-             productForm.defaultProfit === originalProductForm.defaultProfit &&
-             productForm.defaultDiscount === originalProductForm.defaultDiscount &&
-             productForm.costPricePerKg === originalProductForm.costPricePerKg &&
-             productForm.availability === originalProductForm.availability &&
-             productForm.featured === originalProductForm.featured &&
-             productForm.bestseller === originalProductForm.bestseller &&
-             productForm.isExpressDelivery === originalProductForm.isExpressDelivery)
+            !productForm.category || !productForm.productName.trim()
           }
         >
           {editingProductId ? 'Update Product' : 'Add Product'}
@@ -1960,7 +2629,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
   const renderVariantModal = () => {
     // Get product from selection to auto-fill defaults
     const selectedProduct = variantProducts.find(p => p.id === variantForm.product);
-    const costPrice = selectedProduct?.costPrice || 0;
+    const costPrice = parseFloat(variantForm.costPrice) || selectedProduct?.costPrice || 0;
     const defaultProfit = selectedProduct?.profit || 0;
     const defaultDiscount = selectedProduct?.discount || 0;
     
@@ -1969,93 +2638,105 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
     // Sort products alphabetically for dropdown display
     const sortedProducts = [...variantProducts].sort((a, b) => a.name.localeCompare(b.name));
 
+    // Find the current variant if editing to get its details
+    const currentVariant = editingVariantId 
+      ? variants.find(v => v.id === editingVariantId)
+      : null;
+
+    const isEdit = editingVariantId !== null;
+
     return (
       <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto">
+        {/* Read-only info section when editing */}
+        {editingVariantId && currentVariant && (
+          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-3">
+            <h3 className="text-sm font-semibold text-gray-700">Read-Only Information (Cannot be edited)</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-md font-semibold text-gray-900">Cut Type</Label>
+                <p className="mt-1 text-sm font-medium text-gray-600">{currentVariant.cutType}</p>
+              </div>
+              <div>
+                <Label className="text-md font-semibold text-gray-900">Weight</Label>
+                <p className="mt-1 text-sm font-medium text-gray-600">{currentVariant.weight} g</p>
+              </div>
+            </div>
+
+            {/* Read-only Image Display */}
+            {currentVariant.image && (
+              <div>
+                <Label className="text-md font-semibold text-gray-900">Current Image</Label>
+                <div className="mt-2 w-6 h-6 border border-gray-100 rounded-lg overflow-hidden bg-white">
+                  <img
+                    src={currentVariant.image}
+                    alt="Variant"
+                    className=" object-cover"
+                  />
+                </div>
+                <p className="mt-2 text-xs text-gray-500">Image cannot be edited in this form</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Species and Product Selection - Always visible, editable when editing */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="variantSpecies">Select Species *</Label>
-            <Select value={variantForm.species} onValueChange={(value: string) => setVariantForm({ ...variantForm, species: value, product: '' })}>
+            <Label>Species/Category *</Label>
+            <Select
+              value={variantForm.species}
+              onValueChange={(value) => {
+                setVariantForm({ ...variantForm, species: value, product: '', productName: '' });
+              }}
+              disabled={isSubmitting}
+            >
               <SelectTrigger>
-                <SelectValue placeholder="Choose species" />
+                <SelectValue placeholder="Select species" />
               </SelectTrigger>
               <SelectContent>
-                {categories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                {categories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
           <div>
-            <Label htmlFor="variantProduct">Select Product *</Label>
-            <Select 
-              value={variantForm.product} 
-              onValueChange={(value: string) => {
-                  const product = variantProducts.find(p => p.id === value);
+            <Label>Product Name *</Label>
+            <Select
+              value={variantForm.product}
+              onValueChange={(value) => {
+                const prod = variantProducts.find(p => p.id === value);
                 setVariantForm({ 
                   ...variantForm, 
                   product: value,
-                    // pre-fill helpful defaults
-                    profit: product?.profit != null ? String(product.profit) : '',
-                    displayPrice: product?.costPrice != null && product?.profit != null
-                      ? calculateVariantPrices(product.costPrice, product.profit, 0).displayPrice
-                      : '',
-                    discount: product?.discount != null ? String(product.discount) : ''
+                  productName: prod?.name || '',
+                  costPrice: prod?.costPrice?.toString() || '',
+                  profit: prod?.profit?.toString() || '',
+                  discount: prod?.discount?.toString() || ''
                 });
               }}
-              disabled={!variantForm.species}
+              disabled={isSubmitting || !variantForm.species || loadingVariantProducts}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Choose product" />
+                <SelectValue placeholder={loadingVariantProducts ? "Loading..." : "Select product"} />
               </SelectTrigger>
-              <SelectContent className="max-h-80 overflow-y-scroll" style={{maxHeight: '320px'}}>
-                {sortedProducts.map(p => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                ))}
+              <SelectContent>
+                {sortedProducts.length === 0 ? (
+                  <div className="p-2 text-sm text-gray-500">No products available</div>
+                ) : (
+                  sortedProducts.map((prod) => (
+                    <SelectItem key={prod.id} value={prod.id}>
+                      {prod.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
-        </div>
-
-        <div>
-          <Label htmlFor="variantImage">Variant Image {!editingVariantId && '*'}</Label>
-          <Input
-            id="variantImage"
-            type="file"
-            accept="image/*"
-            onChange={(e) => setVariantForm({ ...variantForm, variantImage: e.target.files?.[0] || null })}
-            required={!editingVariantId}
-          />
-          {variantForm.existingImageUrl && !variantForm.variantImage && (
-            <div className="mt-2 text-sm text-gray-600 flex items-center gap-3">
-              <ImageWithFallback
-                src={variantForm.existingImageUrl}
-                alt={variantForm.variantName || 'Current variant image'}
-                className="w-14 h-14 rounded object-cover border"
-              />
-              <span>Current image will be kept unless you upload a new one.</span>
-            </div>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="variantCutType">Select Cut Type *</Label>
-          <Select 
-            value={variantForm.cutType} 
-            onValueChange={(value: string) => setVariantForm({ ...variantForm, cutType: value })}
-            disabled={!variantForm.product}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Choose cut type" />
-            </SelectTrigger>
-            <SelectContent>
-              {cutTypesData
-                .filter(ct => selectedProduct?.cutTypeIds?.includes(ct._id))
-                .map((ct) => (
-                  <SelectItem key={ct._id} value={ct._id}>{ct.name}</SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -2065,6 +2746,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
               id="featured"
               checked={variantForm.featured}
               onCheckedChange={(checked: boolean) => setVariantForm({ ...variantForm, featured: checked })}
+              disabled={isSubmitting}
             />
           </div>
 
@@ -2074,6 +2756,38 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
               id="bestSeller"
               checked={variantForm.bestSeller}
               onCheckedChange={(checked: boolean) => setVariantForm({ ...variantForm, bestSeller: checked })}
+              disabled={isSubmitting}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <Label htmlFor="expressDelivery">Express Delivery</Label>
+            <Switch
+              id="expressDelivery"
+              checked={variantForm.isExpressDelivery || false}
+              onCheckedChange={(checked: boolean) => setVariantForm({ ...variantForm, isExpressDelivery: checked })}
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <Label htmlFor="nextDayDelivery">Next Day Delivery</Label>
+            <Switch
+              id="nextDayDelivery"
+              checked={variantForm.isNextDayDelivery || false}
+              onCheckedChange={(checked: boolean) => setVariantForm({ ...variantForm, isNextDayDelivery: checked })}
+              disabled={isSubmitting}
+            />
+          </div>
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <Label htmlFor="festiveOffer">Festive Offer</Label>
+            <Switch
+              id="festiveOffer"
+              checked={variantForm.isSpecial || false}
+              onCheckedChange={(checked: boolean) => setVariantForm({ ...variantForm, isSpecial: checked })}
+              disabled={isSubmitting}
             />
           </div>
         </div>
@@ -2081,10 +2795,30 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
         <div className="p-4 bg-blue-50 rounded-lg space-y-3">
           <h4 className="font-semibold text-blue-900">Pricing Details</h4>
           
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs text-gray-600">Cost Price (<span className="dirham-symbol">&#xea;</span>/KG)</Label>
-              <Input value={costPrice} disabled className="bg-white" />
+              <Label className="text-xs text-gray-600">Cost Price (<span className="dirham-symbol">&#xea;</span>/kg) *</Label>
+              <Input
+                type="number"
+                value={variantForm.costPrice}
+                onChange={(e) => {
+                  const cp = parseFloat(e.target.value) || 0;
+                  const profit = parseFloat(variantForm.profit) || 0;
+                  const discount = parseFloat(variantForm.discount) || 0;
+                  const dp = cp + (cp * profit / 100);
+                  const sp = dp - (dp * discount / 100);
+                  setVariantForm({ 
+                    ...variantForm, 
+                    costPrice: e.target.value,
+                    displayPrice: dp.toFixed(2),
+                    sellingPrice: sp.toFixed(2)
+                  });
+                }}
+                placeholder="Enter cost price"
+                step="0.01"
+                required
+                disabled={isSubmitting}
+              />
             </div>
             <div>
               <Label className="text-xs text-gray-600">Profit % *</Label>
@@ -2092,64 +2826,93 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                 type="number"
                 value={variantForm.profit}
                 onChange={(e) => {
-                  const profitVal = e.target.value;
-                  // optionally auto-compute display price when profit changes if product is selected
-                  let display = variantForm.displayPrice;
-                  const p = parseFloat(profitVal);
-                  if (!isNaN(p) && selectedProduct) {
-                    display = calculateVariantPrices(selectedProduct?.costPrice ?? 0, p, 0).displayPrice;
-                  }
-                  setVariantForm({ ...variantForm, profit: profitVal, displayPrice: display });
+                  const cp = parseFloat(variantForm.costPrice) || 0;
+                  const profit = parseFloat(e.target.value) || 0;
+                  const discount = parseFloat(variantForm.discount) || 0;
+                  const dp = cp + (cp * profit / 100);
+                  const sp = dp - (dp * discount / 100);
+                  setVariantForm({ 
+                    ...variantForm, 
+                    profit: e.target.value,
+                    displayPrice: dp.toFixed(2),
+                    sellingPrice: sp.toFixed(2)
+                  });
                 }}
                 placeholder="Enter profit %"
+                step="0.01"
                 required
-              />
-            </div>
-            <div>
-              <Label className="text-xs text-gray-600">Display Price (<span className="dirham-symbol">&#xea;</span>) *</Label>
-              <Input
-                type="number"
-                value={variantForm.displayPrice}
-                onChange={(e) => setVariantForm({ ...variantForm, displayPrice: e.target.value })}
-                placeholder="Enter display price"
-                required
+                disabled={isSubmitting}
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
+              <Label className="text-xs text-gray-600">Display Price (<span className="dirham-symbol">&#xea;</span>) *</Label>
+              <Input
+                type="number"
+                value={variantForm.displayPrice}
+                onChange={(e) => {
+                  const dp = parseFloat(e.target.value) || 0;
+                  const discount = parseFloat(variantForm.discount) || 0;
+                  const sp = dp - (dp * discount / 100);
+                  setVariantForm({ 
+                    ...variantForm, 
+                    displayPrice: e.target.value,
+                    sellingPrice: sp.toFixed(2)
+                  });
+                }}
+                placeholder="Enter display price"
+                step="0.01"
+                required
+                disabled={isSubmitting}
+              />
+            </div>
+            <div>
               <Label htmlFor="variantDiscount">Discount % *</Label>
               <Input
                 id="variantDiscount"
                 type="number"
                 value={variantForm.discount}
-                onChange={(e) => setVariantForm({ ...variantForm, discount: e.target.value })}
+                onChange={(e) => {
+                  const dp = parseFloat(variantForm.displayPrice) || 0;
+                  const discount = parseFloat(e.target.value) || 0;
+                  const sp = dp - (dp * discount / 100);
+                  setVariantForm({ 
+                    ...variantForm, 
+                    discount: e.target.value,
+                    sellingPrice: sp.toFixed(2)
+                  });
+                }}
                 placeholder="Enter discount"
+                step="0.01"
                 required
+                disabled={isSubmitting}
               />
             </div>
-            <div>
-              <Label className="text-xs text-gray-600">Selling Price (<span className="dirham-symbol">&#xea;</span>)</Label>
-              <Input 
-                value={(variantForm.displayPrice && variantForm.discount)
-                  ? (parseFloat(variantForm.displayPrice) - (parseFloat(variantForm.displayPrice) * (parseFloat(variantForm.discount) || 0) / 100)).toFixed(2)
-                  : '0.00'}
-                disabled 
-                className="bg-white font-semibold text-green-600" 
-              />
-            </div>
+          </div>
+
+          <div>
+            <Label className="text-xs text-gray-600">Selling Price (<span className="dirham-symbol">&#xea;</span>) - Auto-calculated</Label>
+            <Input 
+              value={(variantForm.displayPrice && variantForm.discount)
+                ? (parseFloat(variantForm.displayPrice) - (parseFloat(variantForm.displayPrice) * (parseFloat(variantForm.discount) || 0) / 100)).toFixed(2)
+                : '0.00'}
+              disabled 
+              className="bg-white font-semibold text-green-600 mt-1" 
+            />
           </div>
         </div>
 
         <div>
-          <Label htmlFor="notes">Notes (Optional)</Label>
+          <Label className="text-gray-600">Notes (Optional)</Label>
           <Textarea
             id="notes"
             value={variantForm.notes}
             onChange={(e) => setVariantForm({ ...variantForm, notes: e.target.value })}
             placeholder="Additional notes or special instructions..."
             rows={2}
+            disabled={isSubmitting}
           />
         </div>
 
@@ -2162,44 +2925,33 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
             id="variantAvailability"
             checked={variantForm.availability}
             onCheckedChange={(checked: boolean) => setVariantForm({ ...variantForm, availability: checked })}
+            disabled={isSubmitting}
           />
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => setShowAddModal(false)}>
+          <Button type="button" variant="outline" onClick={() => {
+            setShowAddModal(false);
+            setEditingVariantId(null);
+          }} disabled={isSubmitting}>
             Cancel
           </Button>
-  <Button 
-    type="submit" 
-    className="bg-blue-600 cursor-pointer hover:bg-blue-700" 
-    disabled={
-      isSubmitting ||
-      !variantForm.product ||
-      !variantForm.cutType ||
-      !variantForm.profit ||
-      !variantForm.displayPrice ||
-      !variantForm.discount ||
-      (!!editingVariantId &&
-       variantForm.species === originalVariantForm.species &&
-       variantForm.product === originalVariantForm.product &&
-       variantForm.variantName === originalVariantForm.variantName &&
-       !variantForm.variantImage &&
-       variantForm.existingImage === originalVariantForm.existingImage &&
-       variantForm.cutType === originalVariantForm.cutType &&
-       variantForm.featured === originalVariantForm.featured &&
-       variantForm.bestSeller === originalVariantForm.bestSeller &&
-       variantForm.profit === originalVariantForm.profit &&
-       variantForm.displayPrice === originalVariantForm.displayPrice &&
-       variantForm.discount === originalVariantForm.discount &&
-       variantForm.sellingPrice === originalVariantForm.sellingPrice &&
-       variantForm.notes === originalVariantForm.notes &&
-       variantForm.availability === originalVariantForm.availability)
-    }
-  >
-    {isSubmitting
-      ? (editingVariantId ? 'Updating...' : 'Adding...')
-      : (editingVariantId ? 'Update Variant' : 'Add Variant')}
-  </Button>
+          <Button 
+            type="submit" 
+            className="bg-blue-600 cursor-pointer hover:bg-blue-700" 
+            disabled={
+              isSubmitting ||
+              !variantForm.product ||
+              !variantForm.costPrice ||
+              !variantForm.profit ||
+              !variantForm.displayPrice ||
+              !variantForm.discount
+            }
+          >
+            {isSubmitting
+              ? (editingVariantId ? 'Updating...' : 'Adding...')
+              : (editingVariantId ? 'Update Variant' : 'Add Variant')}
+          </Button>
         </DialogFooter>
       </form>
     );
@@ -2357,6 +3109,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
 
   return (
     <div className="space-y-6">
+      <div>
       {/* Breadcrumbs */}
       <div className="flex items-center gap-2 text-sm text-gray-600">
         <span>Inventory</span>
@@ -2383,13 +3136,15 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
               Add Product Variant
             </Button> */}
           {/* )} */}
-          <Button
-            className="bg-blue-600 hover:bg-blue-700"
-            onClick={handleOpenAddModal}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add
-          </Button>
+          {activeTab !== 'variants' && (
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={handleOpenAddModal}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add
+            </Button>
+          )}
         </div>
             {/* Add Product Variant Modal/Section */}
             {showAddProductVariant && activeTab === 'variants' && (
@@ -2645,22 +3400,22 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                       <th className="text-left py-3 px-4">Product Name</th>
                       <th className="text-left py-3 px-4">Species</th>
                       <th className="text-left py-3 px-4">Cut Types</th>
+                      <th className="text-left py-3 px-4">Available Weights</th>
                       <th className="text-left py-3 px-4">Available Stock</th>
                       <th className="text-left py-3 px-4">Cost Price (<span className="dirham-symbol">&#xea;</span>/KG)</th>
                       <th className="text-left py-3 px-4">Default Profit %</th>
                       <th className="text-left py-3 px-4">Default Discount %</th>
-                      <th className="text-left py-3 px-4">Featured</th>
-                      <th className="text-left py-3 px-4">Best Seller</th>
-                      <th className="text-left py-3 px-4">Express Delivery</th>
+                      {/* <th className="text-left py-3 px-4">Featured</th> */}
+                      {/* <th className="text-left py-3 px-4">Best Seller</th> */}
+                      {/* <th className="text-left py-3 px-4">Express Delivery</th> */}
                       <th className="text-left py-3 px-4">Status</th>
-                      <th className="text-left py-3 px-4">Last Updated</th>
                       <th className="text-left py-3 px-4">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {productsLoading ? (
                       <tr>
-                        <td colSpan={16} className="py-8 text-center text-gray-500">
+                        <td colSpan={15} className="py-8 text-center text-gray-500">
                           <div className="inline-flex items-center gap-2">
                             <Loader className="w-4 h-4 animate-spin" />
                             Loading products...
@@ -2669,11 +3424,11 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                       </tr>
                     ) : productsError ? (
                       <tr>
-                        <td colSpan={16} className="py-8 text-center text-red-600">{productsError}</td>
+                        <td colSpan={15} className="py-8 text-center text-red-600">{productsError}</td>
                       </tr>
                     ) : filteredProducts.length === 0 ? (
                       <tr>
-                        <td colSpan={16} className="py-8 text-center text-gray-500">No products found</td>
+                        <td colSpan={15} className="py-8 text-center text-gray-500">No products found</td>
                       </tr>
                     ) : displayProductsPage.map((product, pageIndex) => {
                       const originalIndex = products.findIndex((p) => p.id === product.id);
@@ -2711,14 +3466,34 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                         <td className="py-3 px-4">
                           <div className="flex flex-wrap gap-1">
                             {product.cutTypes.slice(0, 2).map((ct, idx) => (
-                              <Badge key={idx} variant="outline" className="text-xs">
+                              <Badge key={idx} variant="outline" className="text-xs bg-gray-100 text-orange-600">
                                 {ct}
                               </Badge>
                             ))}
                             {product.cutTypes.length > 2 && (
-                              <Badge variant="outline" className="text-xs">
+                              <Badge variant="outline" className="text-xs bg-green-50 text-green-600">
                                 +{product.cutTypes.length - 2}
                               </Badge>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex flex-wrap gap-1">
+                            {product.availableWeights && product.availableWeights.length > 0 ? (
+                              <>
+                                {product.availableWeights.slice(0, 3).map((weight, idx) => (
+                                  <Badge key={idx} variant="outline" className="text-xs bg-blue-50 text-blue-600">
+                                    {weight}{product.weightUnit || 'g'}
+                                  </Badge>
+                                ))}
+                                {product.availableWeights.length > 3 && (
+                                  <Badge variant="outline" className="text-xs">
+                                    +{product.availableWeights.length - 3}
+                                  </Badge>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-gray-400 text-sm">—</span>
                             )}
                           </div>
                         </td>
@@ -2726,7 +3501,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                         <td className="py-3 px-4"><div className="flex items-center"><span className="dirham-symbol mr-2">&#xea;</span>{product.costPrice}</div></td>
                         <td className="py-3 px-4">{product.profit}%</td>
                         <td className="py-3 px-4">{product.discount}%</td>
-                        <td className="py-3 px-4">
+                        {/* <td className="py-3 px-4"> 
                           <Badge variant={product.featured ? 'default' : 'outline'} className={product.featured ? 'bg-yellow-100 text-yellow-800 text-xs' : 'bg-red-100 text-red-600'}>
                             {product.featured ? 'Yes' : 'No'}
                           </Badge>
@@ -2737,22 +3512,21 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                           </Badge>
                         </td>
                         <td className="py-3 px-4">
-                          <Badge variant={product.isExpressDelivery ? 'default' : 'outline'} className={product.isExpressDelivery ? 'bg-yellow-100 text-yellow-800 text-xs' : ' bg-red-100 text-red-600'}>
+                          <Badge variant={product.isExpressDelivery ? 'default' : 'outline'} className={product.isExpressDelivery ? 'bg-blue-100 text-blue-800 text-xs' : ' bg-red-100 text-red-600'}>
                             {product.isExpressDelivery ? 'Yes' : 'No'}
                           </Badge>
-                        </td>
+                        </td>*/}
                         <td className="py-3 px-4">
                           <Badge variant={product.status === 'Active' ? 'default' : 'destructive'}>
                             {product.status}
                           </Badge>
                         </td>
-                        <td className="py-3 px-4">{product.lastUpdated}</td>
                         <td className="py-3 px-4">
                           <div className="flex gap-2">
                             <button
                               className="p-1 hover:bg-gray-100 rounded"
                               title="Edit product"
-                              onClick={() => {
+                              onClick={async () => {
                                 // Prefill form for editing
                                 const resolvedCategoryId = getCategoryIdForProduct(product);
                                 const formData = {
@@ -2796,6 +3570,54 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                                   bestseller: formData.bestseller,
                                   isExpressDelivery: formData.isExpressDelivery
                                 });
+
+                                // Filter variants for this product to populate pricing table
+                                const productVariants = variants.filter(v => v.product === product.name);
+                                
+                                if (productVariants.length > 0) {
+                                  const variantRows: typeof productVariantRows = {};
+                                  const cutTypeImages: typeof productCutTypeImages = {};
+                                  const existingImages: typeof existingCutTypeImages = {};
+                                  const variantIds: typeof existingVariantIds = {};
+
+                                  productVariants.forEach(v => {
+                                    // Use the cutTypeId from variant if available, otherwise find it from cutTypesData
+                                    let cutTypeId = v.cutTypeId;
+                                    if (!cutTypeId) {
+                                      const cutTypeData = cutTypesData.find(ct => ct.name === v.cutType);
+                                      cutTypeId = cutTypeData?._id || v.cutType;
+                                    }
+                                    
+                                    const rowKey = getVariantRowKey(cutTypeId, v.weight);
+                                    variantRows[rowKey] = {
+                                      costPricePerKg: String(v.costPrice),
+                                      profitPercent: String(v.profit),
+                                      displayPrice: String(v.displayPrice),
+                                      discountPercent: String(v.discount),
+                                      sellingPrice: String(v.sellingPrice),
+                                      featured: v.featured,
+                                      bestSeller: v.bestSeller,
+                                      expressDelivery: v.isExpressDelivery,
+                                      nextDayDelivery: v.isNextDayDelivery,
+                                      festivOffer: v.special,
+                                      notes: v.notes || ''
+                                    };
+                                    
+                                    // Store existing variant ID for updates
+                                    variantIds[rowKey] = v.id;
+                                    
+                                    // Store existing image PATH (not full URL) for this cut type
+                                    if (v.imagePath && !existingImages[cutTypeId]) {
+                                      existingImages[cutTypeId] = v.imagePath;
+                                    }
+                                  });
+
+                                  setProductVariantRows(variantRows);
+                                  setProductCutTypeImages(cutTypeImages);
+                                  setExistingCutTypeImages(existingImages);
+                                  setExistingVariantIds(variantIds);
+                                }
+
                                 setShowAddModal(true);
                               }}
                             >
@@ -2814,7 +3636,8 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                           </div>
                         </td>
                       </tr>
-                    )})}
+                    )})
+                  }
                   </tbody>
                 </table>
               </div>
@@ -2886,22 +3709,26 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                       <th className="text-left py-3 px-4">Product Name</th>
                       <th className="text-left py-3 px-4">Species</th>
                       <th className="text-left py-3 px-4">Cut Type</th>
+                      <th className="text-left py-3 px-4">Weight (g)</th>
                       <th className="text-left py-3 px-4">Featured</th>
                       <th className="text-left py-3 px-4">Best Seller</th>
-                      <th className="text-left py-3 px-4">Cost Price (<span className="dirham-symbol">&#xea;</span>/KG)</th>
+                      <th className="text-left py-3 px-4">Express Delivery</th>
+                      <th className="text-left py-3 px-4">Next Day Delivery</th>
+                      <th className="text-left py-3 px-4">Festive Offer</th>
+                      <th className="text-left py-3 px-4">Cost Price (<span className="dirham-symbol">&#xea;</span>)</th>
                       <th className="text-left py-3 px-4">Profit %</th>
                       <th className="text-left py-3 px-4">Display Price (<span className="dirham-symbol">&#xea;</span>)</th>
                       <th className="text-left py-3 px-4">Discount %</th>
                       <th className="text-left py-3 px-4">Selling Price (<span className="dirham-symbol">&#xea;</span>)</th>
                       <th className="text-left py-3 px-4">Status</th>
-                      <th className="text-left py-3 px-4">Last Updated</th>
+                      {/* <th className="text-left py-3 px-4">Last Updated</th> */}
                       <th className="text-left py-3 px-4">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedVariants.length === 0 ? (
                       <tr>
-                        <td colSpan={16} className="py-8 text-center text-gray-500">Variants Loading</td>
+                        <td colSpan={20} className="py-8 text-center text-gray-500">Variants Loading</td>
                       </tr>
                     ) : displayVariantsPage.map((variant, pageIndex) => {
                       const originalIndex = variants.findIndex((v) => v.id === variant.id);
@@ -2944,18 +3771,42 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                         <td className="py-3 px-4">
                           <Badge variant="outline" className="text-xs">{variant.cutType}</Badge>
                         </td>
+                        <td className="py-3 px-4" title={`${variant.weight}g`}>
+                          <Badge variant="secondary" className="text-xs">{variant.weight}g</Badge>
+                        </td>
                         <td className="py-3 px-4">
                           {variant.featured ? (
                             <Badge className="bg-yellow-100 text-yellow-800 text-xs">Yes</Badge>
                           ) : (
-                            <Badge className="text-white bg-red-600 font-medium">No</Badge>
+                            <Badge className="text-white bg-red-600 font-medium text-xs">No</Badge>
                           )}
                         </td>
                         <td className="py-3 px-4">
                           {variant.bestSeller ? (
                             <Badge className="bg-green-100 text-green-800 text-xs">Yes</Badge>
                           ) : (
-                            <Badge className="text-white bg-red-600 font-medium">No</Badge>
+                            <Badge className="text-white bg-red-600 font-medium text-xs">No</Badge>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          {variant.isExpressDelivery ? (
+                            <Badge className="bg-blue-100 text-blue-800 text-xs">Yes</Badge>
+                          ) : (
+                            <Badge  className="text-white bg-red-600 font-medium text-xs">No</Badge>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          {variant.isNextDayDelivery ? (
+                            <Badge className="bg-purple-100 text-purple-800 text-xs">Yes</Badge>
+                          ) : (
+                            <Badge  className="text-white bg-red-600 font-medium text-xs">No</Badge>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          {variant.special ? (
+                            <Badge className="bg-orange-100 text-orange-800 text-xs">Yes</Badge>
+                          ) : (
+                            <Badge  className="text-white bg-red-600 font-medium text-xs">No</Badge>
                           )}
                         </td>
                         <td className="py-3 px-4"><div className="flex items-center"><span className="dirham-symbol mr-2">&#xea;</span>{variant.costPrice}</div></td>
@@ -2968,7 +3819,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                             {variant.status}
                           </Badge>
                         </td>
-                        <td className="py-3 px-4">{variant.lastUpdated}</td>
+                        {/* <td className="py-3 px-4">{variant.lastUpdated}</td> */}
                         <td className="py-3 px-4">
                           <div className="flex gap-2">
                             <button 
@@ -2998,7 +3849,8 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
                           </div>
                         </td>
                       </tr>
-                    )})}
+                    )})
+                  }
                   </tbody>
                 </table>
               </div>
@@ -3020,7 +3872,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
         }
         setShowAddModal(open);
       }}>
-        <DialogContent className="sm:max-w-[600px]" onInteractOutside={(e: any) => e.preventDefault()}>
+        <DialogContent className="sm:max-w-[500px]" onInteractOutside={(e: any) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>
               {activeTab === 'categories'
@@ -3296,6 +4148,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
         pauseOnHover
         theme="light"
       />
+      </div>
     </div>
   );
 }

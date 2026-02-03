@@ -19,6 +19,7 @@ interface Particular {
   amount: number;
   vat: string;
   totalAmount: number;
+  rfv?: string;
 }
 
 export default function PrePurchaseOrders() {
@@ -35,6 +36,7 @@ export default function PrePurchaseOrders() {
   const [date, setDate] = useState('');
   const [vendor, setVendor] = useState('');
   const [notes, setNotes] = useState('');
+  const [rfv, setRfv] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingPpo, setIsLoadingPpo] = useState(false);
   const [ppos, setPpos] = useState<any[]>([]);
@@ -175,6 +177,7 @@ export default function PrePurchaseOrders() {
       }));
       
       setParticulars(mappedParticulars);
+      setRfv(ppo.rfv?.toString() || '');
       setIsEditMode(true);
       setEditingPpoId(ppoId);
       setShowAddForm(true);
@@ -262,7 +265,8 @@ export default function PrePurchaseOrders() {
         quantity: '',
         amount: 0,
         vat: '',
-        totalAmount: 0
+        totalAmount: 0,
+        rfv: ''
       }
     ]);
   };
@@ -341,6 +345,7 @@ export default function PrePurchaseOrders() {
           vendor,
           particulars: mappedParticulars,
           notes,
+          rfv: rfv ? parseFloat(rfv) : 0,
           ppoValue
         }),
       });
@@ -354,6 +359,7 @@ export default function PrePurchaseOrders() {
       setDate('');
       setVendor('');
       setNotes('');
+      setRfv('');
       setParticulars([{
         id: '1',
         product: '',
@@ -361,7 +367,8 @@ export default function PrePurchaseOrders() {
         quantity: '',
         amount: 0,
         vat: '',
-        totalAmount: 0
+        totalAmount: 0,
+        rfv: ''
       }]);
       setShowAddForm(false);
       setIsEditMode(false);
@@ -460,6 +467,19 @@ export default function PrePurchaseOrders() {
                 </div>
               </div>
 
+              <div>
+                <Label htmlFor="rfv">RFV (Round Figure Value)</Label>
+                <Input
+                  id="rfv"
+                  type="number"
+                  value={rfv}
+                  onChange={(e) => setRfv(e.target.value)}
+                  placeholder="Enter round figure value (for records purpose)"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
               {/* Particulars Table */}
               <div>
                 <div className="flex justify-between items-center mb-3">
@@ -485,6 +505,7 @@ export default function PrePurchaseOrders() {
                         <th className="text-left py-3 px-4 text-sm font-semibold">Amount (<span className="dirham-symbol">&#xea;</span>)</th>
                         <th className="text-left py-3 px-4 text-sm font-semibold">VAT % *</th>
                         <th className="text-left py-3 px-4 text-sm font-semibold">Total Amount (<span className="dirham-symbol">&#xea;</span>)</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold">RFV (<span className="dirham-symbol">&#xea;</span>)</th>
                         <th className="text-left py-3 px-4 text-sm font-semibold">Action</th>
                       </tr>
                     </thead>
@@ -554,6 +575,16 @@ export default function PrePurchaseOrders() {
                               value={particular.totalAmount.toFixed(2)}
                               disabled
                               className="bg-gray-50 font-semibold"
+                            />
+                          </td>
+                          <td className="py-3 px-4">
+                            <Input
+                              type="number"
+                              value={particular.rfv || ''}
+                              onChange={(e) => handleParticularChange(particular.id, 'rfv', e.target.value)}
+                              placeholder="0.00"
+                              min="0"
+                              step="0.01"
                             />
                           </td>
                           <td className="py-3 px-4">
@@ -764,6 +795,14 @@ export default function PrePurchaseOrders() {
                 </div>
               )}
 
+              {/* RFV */}
+              {selectedPpo.rfv && (
+                <div>
+                  <Label className="text-gray-600">RFV (Round Figure Value)</Label>
+                  <p className="font-semibold"><span className="dirham-symbol mr-1">&#xea;</span>{parseFloat(selectedPpo.rfv).toFixed(2)}</p>
+                </div>
+              )}
+
               {/* Particulars */}
               <div>
                 <Label className="text-gray-600 text-lg font-semibold mb-3 block">Particulars</Label>
@@ -777,6 +816,7 @@ export default function PrePurchaseOrders() {
                         <th className="text-left py-2 px-3 text-xs font-semibold">Amount (<span className="dirham-symbol">&#xea;</span>)</th>
                         <th className="text-left py-2 px-3 text-xs font-semibold">VAT %</th>
                         <th className="text-left py-2 px-3 text-xs font-semibold">Total Amount (<span className="dirham-symbol">&#xea;</span>)</th>
+                        <th className="text-left py-2 px-3 text-xs font-semibold">RFV (<span className="dirham-symbol">&#xea;</span>)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -788,6 +828,7 @@ export default function PrePurchaseOrders() {
                           <td className="py-3 px-6"><span className="dirham-symbol mr-2">&#xea;</span>{particular.amount.toFixed(2)}</td>
                           <td className="py-3 px-6">{particular.vat}%</td>
                           <td className="py-3 px-6 font-semibold"><span className="dirham-symbol mr-2">&#xea;</span>{particular.totalAmount.toFixed(2)}</td>
+                          <td className="py-3 px-6">{particular.rfv ? <><span className="dirham-symbol mr-2">&#xea;</span>{parseFloat(particular.rfv).toFixed(2)}</> : '—'}</td>
                         </tr>
                       ))}
                     </tbody>
