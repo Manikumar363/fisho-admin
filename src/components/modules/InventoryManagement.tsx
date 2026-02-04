@@ -1075,6 +1075,8 @@ const handleRemoveWeight = (weight: number) => {
             _id: string;
             name: string;
           };
+          weight?: number;
+          costPrice?: number;
           featured: boolean;
           bestSeller: boolean;
           notes?: string;
@@ -1084,6 +1086,9 @@ const handleRemoveWeight = (weight: number) => {
           discount: number;
           isActive: boolean;
           isDeleted: boolean;
+          isExpressDelivery?: boolean;
+          isNextDayDelivery?: boolean;
+          special?: boolean;
           createdAt: string;
           updatedAt: string;
         };
@@ -1115,8 +1120,13 @@ const handleRemoveWeight = (weight: number) => {
         productImage: v.product?.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${v.product.image}` : v.product.image) : undefined,
         categoryName,
         cutTypeName: v.cutType?.name || 'N/A',
+        weight: v.weight || 0,
+        costPrice: v.costPrice || 0,
         featured: v.featured,
         bestSeller: v.bestSeller,
+        isExpressDelivery: v.isExpressDelivery || false,
+        isNextDayDelivery: v.isNextDayDelivery || false,
+        isSpecial: v.special || false,
         notes: v.notes || 'N/A',
         displayPrice: v.displayPrice,
         sellingPrice: v.sellingPrice,
@@ -3913,16 +3923,11 @@ const handleRemoveWeight = (weight: number) => {
 
                 {/* Basic Information */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
+                  {/* <div> 
                     <Label className="text-gray-600">Variant Name</Label>
                     <p className="font-medium">{viewingVariant.name}</p>
-                  </div>
-                  <div>
-                    <Label className="text-gray-600">Status</Label>
-                    <Badge variant={viewingVariant.status === 'Active' ? 'default' : 'secondary'} className="text-xs">
-                      {viewingVariant.status}
-                    </Badge>
-                  </div>
+                  </div>*/}
+                  
                 </div>
 
                 {/* Product & Category */}
@@ -3943,7 +3948,19 @@ const handleRemoveWeight = (weight: number) => {
                   <p className="font-medium">{viewingVariant.cutTypeName}</p>
                 </div>
 
-                {/* Badges */}
+                {/* Weight and Cost Price */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-600">Weight (g)</Label>
+                    <p className="font-medium">{viewingVariant.weight}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-600">Cost Price per kg</Label>
+                    <p className="font-medium"><span className="dirham-symbol">&#xea;</span> {parseFloat(String(viewingVariant.costPrice)).toFixed(2)}</p>
+                  </div>
+                </div>
+
+                {/* Badges - Variant Features */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-gray-600">Featured</Label>
@@ -3963,43 +3980,90 @@ const handleRemoveWeight = (weight: number) => {
                   </div>
                 </div>
 
-                {/* Pricing Information */}
-                <div className="p-4 bg-blue-50 rounded-lg space-y-3">
-                  <h4 className="font-semibold text-blue-900">Pricing Details</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-gray-600">Display Price</Label>
-                      <p className="font-semibold text-lg"><div className="flex items-center"><span className="dirham-symbol mr-2">&#xea;</span>{viewingVariant.displayPrice}</div></p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-600">Selling Price</Label>
-                      <p className="font-semibold text-lg text-green-600"><div className="flex items-center"><span className="dirham-symbol mr-2">&#xea;</span>{viewingVariant.sellingPrice}</div></p>
+                {/* Delivery and Special Offer Options */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-gray-600">Express Delivery</Label>
+                    <div className="mt-1">
+                      <Badge variant={viewingVariant.isExpressDelivery ? 'default' : 'secondary'} className="text-xs">
+                        {viewingVariant.isExpressDelivery ? 'Yes' : 'No'}
+                      </Badge>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="variantProfit">Profit Margin</Label>
-                      <Input
-                        id="variantProfit"
-                        type="number"
-                        value={viewingVariant.profit}
-                        readOnly
-                        className="bg-gray-100"
-                      />
+                  <div>
+                    <Label className="text-gray-600">Next Day Delivery</Label>
+                    <div className="mt-1">
+                      <Badge variant={viewingVariant.isNextDayDelivery ? 'default' : 'secondary'} className="text-xs">
+                        {viewingVariant.isNextDayDelivery ? 'Yes' : 'No'}
+                      </Badge>
                     </div>
-                    <div>
-                      <Label htmlFor="variantDiscount">Discount</Label>
-                      <Input
-                        id="variantDiscount"
-                        type="number"
-                        value={viewingVariant.discount}
-                        readOnly
-                        className="bg-gray-100"
-                      />
+                  </div>
+                  <div>
+                    <Label className="text-gray-600">Special Offer</Label>
+                    <div className="mt-1">
+                      <Badge variant={viewingVariant.isSpecial ? 'default' : 'secondary'} className="text-xs">
+                        {viewingVariant.isSpecial ? 'Yes' : 'No'}
+                      </Badge>
                     </div>
                   </div>
                 </div>
 
+                {/* Pricing Information Table */}
+                <div className="p-4 bg-blue-50 rounded-lg space-y-3">
+                  <h4 className="font-semibold text-blue-900">Pricing Table Details</h4>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-gray-600">Cost Price (per kg)</Label>
+                        <Input
+                          type="number"
+                          value={parseFloat(String(viewingVariant.costPrice)).toFixed(2)}
+                          readOnly
+                          className="bg-gray-100 mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Profit %</Label>
+                        <Input
+                          type="number"
+                          value={parseFloat(String(viewingVariant.profit)).toFixed(2)}
+                          readOnly
+                          className="bg-gray-100 mt-1"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-gray-600">Display Price</Label>
+                        <Input
+                          type="number"
+                          value={parseFloat(String(viewingVariant.displayPrice)).toFixed(2)}
+                          readOnly
+                          className="bg-gray-100 mt-1 font-semibold"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Discount %</Label>
+                        <Input
+                          type="number"
+                          value={parseFloat(String(viewingVariant.discount)).toFixed(2)}
+                          readOnly
+                          className="bg-gray-100 mt-1"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-gray-600">Selling Price (Final)</Label>
+                      <Input
+                        type="number"
+                        value={parseFloat(String(viewingVariant.sellingPrice)).toFixed(2)}
+                        readOnly
+                        className="bg-green-100 mt-1 font-semibold text-green-700"
+                      />
+                    </div>
+                  </div>
+                
+                 </div>
                 {/* Notes */}
                 <div>
                   <Label className="text-gray-600">Notes</Label>
@@ -4007,18 +4071,25 @@ const handleRemoveWeight = (weight: number) => {
                 </div>
 
                 {/* Timestamps */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label className="text-gray-600">Date Created</Label>
                     <p className="font-medium">{viewingVariant.dateCreated}</p>
                   </div>
                   <div>
+                    <Label className="text-gray-600">Status</Label>
+                    <Badge variant={viewingVariant.status === 'Active' ? 'default' : 'secondary'} className="text-xs">
+                      {viewingVariant.status}
+                    </Badge>
+                  </div>
+                  <div>
                     <Label className="text-gray-600">Last Updated</Label>
                     <p className="font-medium">{viewingVariant.lastUpdated}</p>
                   </div>
-                </div>
+               
               </div>
-            )}
+          </div>
+         )}
           </div>
         </DialogContent>
       </Dialog>
