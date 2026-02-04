@@ -394,6 +394,7 @@ export default function StoreBilling() {
       productId: item.productId,
       variantId: item.variantId || '',
       name: item.variantName || item.productName,
+      weight: item.weight || 0,
       totalPrice: item.price * item.quantity,
       quantityGrams: item.weight ? item.weight * item.quantity : item.quantity,
       pricePerKg: item.price,

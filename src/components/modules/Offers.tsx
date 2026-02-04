@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Search, Plus, Edit, Eye, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '../ui/card';
 import { Input } from '../ui/input';
@@ -61,6 +62,7 @@ interface CouponsResponse {
 }
 
 const Offers: React.FC = () => {
+  const location = useLocation();
   const [showAddOffer, setShowAddOffer] = useState(false);
   const [showAddProductVariant, setShowAddProductVariant] = useState(false);
   const [editingOffer, setEditingOffer] = useState<Offer | null>(null);
@@ -76,6 +78,16 @@ const Offers: React.FC = () => {
     inactiveCoupons: 0,
     totalCoupons: 0
   });
+
+  // Check navigation state for auto-opening AddOffer
+  useEffect(() => {
+    const state = location.state as any;
+    if (state?.mode === 'add') {
+      setShowAddOffer(true);
+      // Clear the state to prevent re-triggering
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   useEffect(() => {
     fetchCoupons();

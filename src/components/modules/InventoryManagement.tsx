@@ -2018,7 +2018,7 @@ const handleRemoveWeight = (weight: number) => {
       categoryForm.existingIcon === originalCategoryForm.existingIcon &&
       !categoryForm.speciesIcon;
     return (
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4 max-w-[600px]">
         <div>
           <Label
             htmlFor="speciesName"
@@ -2068,7 +2068,19 @@ const handleRemoveWeight = (weight: number) => {
             required={!isEdit}
             disabled={isSubmitting}
           />
-          {categoryForm.existingIconUrl && !categoryForm.speciesIcon && (
+          {categoryForm.speciesIcon ? (
+            <div className="mt-2 text-sm text-gray-600 flex items-center gap-3">
+              <img
+                src={URL.createObjectURL(categoryForm.speciesIcon)}
+                alt="New category icon preview"
+                className="w-14 h-14 rounded object-cover border"
+              />
+              <div>
+                
+                <span className="text-xs text-gray-500">{categoryForm.speciesIcon.name}</span>
+              </div>
+            </div>
+          ) : categoryForm.existingIconUrl && !categoryForm.speciesIcon ? (
             <div className="mt-2 text-sm text-gray-600 flex items-center gap-3">
               <ImageWithFallback
                 src={categoryForm.existingIconUrl}
@@ -2077,7 +2089,7 @@ const handleRemoveWeight = (weight: number) => {
               />
               <span>Current icon will be kept unless you upload a new one.</span>
             </div>
-          )}
+          ) : null}
           <p className="text-sm text-gray-500 mt-1">
             {isEdit ? 'Upload a new icon to replace the current one (optional)' : 'Upload an icon or image for this species'}
           </p>
@@ -2600,9 +2612,7 @@ const handleRemoveWeight = (weight: number) => {
             </tbody>
           </table>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Weight options table shows all combinations of cut types and weights. Details will be managed at the variant level.
-        </p>
+        
       </div>
 
       <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
@@ -2660,7 +2670,7 @@ const handleRemoveWeight = (weight: number) => {
         {/* Read-only info section when editing */}
         {editingVariantId && currentVariant && (
           <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-3">
-            <h3 className="text-sm font-semibold text-gray-700">Read-Only Information (Cannot be edited)</h3>
+            
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -3618,7 +3628,9 @@ const handleRemoveWeight = (weight: number) => {
                                     
                                     // Store existing image PATH (not full URL) for this cut type
                                     if (v.imagePath && !existingImages[cutTypeId]) {
-                                      existingImages[cutTypeId] = v.imagePath;
+                                      // Store full URL for display
+                                      const imageUrl = IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${v.imagePath}` : v.imagePath;
+                                      existingImages[cutTypeId] = imageUrl;
                                     }
                                   });
 
@@ -3882,12 +3894,10 @@ const handleRemoveWeight = (weight: number) => {
         }
         setShowAddModal(open);
       }}>
-        <DialogContent className="sm:max-w-[500px]" onInteractOutside={(e: any) => e.preventDefault()}>
+        <DialogContent className="sm:max-w-[650px] max-h-[90vh] w-[90vw]" onInteractOutside={(e: any) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>
-              {activeTab === 'categories'
-                ? (editingCategoryId ? 'Edit' : 'Add New')
-                : activeTab === 'products'
+              { activeTab === 'products'
                 ? (editingProductId ? 'Edit' : 'Add New')
                 : activeTab === 'variants'
                 ? (editingVariantId ? 'Edit' : 'Add New')

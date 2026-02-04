@@ -128,7 +128,7 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
       label: 'Orders',
       icon: ShoppingCart,
       path: '/orders',
-      roles: ['admin']
+      roles: ['admin', 'subadmin']
     },
     {
       id: 'pre-purchase',

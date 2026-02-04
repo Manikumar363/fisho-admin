@@ -82,7 +82,11 @@ export default function Dashboard() {
         </div>
         <div className="flex gap-3">
           {userRole === 'admin' && (
-            <Button variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-50">
+            <Button 
+              variant="outline" 
+              className="border-blue-600 text-blue-600 hover:bg-blue-50"
+              onClick={() => navigate('/offers', { state: { mode: 'add' } })}
+            >
               <Plus className="w-4 h-4 mr-2" />
               Add Offer
             </Button>
