@@ -10,7 +10,7 @@ import { apiFetch, getToken } from '../../../lib/api';
 import { toast } from 'react-toastify';
 
 interface TextContentEditorProps {
-  contentType: 'terms' | 'privacy' | 'about' | 'deliveryTc' | 'deliveryPrivacy';
+  contentType: 'terms' | 'privacy' | 'about' | 'deliveryTc' | 'deliveryPrivacy' | 'returnRefund';
   contentItem?: any;
   onSave: (contentData: any) => void;
   onCancel: () => void;
@@ -64,7 +64,8 @@ export default function TextContentEditor({
     privacy: 'Privacy Policy',
     about: 'About Us',
     deliveryTc: 'Delivery T&C',
-    deliveryPrivacy: 'Delivery Privacy'
+    deliveryPrivacy: 'Delivery Privacy',
+    returnRefund: 'Return and Refund Policy'
   };
 
   const contentTypeIds = {
@@ -72,7 +73,8 @@ export default function TextContentEditor({
     privacy: '694128ead430ff450e4ac0b2',
     about: '69442a843fcd660eec9c89ed',
     deliveryTc: '694babb9463a57211a1cbdbb',
-    deliveryPrivacy: '694bb389463a57211a1cbde0'
+    deliveryPrivacy: '694bb389463a57211a1cbde0',
+    returnRefund: '69842feb16114389714e555f'
   };
 
   useEffect(() => {

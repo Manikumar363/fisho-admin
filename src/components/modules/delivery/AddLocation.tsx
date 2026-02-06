@@ -44,7 +44,7 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
     status: true
   });
 
-  const [deliveryType, setDeliveryType] = useState<'express' | 'nextDay' | ''>('');
+  const [expressDelivery, setExpressDelivery] = useState(false);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -84,21 +84,11 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
     }
   };
 
-  const handleDeliveryTypeChange = (type: 'express' | 'nextDay', checked: boolean) => {
-    setDeliveryType(checked ? type : '');
-    if (errors.deliveryType) {
-      setErrors(prev => ({ ...prev, deliveryType: '' }));
-    }
-  };
-
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.locationName.trim()) {
       newErrors.locationName = 'Location name is required';
-    }
-    if (!deliveryType) {
-      newErrors.deliveryType = 'Please select a delivery type';
     }
     if (!formData.nearestStore) {
       newErrors.nearestStore = 'Please select a store';
@@ -118,16 +108,14 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
 
     setLoading(true);
     try {
-      const selectedTypes = deliveryType === 'express'
+      const selectedTypes = expressDelivery
         ? ['Express Delivery']
-        : deliveryType === 'nextDay'
-          ? ['Next Day Delivery']
-          : [];
+        : ['Next Day Delivery'];
 
       // Prepare the payload for the API
       const payload = {
         name: formData.locationName.trim(),
-        expressDelivery: deliveryType === 'express',
+        expressDelivery: expressDelivery,
         nearByStore: formData.nearestStore 
       };
 
@@ -222,46 +210,25 @@ export default function AddLocation({ onBack, onSave }: AddLocationProps) {
               )}
             </div>
 
-            {/* Delivery Type */}
+            {/* Express Delivery */}
             <div className="space-y-3">
-              <Label>
-                Delivery Type <span className="text-red-500">*</span>
-              </Label>
-              <div className="flex flex-col gap-3">
-                <label className="flex items-center gap-3 border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="deliveryType"
-                    value="express"
-                    checked={deliveryType === 'express'}
-                    onChange={() => setDeliveryType('express')}
-                    disabled={loading}
-                    className="form-radio"
-                  />
-                  <div>
-                    <p className="text-sm pr-1">Express Delivery</p>
-                    <p className="text-xs text-gray-500">Same-day delivery service</p>
-                  </div>
-                </label>
-                <label className="flex items-center gap-3 border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="deliveryType"
-                    value="nextDay"
-                    checked={deliveryType === 'nextDay'}
-                    onChange={() => setDeliveryType('nextDay')}
-                    disabled={loading}
-                    className="form-radio"
-                  />
-                  <div>
-                    <p className="text-sm">Next Day Delivery</p>
-                    <p className="text-xs text-gray-500">Delivery within 24 hours</p>
-                  </div>
-                </label>
+              <div className="flex items-center gap-3 border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                <Checkbox
+                  id="expressDelivery"
+                  checked={expressDelivery}
+                  onCheckedChange={(checked) => setExpressDelivery(checked as boolean)}
+                  disabled={loading}
+                />
+                <div className="flex-1">
+                  <label
+                    htmlFor="expressDelivery"
+                    className="cursor-pointer"
+                  >
+                    <p className="text-sm font-medium">Express Delivery</p>
+                    <p className="text-xs text-gray-500">Enable same-day delivery service (Default: Next Day Delivery)</p>
+                  </label>
+                </div>
               </div>
-              {errors.deliveryType && (
-                <p className="text-sm text-red-600 font-medium">{errors.deliveryType}</p>
-              )}
             </div>
             {/* Nearest Store */}
             <div className="space-y-2">

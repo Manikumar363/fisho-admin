@@ -19,7 +19,7 @@ import BannerManagement from './cms/BannerManagement';
 import TextContentEditor from './cms/TextContentEditor';
 import { apiFetch } from '../../lib/api';
 
-type ContentType = 'banners' | 'terms' | 'privacy' | 'about' | 'deliveryTc' | 'deliveryPrivacy';
+type ContentType = 'banners' | 'terms' | 'privacy' | 'about' | 'deliveryTc' | 'deliveryPrivacy' | 'returnRefund';
 
 interface ContentItem {
   id: string;
@@ -75,15 +75,22 @@ export default function CMS() {
       title: 'Delivery T&C',
       lastUpdated: '',
       type: 'deliveryTc'
+    },
+    {
+      id: 'returnRefund-loading',
+      title: 'Return and Refund Policy',
+      lastUpdated: '',
+      type: 'returnRefund'
     }
   ]);
 
-  const PAGE_IDS: Record<'terms' | 'privacy' | 'about' | 'deliveryTc' | 'deliveryPrivacy', string> = {
+  const PAGE_IDS: Record<'terms' | 'privacy' | 'about' | 'deliveryTc' | 'deliveryPrivacy' | 'returnRefund', string> = {
     terms: '69412955d430ff450e4ac0b8',
     privacy: '694128ead430ff450e4ac0b2',
     about: '69442a843fcd660eec9c89ed',
     deliveryTc: '694babb9463a57211a1cbdbb',
     deliveryPrivacy: '694bb389463a57211a1cbde0',
+    returnRefund: '69842feb16114389714e555f',
   };
 
   const contentTypes = [
@@ -118,6 +125,14 @@ export default function CMS() {
       icon: FileText,
       color: 'orange',
       items: textContents.filter(item => item.type === 'about')
+    },
+    {
+      id: 'returnRefund' as ContentType,
+      title: 'Return and Refund Policy',
+      description: 'Manage return and refund policy information',
+      icon: FileText,
+      color: 'red',
+      items: textContents.filter(item => item.type === 'returnRefund')
     }
   ];
 
@@ -234,7 +249,7 @@ export default function CMS() {
     setPagesLoading(true);
     setPagesError(null);
     try {
-      const entries: Array<Promise<ContentItem>> = (['terms', 'privacy', 'about', 'deliveryTc', 'deliveryPrivacy'] as const).map(async (key) => {
+      const entries: Array<Promise<ContentItem>> = (['terms', 'privacy', 'about', 'deliveryTc', 'deliveryPrivacy', 'returnRefund'] as const).map(async (key) => {
         try {
           const res = await apiFetch<{
             success: boolean;
@@ -457,7 +472,7 @@ export default function CMS() {
     );
   }
 
-  if (selectedContent && ['terms', 'privacy', 'about', 'deliveryTc', 'deliveryPrivacy'].includes(selectedContent)) {
+  if (selectedContent && ['terms', 'privacy', 'about', 'deliveryTc', 'deliveryPrivacy', 'returnRefund'].includes(selectedContent)) {
     return (
       <TextContentEditor
         contentType={selectedContent}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Loader } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
@@ -32,14 +32,6 @@ interface EditLocationProps {
   onSave: (location: DeliveryLocation) => void;
 }
 
-const stores = [
-  'Fisho Marine Drive',
-  'Fisho Bandra West',
-  'Fisho Andheri',
-  'Fisho Juhu',
-  'Fisho Powai'
-];
-
 export default function EditLocation({ location, onBack, onSave }: EditLocationProps) {
   const [formData, setFormData] = useState({
     locationName: location.locationName,
@@ -63,6 +55,26 @@ export default function EditLocation({ location, onBack, onSave }: EditLocationP
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [stores, setStores] = useState<{ _id: string; name: string }[]>([]);
+  const [storesLoading, setStoresLoading] = useState(false);
+
+  useEffect(() => {
+    setStoresLoading(true);
+    apiFetch<{ success: boolean; stores: { _id: string; name: string }[]; message?: string }>('/api/stores')
+      .then(res => {
+        if (res.success && Array.isArray(res.stores)) {
+          setStores(res.stores);
+        } else {
+          setStores([]);
+          toast.error(res.message || 'Failed to fetch stores');
+        }
+      })
+      .catch(() => {
+        setStores([]);
+        toast.error('Failed to fetch stores');
+      })
+      .finally(() => setStoresLoading(false));
+  }, []);
 
   // Check if any changes have been made
   const hasChanges = () => {
@@ -252,15 +264,15 @@ export default function EditLocation({ location, onBack, onSave }: EditLocationP
               <Select
                 value={formData.nearestStore}
                 onValueChange={handleStoreChange}
-                disabled={loading}
+                disabled={loading || storesLoading}
               >
                 <SelectTrigger className={errors.nearestStore ? 'border-red-500' : ''}>
-                  <SelectValue placeholder="Select a store" />
+                  <SelectValue placeholder={storesLoading ? "Loading stores..." : "Select a store"} />
                 </SelectTrigger>
                 <SelectContent>
                   {stores.map((store) => (
-                    <SelectItem key={store} value={store}>
-                      {store}
+                    <SelectItem key={store._id} value={store._id}>
+                      {store.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
