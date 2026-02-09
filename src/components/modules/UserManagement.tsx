@@ -715,6 +715,18 @@ export default function UserManagement() {
     return filters.status !== '';
   };
 
+  const storeManagerSortOptions = [
+    ...(storeManagers.some((manager) => manager.createdAt)
+      ? [{ value: 'recently-added', label: 'Recently Added' }]
+      : []),
+    ...(storeManagers.some((manager) => manager.name)
+      ? [
+          { value: 'name-asc', label: 'Name (A-Z)' },
+          { value: 'name-desc', label: 'Name (Z-A)' },
+        ]
+      : []),
+  ];
+
   // Filter functions
   const getFilteredEndUsers = () => {
     let filtered = endUsers;
@@ -1034,10 +1046,14 @@ export default function UserManagement() {
                     ) : (
                       getFilteredEndUsers().map((user) => (
                         <tr key={user._id} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="py-3 px-4 text-blue-600">{user._id.substring(0, 8)}...</td>
-                          <td className="py-3 px-4">{user.firstName} {user.lastName}</td>
-                          <td className="py-3 px-4">{user.countryCode} {user.phone}</td>
-                          <td className="py-3 px-4">{user.email}</td>
+                          <td className="py-3 px-4 text-blue-600">{user._id ? `${user._id.substring(0, 8)}...` : 'N/A'}</td>
+                          <td className="py-3 px-4">
+                            {user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'N/A'}
+                          </td>
+                          <td className="py-3 px-4">
+                            {user.phone ? `${user.countryCode || ''} ${user.phone}`.trim() : 'N/A'}
+                          </td>
+                          <td className="py-3 px-4">{user.email || 'N/A'}</td>
                           <td className="py-3 px-4">
                             <Badge variant={user.isActive ? 'default' : 'secondary'}>
                               {user.isActive ? 'Active' : 'Inactive'}
@@ -2487,50 +2503,28 @@ export default function UserManagement() {
             {activeTab === 'store-managers' && (
               <div className="space-y-3">
                 <Label className="text-sm font-medium">Sort By</Label>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="sm-recently-added"
-                      name="sm-sortBy"
-                      value="recently-added"
-                      checked={filters.sortBy === 'recently-added'}
-                      onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
-                      className="w-4 h-4 text-blue-600"
-                    />
-                    <Label htmlFor="sm-recently-added" className="text-sm font-normal cursor-pointer">
-                      Recently Added
-                    </Label>
+                {storeManagerSortOptions.length === 0 ? (
+                  <p className="text-sm text-gray-500">No sort options available</p>
+                ) : (
+                  <div className="space-y-2">
+                    {storeManagerSortOptions.map((option) => (
+                      <div key={option.value} className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          id={`sm-${option.value}`}
+                          name="sm-sortBy"
+                          value={option.value}
+                          checked={filters.sortBy === option.value}
+                          onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                          className="w-4 h-4 text-blue-600"
+                        />
+                        <Label htmlFor={`sm-${option.value}`} className="text-sm font-normal cursor-pointer">
+                          {option.label}
+                        </Label>
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="sm-name-asc"
-                      name="sm-sortBy"
-                      value="name-asc"
-                      checked={filters.sortBy === 'name-asc'}
-                      onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
-                      className="w-4 h-4 text-blue-600"
-                    />
-                    <Label htmlFor="sm-name-asc" className="text-sm font-normal cursor-pointer">
-                      Name (A-Z)
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="sm-name-desc"
-                      name="sm-sortBy"
-                      value="name-desc"
-                      checked={filters.sortBy === 'name-desc'}
-                      onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
-                      className="w-4 h-4 text-blue-600"
-                    />
-                    <Label htmlFor="sm-name-desc" className="text-sm font-normal cursor-pointer">
-                      Name (Z-A)
-                    </Label>
-                  </div>
-                </div>
+                )}
               </div>
             )}
           </div>

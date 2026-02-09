@@ -17,6 +17,11 @@ const getImageUrl = (imagePath?: string): string | undefined => {
   return `${baseUrl}${cleanPath}`;
 };
 
+const formatPrice = (value: number): string => {
+  if (!Number.isFinite(value)) return '0.00';
+  return value.toFixed(2);
+};
+
 interface Variant {
   variantId: {
     _id: string;
@@ -365,7 +370,7 @@ export default function StoreBilling() {
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const discountAmount = (subtotal * discount) / 100;
   const taxAmount = ((subtotal - discountAmount) * tax) / 100;
-  const total = subtotal - discountAmount + taxAmount;
+  const total = subtotal - discountAmount - taxAmount;
 
   const handleCreateOrder = async () => {
     // Validation
@@ -466,7 +471,7 @@ export default function StoreBilling() {
             <CardHeader>
               <CardTitle>Select Store & Category</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="!pb-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Store Dropdown */}
                 <div className="space-y-2">
@@ -536,7 +541,7 @@ export default function StoreBilling() {
             <CardHeader>
               <CardTitle>Product Search</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="!pb-2">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <Input
@@ -563,7 +568,7 @@ export default function StoreBilling() {
               ) : filteredInventory.length === 0 ? (
                 <p className="text-center text-gray-500 py-8">No products found</p>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {filteredInventory.map((inventoryItem) => (
                     <div key={inventoryItem._id}>
                       {/* Product Header */}
@@ -603,7 +608,7 @@ export default function StoreBilling() {
                             className="bg-blue-600 hover:bg-blue-700 text-white"
                           >
                             <Plus className="w-4 h-4 mr-2" />
-                            Add - <span className="dirham-symbol mr-2">&#xea;</span>{inventoryItem.productId.cost}
+                            Add - <span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(inventoryItem.productId.cost)}
                           </Button>
                         </div>
                       ) : (
@@ -615,7 +620,7 @@ export default function StoreBilling() {
                                 key={variant._id}
                                 onClick={() => openWeightModal(inventoryItem, variant)}
                                 disabled={inventoryItem.totalStock <= 0}
-                                className="flex flex-col items-center gap-2 p-3 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+                                className="flex flex-col items-center justify-between gap-2 p-3 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed min-h-[200px]"
                               >
                                 {variant.variantId.image && (
                                   <div className="flex-shrink-0">
@@ -637,7 +642,7 @@ export default function StoreBilling() {
                                     {variant.variantId.discount > 0 && (
                                       <>
                                         <span className="text-xs line-through text-gray-400">
-                                          <span className="dirham-symbol mr-2">&#xea;</span>{variant.variantId.displayPrice}
+                                          <span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(variant.variantId.displayPrice)}
                                         </span>
                                         <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-semibold">
                                           {variant.variantId.discount}% off
@@ -645,13 +650,14 @@ export default function StoreBilling() {
                                       </>
                                     )}
                                     <p className="text-blue-600 font-bold text-sm mt-1">
-                                      <span className="dirham-symbol mr-2">&#xea;</span>{variant.variantId.sellingPrice}
+                                      <span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(variant.variantId.sellingPrice)}
                                     </p>
                                   </div>
                                 </div>
 
-                                <div className="absolute -top-2 -right-2 bg-blue-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <Plus className="w-3 h-3" />
+                                <div className="flex items-center gap-1 text-blue-600 font-medium text-sm">
+                                  <Plus className="w-4 h-4" />
+                                  Add
                                 </div>
                               </button>
                             ))}
@@ -722,7 +728,7 @@ export default function StoreBilling() {
                           {item.weight && (
                             <p className="text-xs text-gray-500">{item.weight} {item.weightUnit}</p>
                           )}
-                          <p className="text-xs text-blue-600 mt-1"><span className="dirham-symbol mr-2">&#xea;</span>{item.price} × {item.quantity}</p>
+                          <p className="text-xs text-blue-600 mt-1"><span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(item.price)} × {item.quantity}</p>
                         </div>
 
                         <div className="flex items-center gap-1 flex-shrink-0">
@@ -800,23 +806,23 @@ export default function StoreBilling() {
                 <div className="pt-2 space-y-2 text-sm border-t border-gray-200">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Subtotal</span>
-                    <span className="font-medium"><span className="dirham-symbol mr-2">&#xea;</span>{subtotal.toFixed(2)}</span>
+                    <span className="font-medium"><span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(subtotal)}</span>
                   </div>
                   {discount > 0 && (
                     <div className="flex justify-between text-green-600">
                       <span>Discount ({discount}%)</span>
-                      <span>-<span className="dirham-symbol mr-2">&#xea;</span>{discountAmount.toFixed(2)}</span>
+                      <span>-<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(discountAmount)}</span>
                     </div>
                   )}
                   {tax > 0 && (
-                    <div className="flex justify-between text-blue-600">
+                    <div className="flex justify-between text-red-600">
                       <span>Tax ({tax}%)</span>
-                      <span>+<span className="dirham-symbol mr-2">&#xea;</span>{taxAmount.toFixed(2)}</span>
+                      <span>-<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(taxAmount)}</span>
                     </div>
                   )}
                   <div className="flex justify-between pt-2 border-t border-gray-200">
                     <span className="font-semibold">Total Amount</span>
-                    <span className="text-blue-600 font-bold text-lg"><span className="dirham-symbol mr-2">&#xea;</span>{total.toFixed(2)}</span>
+                    <span className="text-blue-600 font-bold text-lg"><span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(total)}</span>
                   </div>
                 </div>
 
@@ -878,7 +884,7 @@ export default function StoreBilling() {
                   <p className="font-semibold text-sm">{weightModal.variant?.variantId.name}</p>
                   <p className="text-sm text-blue-600 mt-1">
                     <span className="dirham-symbol mr-1">&#xea;</span>
-                    {weightModal.variant?.variantId.sellingPrice}
+                    {formatPrice(weightModal.variant?.variantId.sellingPrice || 0)}
                   </p>
                 </div>
               </div>
