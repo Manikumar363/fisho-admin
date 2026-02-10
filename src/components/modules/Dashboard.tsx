@@ -12,10 +12,13 @@ import {
   AlertTriangle,
   CreditCard,
   Plus,
-  Receipt
+  Receipt,
+  UserPlus
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'react-toastify';
 import { getAdminData, getUserRole } from '../../lib/api';
 
@@ -23,6 +26,20 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const [userRole, setUserRole] = useState<string>('admin');
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [selectedDeliveryPartner, setSelectedDeliveryPartner] = useState<string>('');
+
+  // List of delivery partners
+  const deliveryPartners = [
+    'Mohammed Ali',
+    'Suresh Babu',
+    'Ramesh Kumar',
+    'Vikram Singh',
+    'Rajesh Patel',
+    'Amit Kumar',
+    'Priya Sharma'
+  ];
 
   useEffect(() => {
     const role = getUserRole();
@@ -53,17 +70,34 @@ export default function Dashboard() {
     }, 0);
   }, [location.state, location.pathname, navigate]);
 
+  const handleAssignDeliveryPartner = (order: any) => {
+    setSelectedOrder(order);
+    setSelectedDeliveryPartner('');
+    setIsDialogOpen(true);
+  };
+
+  const handleConfirmAssignment = () => {
+    if (!selectedDeliveryPartner) {
+      toast.error('Please select a delivery partner');
+      return;
+    }
+    toast.success(`Delivery partner "${selectedDeliveryPartner}" assigned to order ${selectedOrder.id}`);
+    setIsDialogOpen(false);
+    setSelectedOrder(null);
+    setSelectedDeliveryPartner('');
+  };
+
   const kpiData = [
-    { label: 'Active Users', value: '15,234', change: '+22.1%', icon: Users, color: 'text-indigo-600', bgColor: 'bg-indigo-100', onClick: () => navigate('/user-management?filter=end-users'), roles: ['admin', 'subadmin'] },
-    { label: 'Total Orders', value: '2,543', change: '+12.5%', icon: ShoppingBag, color: 'text-blue-600', bgColor: 'bg-blue-100', onClick: () => navigate('/orders'), roles: ['admin', 'subadmin'] },
-    { label: 'Transactions', value: '3,245', change: '+16.7%', icon: CreditCard, color: 'text-pink-600', bgColor: 'bg-pink-100', roles: ['admin', 'subadmin'] },
-    { label: 'Total Revenue', value: '₹8.2L', change: '+18.4%', icon: DollarSign, color: 'text-emerald-600', bgColor: 'bg-emerald-100', roles: ['admin', 'subadmin'] },
-    { label: 'Inventory Alerts', value: '12', change: '-3', icon: AlertTriangle, color: 'text-amber-600', bgColor: 'bg-amber-100', onClick: () => navigate('/inventory-management?filter=low-stock'), roles: ['admin'] },
-    { label: 'Express Orders', value: '856', change: '+8.3%', icon: Zap, color: 'text-orange-600', bgColor: 'bg-orange-100', onClick: () => navigate('/orders?type=express'), roles: ['admin', 'subadmin'] },
-    { label: 'Next-Day Orders', value: '1,423', change: '+15.2%', icon: Calendar, color: 'text-green-600', bgColor: 'bg-green-100', onClick: () => navigate('/orders?type=next-day'), roles: ['admin', 'subadmin'] },
-    { label: 'Bulk Orders', value: '264', change: '+5.7%', icon: PackageIcon, color: 'text-purple-600', bgColor: 'bg-purple-100', onClick: () => navigate('/orders?type=bulk'), roles: ['admin', 'subadmin'] },
-    { label: 'Waste Management', value: '3.2%', change: '-0.8%', icon: AlertTriangle, color: 'text-red-600', bgColor: 'bg-red-100', onClick: () => navigate('/waste-management'), roles: ['admin', 'subadmin'] },
-    { label: "Today's Revenue", value: '₹1.8L', change: '+11.3%', icon: Receipt, color: 'text-teal-600', bgColor: 'bg-teal-100', onClick: () => navigate('/transactions'), roles: ['admin', 'subadmin'] }
+    { label: 'Active Users', value: '15,234', icon: Users, color: 'text-indigo-600', bgColor: 'bg-indigo-100', onClick: () => navigate('/user-management?filter=end-users'), roles: ['admin', 'subadmin'] },
+    { label: 'Total Orders', value: '2,543', icon: ShoppingBag, color: 'text-blue-600', bgColor: 'bg-blue-100', onClick: () => navigate('/orders'), roles: ['admin', 'subadmin'] },
+    { label: 'Transactions', value: '3,245', icon: CreditCard, color: 'text-pink-600', bgColor: 'bg-pink-100', roles: ['admin', 'subadmin'] },
+    { label: 'Total Revenue', value: '₹8.2L', icon: DollarSign, color: 'text-emerald-600', bgColor: 'bg-emerald-100', roles: ['admin', 'subadmin'] },
+    { label: 'Inventory Alerts', value: '8', icon: AlertTriangle, color: 'text-amber-600', bgColor: 'bg-amber-100', onClick: () => navigate('/inventory-management?filter=low-stock'), roles: ['admin'] },
+    { label: 'Express Orders', value: '856', icon: Zap, color: 'text-orange-600', bgColor: 'bg-orange-100', onClick: () => navigate('/orders?type=express'), roles: ['admin', 'subadmin'] },
+    { label: 'Next-Day Orders', value: '1,423', icon: Calendar, color: 'text-green-600', bgColor: 'bg-green-100', onClick: () => navigate('/orders?type=next-day'), roles: ['admin', 'subadmin'] },
+    { label: 'Bulk Orders', value: '264', icon: PackageIcon, color: 'text-purple-600', bgColor: 'bg-purple-100', onClick: () => navigate('/orders?type=bulk'), roles: ['admin', 'subadmin'] },
+    { label: 'Waste Management', value: '3.2%', icon: AlertTriangle, color: 'text-red-600', bgColor: 'bg-red-100', onClick: () => navigate('/waste-management'), roles: ['admin', 'subadmin'] },
+    { label: "Today's Revenue", value: '₹1.8L', icon: Receipt, color: 'text-teal-600', bgColor: 'bg-teal-100', onClick: () => navigate('/transactions'), roles: ['admin', 'subadmin'] }
   ];
 
   // Filter KPI data based on user role
@@ -114,9 +148,6 @@ export default function Dashboard() {
                 <div className="flex-1">
                   <p className="text-gray-600 text-sm mb-2">{kpi.label}</p>
                   <p className="mb-1">{kpi.value}</p>
-                  <p className={`text-sm ${kpi.change.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
-                    {kpi.change}
-                  </p>
                 </div>
                 <div className={`${kpi.bgColor} p-3 rounded-lg`}>
                   <kpi.icon className={`w-5 h-5 ${kpi.color}`} />
@@ -144,6 +175,7 @@ export default function Dashboard() {
                   <th className="text-left py-3 px-4">Status</th>
                   <th className="text-left py-3 px-4">Delivery Partner</th>
                   <th className="text-left py-3 px-4">Date</th>
+                  <th className="text-left py-3 px-4">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -180,6 +212,17 @@ export default function Dashboard() {
                     </td>
                     <td className="py-3 px-4">{order.deliveryPartner}</td>
                     <td className="py-3 px-4">{order.date}</td>
+                    <td className="py-3 px-4">
+                      {order.type === 'Express' && (
+                        <button
+                          onClick={() => handleAssignDeliveryPartner(order)}
+                          className="p-2 hover:bg-blue-100 rounded-lg transition-colors"
+                          title="Assign Delivery Partner"
+                        >
+                          <UserPlus className="w-5 h-5 text-blue-600" />
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -187,6 +230,55 @@ export default function Dashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Delivery Partner Assignment Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assign Delivery Partner</DialogTitle>
+          </DialogHeader>
+          {selectedOrder && (
+            <div className="space-y-4">
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <p className="text-sm text-gray-600">Order ID</p>
+                <p className="font-semibold text-gray-900">{selectedOrder.id}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Select Delivery Partner
+                </label>
+                <Select value={selectedDeliveryPartner} onValueChange={setSelectedDeliveryPartner}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Choose a delivery partner..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {deliveryPartners.map((partner) => (
+                      <SelectItem key={partner} value={partner}>
+                        {partner}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleConfirmAssignment}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                >
+                  Assign
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

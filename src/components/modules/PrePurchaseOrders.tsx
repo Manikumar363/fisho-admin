@@ -64,6 +64,18 @@ export default function PrePurchaseOrders() {
     fetchProducts();
   }, []);
 
+  // Auto-update global RFV when particulars change
+  useEffect(() => {
+    const totalValue = particulars.reduce((sum, p) => sum + p.totalAmount, 0);
+    if (totalValue === 0) {
+      setRfv('');
+    } else {
+      // Round to nearest 10
+      const roundedValue = Math.ceil(totalValue / 10) * 10;
+      setRfv(roundedValue.toFixed(2));
+    }
+  }, [particulars]);
+
   const fetchVendors = async () => {
     setVendorsLoading(true);
     try {
@@ -277,6 +289,15 @@ export default function PrePurchaseOrders() {
     }
   };
 
+  // Function to calculate RFV (Round Figure Value) from total amount
+  const calculateRFV = (amount: number): string => {
+    if (amount === 0) return '';
+    
+    // Round to nearest 10
+    const roundedValue = Math.ceil(amount / 10) * 10;
+    return roundedValue.toFixed(2);
+  };
+
   const handleParticularChange = (id: string, field: keyof Particular, value: string) => {
     setParticulars(particulars.map(p => {
       if (p.id === id) {
@@ -290,6 +311,9 @@ export default function PrePurchaseOrders() {
         // Calculate total amount (Amount + VAT%)
         const vat = parseFloat(updated.vat) || 0;
         updated.totalAmount = updated.amount + (updated.amount * vat / 100);
+        
+        // Auto-calculate RFV from totalAmount
+        updated.rfv = calculateRFV(updated.totalAmount);
         
         return updated;
       }
@@ -473,10 +497,9 @@ export default function PrePurchaseOrders() {
                   id="rfv"
                   type="number"
                   value={rfv}
-                  onChange={(e) => setRfv(e.target.value)}
-                  placeholder="Enter round figure value (for records purpose)"
-                  min="0"
-                  step="0.01"
+                  disabled
+                  className="bg-gray-50"
+                  placeholder="Auto-calculated"
                 />
               </div>
 
@@ -581,10 +604,9 @@ export default function PrePurchaseOrders() {
                             <Input
                               type="number"
                               value={particular.rfv || ''}
-                              onChange={(e) => handleParticularChange(particular.id, 'rfv', e.target.value)}
+                              disabled
+                              className="bg-gray-50"
                               placeholder="0.00"
-                              min="0"
-                              step="0.01"
                             />
                           </td>
                           <td className="py-3 px-4">
@@ -609,7 +631,7 @@ export default function PrePurchaseOrders() {
                     <div className="flex items-center gap-4">
                       <span className="text-gray-700">Total PPO Value:</span>
                       <span className="text-2xl font-bold text-blue-600">
-                        <span className="dirham-symbol">&#xea;</span>{calculatePPOTotal().toFixed(2)}
+                        <span className="dirham-symbol mr-2">&#xea;</span>{calculatePPOTotal().toFixed(2)}
                       </span>
                     </div>
                   </div>

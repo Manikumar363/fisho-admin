@@ -47,6 +47,8 @@ export default function Enquiries() {
 
   const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
 
+  const IMAGE_BASE = ((import.meta as any).env?.VITE_IMAGE_BASE_URL || (import.meta as any).env?.VITE_BASE_URL) as string | undefined;
+
   const fetchEnquiries = async () => {
     setLoading(true);
     setError(null);
@@ -61,6 +63,7 @@ export default function Enquiries() {
           email: string;
           phone: string;
           message: string;
+          image?: string;
           isDeleted: boolean;
           createdAt: string;
           updatedAt: string;
@@ -80,7 +83,7 @@ export default function Enquiries() {
           mobile: q.phone,
           platform: (q.platform || 'Web') as 'Web' | 'Mobile',
           message: q.message,
-          // imageUrl: q.imageUrl || undefined, // Removed because not present in API
+          imageUrl: q.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${q.image}` : q.image) : undefined,
         }));
 
       setEnquiries(mapped);
