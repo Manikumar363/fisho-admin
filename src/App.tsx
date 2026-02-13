@@ -28,6 +28,8 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Profile from './components/modules/Profile';
 import ChangePassword from './components/modules/ChangePassword';
+import BulkOrders from './components/modules/BulkOrders';
+import BulkOrderDetails from './components/modules/BulkOrderDetails';
 
 function EditStoreWrapper() {
   const { storeId } = useParams<{ storeId: string }>();
@@ -102,6 +104,8 @@ export default function App() {
                   <Route path="/inventory/add-variant" element={<AddProductVariant />} />
                   <Route path="/orders" element={<OrdersManagement />} />
                   <Route path="/orders/:orderId" element={<OrderDetails />} />
+                  <Route path='/bulk-orders' element={<BulkOrders />} />
+                  <Route path='/bulk-order/:id' element={<BulkOrderDetails />} />
                   <Route path="/transactions" element={<Transactions />} />
                   <Route path="/store-billing" element={<StoreBilling />} />
                   <Route path="/waste-management" element={<WasteManagement />} />

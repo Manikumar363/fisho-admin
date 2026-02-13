@@ -23,6 +23,10 @@ import PrePurchaseOrders from './components/modules/PrePurchaseOrders';
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+  };
+
   return (
     <BrowserRouter>
       <Routes>
@@ -35,7 +39,7 @@ export default function App() {
           path="/*"
           element={
             isAuthenticated ? (
-              <AdminLayout>
+              <AdminLayout onLogout={handleLogout}>
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/dashboard" element={<Dashboard />} />
@@ -48,8 +52,8 @@ export default function App() {
                   <Route path="/store-billing" element={<StoreBilling />} />
                   <Route path="/waste-management" element={<WasteManagement />} />
                   <Route path="/store-mapping" element={<StoreMapping />} />
-                  <Route path="/store-mapping/add" element={<AddStore />} />
-                  <Route path="/store-mapping/edit/:storeId" element={<EditStore />} />
+                  <Route path="/store-mapping/add" element={<AddStore onBack={() => window.history.back()} />} />
+                  <Route path="/store-mapping/edit/:storeId" element={<EditStore storeId={''} onBack={() => window.history.back()} />} />
                   <Route path="/pre-purchase-orders" element={<PrePurchaseOrders />} />
                 </Routes>
               </AdminLayout>

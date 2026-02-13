@@ -17,6 +17,7 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import CutTypeSection from './inventory/CutTypeSection';
 import AddProductVariant from './inventory/AddProductVariant';
+import InventoryAlerts from './inventory/InventoryAlerts';
 
 const IMAGE_BASE = ((import.meta as any).env?.VITE_IMAGE_BASE_URL || (import.meta as any).env?.VITE_BASE_URL) as string | undefined;
 
@@ -2982,6 +2983,7 @@ const handleRemoveWeight = (weight: number) => {
     products: 'Products',
     variants: 'Product Variants',
     cuttypes: 'Cut Types',
+    inventoryAlerts: 'Inventory Alerts',
   };
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -3141,10 +3143,10 @@ const handleRemoveWeight = (weight: number) => {
 
      
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="mb-2">Inventory Management</h1>
-          <p className="text-gray-600">Manage categories, products, variants, and cut types</p>
+          <p className="text-gray-600">Manage categories, products, variants, cut types, and inventory alerts</p>
         </div>
         <div className="flex gap-3">
           {/* {activeTab === 'variants' && ( */}
@@ -3156,7 +3158,7 @@ const handleRemoveWeight = (weight: number) => {
               Add Product Variant
             </Button> */}
           {/* )} */}
-          {activeTab !== 'variants' && (
+          {!['variants', 'cuttypes', 'inventoryAlerts'].includes(activeTab) && (
             <Button
               className="bg-blue-600 hover:bg-blue-700"
               onClick={handleOpenAddModal}
@@ -3190,6 +3192,7 @@ const handleRemoveWeight = (weight: number) => {
           <TabsTrigger className="min-w-[240px] flex-1" value="products">Products</TabsTrigger>
           <TabsTrigger className="min-w-[240px] flex-1" value="variants">Product Variants</TabsTrigger>
           <TabsTrigger className="min-w-[300px] flex-1" value="cuttypes">Cut Types</TabsTrigger>
+          <TabsTrigger className="min-w-[300px] flex-1" value="inventoryAlerts">Inventory Alerts</TabsTrigger>
         </TabsList>
 
         {/* Categories Tab */}
@@ -3883,6 +3886,11 @@ const handleRemoveWeight = (weight: number) => {
         {/* Cut Types Tab */}
         <TabsContent value="cuttypes" className="space-y-4">
           <CutTypeSection openAdd={openCutTypeAdd} onAddClose={() => setOpenCutTypeAdd(false)} resetAdd={() => setOpenCutTypeAdd(false)} />
+        </TabsContent>
+
+        {/* Inventory Alerts Tab */}
+        <TabsContent value="inventoryAlerts" className="space-y-4">
+          <InventoryAlerts />
         </TabsContent>
       </Tabs>
 

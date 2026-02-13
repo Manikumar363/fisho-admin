@@ -370,7 +370,7 @@ export default function StoreBilling() {
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const discountAmount = (subtotal * discount) / 100;
   const taxAmount = ((subtotal - discountAmount) * tax) / 100;
-  const total = subtotal - discountAmount - taxAmount;
+  const total = subtotal - discountAmount + taxAmount;
 
   const handleCreateOrder = async () => {
     // Validation
@@ -815,9 +815,9 @@ export default function StoreBilling() {
                     </div>
                   )}
                   {tax > 0 && (
-                    <div className="flex justify-between text-red-600">
+                    <div className="flex justify-between text-orange-600">
                       <span>Tax ({tax}%)</span>
-                      <span>-<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(taxAmount)}</span>
+                      <span>+<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(taxAmount)}</span>
                     </div>
                   )}
                   <div className="flex justify-between pt-2 border-t border-gray-200">

@@ -18,7 +18,8 @@ import {
   Tag,
   Navigation,
   MessageSquare,
-  KeyRound, // add
+  KeyRound,
+  ShoppingBag, // add
 } from 'lucide-react';
 import { getAdminData, getUserRole, clearAuthData } from '../../lib/api';
 import {
@@ -128,6 +129,13 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
       label: 'Orders',
       icon: ShoppingCart,
       path: '/orders',
+      roles: ['admin', 'subadmin']
+    },
+    {
+      id: 'Bulk Orders',
+      label: 'Bulk Orders',
+      icon: ShoppingBag,
+      path: '/bulk-orders',
       roles: ['admin', 'subadmin']
     },
     {

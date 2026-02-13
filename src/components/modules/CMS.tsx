@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FileText, Image, Plus, Edit, Trash2, Shield, ScrollText, ChevronUp, ChevronDown } from 'lucide-react';
+import { FileText, Image, Plus, Edit, Trash2, Shield, ScrollText, ChevronUp, ChevronDown, Layers } from 'lucide-react';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -17,9 +17,10 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import BannerManagement from './cms/BannerManagement';
 import TextContentEditor from './cms/TextContentEditor';
+import Section1Editor from './cms/Section1Editor';
 import { apiFetch } from '../../lib/api';
 
-type ContentType = 'banners' | 'terms' | 'privacy' | 'about' | 'deliveryTc' | 'deliveryPrivacy' | 'returnRefund';
+type ContentType = 'banners' | 'terms' | 'privacy' | 'about' | 'deliveryTc' | 'deliveryPrivacy' | 'returnRefund' | 'cancelPolicy' | 'section1';
 
 interface ContentItem {
   id: string;
@@ -42,6 +43,9 @@ export default function CMS() {
   const [isReordering, setIsReordering] = useState(false);
   const [pagesLoading, setPagesLoading] = useState(false);
   const [pagesError, setPagesError] = useState<string | null>(null);
+  const [sections, setSections] = useState<ContentItem[]>([]);
+  const [sectionsLoading, setSectionsLoading] = useState(false);
+  const [sectionsError, setSectionsError] = useState<string | null>(null);
 
   const IMAGE_BASE = ((import.meta as any).env?.VITE_IMAGE_BASE_URL || (import.meta as any).env?.VITE_BASE_URL) as string | undefined;
 
@@ -81,16 +85,23 @@ export default function CMS() {
       title: 'Return and Refund Policy',
       lastUpdated: '',
       type: 'returnRefund'
+    },
+    {
+      id: 'cancelPolicy-loading',
+      title: 'Cancellation Policy',
+      lastUpdated: '',
+      type: 'cancelPolicy'
     }
   ]);
 
-  const PAGE_IDS: Record<'terms' | 'privacy' | 'about' | 'deliveryTc' | 'deliveryPrivacy' | 'returnRefund', string> = {
+  const PAGE_IDS: Record<'terms' | 'privacy' | 'about' | 'deliveryTc' | 'deliveryPrivacy' | 'returnRefund' | 'cancelPolicy', string> = {
     terms: '69412955d430ff450e4ac0b8',
     privacy: '694128ead430ff450e4ac0b2',
     about: '69442a843fcd660eec9c89ed',
     deliveryTc: '694babb9463a57211a1cbdbb',
     deliveryPrivacy: '694bb389463a57211a1cbde0',
     returnRefund: '69842feb16114389714e555f',
+    cancelPolicy: '698c2c521e2a6db472ac828f',
   };
 
   const contentTypes = [
@@ -101,6 +112,14 @@ export default function CMS() {
       icon: Image,
       color: 'blue',
       items: banners
+    },
+    {
+      id: 'section1' as ContentType,
+      title: 'Section Content',
+      description: 'Manage section content with multiple images and descriptions',
+      icon: Layers,
+      color: 'indigo',
+      items: sections
     },
     {
       id: 'terms' as ContentType,
@@ -133,6 +152,14 @@ export default function CMS() {
       icon: FileText,
       color: 'red',
       items: textContents.filter(item => item.type === 'returnRefund')
+    },
+    {
+      id: 'cancelPolicy' as ContentType,
+      title: 'Cancellation Policy',
+      description: 'Manage cancellation policy information',
+      icon: FileText,
+      color: 'yellow',
+      items: textContents.filter(item => item.type === 'cancelPolicy')
     }
   ];
 
@@ -183,6 +210,7 @@ export default function CMS() {
   useEffect(() => {
     loadBanners();
     loadPages();
+    loadSections();
   }, []);
 
   const handleAddContent = (type: ContentType) => {
@@ -228,6 +256,11 @@ export default function CMS() {
         toast.success('Banner Successfully deleted');
         console.log('Banner deleted:', itemToDelete.id);
         await loadBanners();
+      } else if (itemToDelete.type === 'section1') {
+        // For static sections - remove locally
+        setSections(sections.filter(section => section.id !== itemToDelete.id));
+        toast.success('Section Successfully deleted');
+        console.log('Section deleted:', itemToDelete.id);
       } else {
         // For text content (delete locally)
         setTextContents(textContents.filter(content => content.id !== itemToDelete.id));
@@ -249,7 +282,7 @@ export default function CMS() {
     setPagesLoading(true);
     setPagesError(null);
     try {
-      const entries: Array<Promise<ContentItem>> = (['terms', 'privacy', 'about', 'deliveryTc', 'deliveryPrivacy', 'returnRefund'] as const).map(async (key) => {
+      const entries: Array<Promise<ContentItem>> = (['terms', 'privacy', 'about', 'deliveryTc', 'deliveryPrivacy', 'returnRefund', 'cancelPolicy'] as const).map(async (key) => {
         try {
           const res = await apiFetch<{
             success: boolean;
@@ -291,6 +324,32 @@ export default function CMS() {
       toast.error(msg);
     } finally {
       setPagesLoading(false);
+    }
+  };
+
+  // Fetch sections from API
+  const loadSections = async () => {
+    setSectionsLoading(true);
+    setSectionsError(null);
+    try {
+      // Load static content for now - API endpoint not yet developed
+      const staticSections: ContentItem[] = [
+        {
+          id: 'section1-static',
+          title: 'Fresh Fish for Online Purchase in Dubai',
+          lastUpdated: new Date().toISOString().split('T')[0],
+          status: 'Active',
+          type: 'section1',
+        }
+      ];
+      setSections(staticSections);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to load sections';
+      console.error('Load sections error:', e);
+      setSectionsError(msg);
+      toast.error(msg);
+    } finally {
+      setSectionsLoading(false);
     }
   };
 
@@ -390,6 +449,19 @@ export default function CMS() {
     }
   };
 
+  const handleSaveSection = async (sectionData: any) => {
+    try {
+      // Static content - no API call yet
+      toast.info('Static content - API integration coming soon');
+      setSelectedContent(null);
+      setEditingItem(null);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to save section';
+      console.error('Save section error:', e);
+      toast.error(msg);
+    }
+  };
+
   const handleCancel = () => {
     setSelectedContent(null);
     setEditingItem(null);
@@ -449,10 +521,12 @@ export default function CMS() {
   const getColorClasses = (color: string) => {
     const colors: Record<string, { bg: string; text: string; border: string }> = {
       blue: { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' },
+      indigo: { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-200' },
       green: { bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-200' },
       purple: { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200' },
       orange: { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200' },
-      red: { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' }
+      red: { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },
+      yellow: { bg: 'bg-yellow-50', text: 'text-yellow-600', border: 'border-yellow-200' }
     };
     return colors[color] || colors.blue;
   };
@@ -472,7 +546,16 @@ export default function CMS() {
     );
   }
 
-  if (selectedContent && ['terms', 'privacy', 'about', 'deliveryTc', 'deliveryPrivacy', 'returnRefund'].includes(selectedContent)) {
+  if (selectedContent === 'section1') {
+    return (
+      <Section1Editor
+        sectionItem={editingItem}
+        onCancel={handleCancel}
+      />
+    );
+  }
+
+  if (selectedContent && ['terms', 'privacy', 'about', 'deliveryTc', 'deliveryPrivacy', 'returnRefund', 'cancelPolicy'].includes(selectedContent)) {
     return (
       <TextContentEditor
         contentType={selectedContent}
@@ -511,7 +594,7 @@ export default function CMS() {
                       <p className="text-gray-600 mt-1">{contentType.description}</p>
                     </div>
                   </div>
-                  {contentType.id === 'banners' && (
+                  {(contentType.id === 'banners' ) && (
                     <Button
                       onClick={() => handleAddContent(contentType.id)}
                       size="sm"
@@ -532,6 +615,12 @@ export default function CMS() {
                     )}
                     {contentType.id === 'banners' && bannersError && (
                       <div className="p-4 text-red-600">Error: {bannersError}</div>
+                    )}
+                    {contentType.id === 'section1' && sectionsLoading && (
+                      <div className="p-4 text-gray-600">Loading sections...</div>
+                    )}
+                    {contentType.id === 'section1' && sectionsError && (
+                      <div className="p-4 text-red-600">Error: {sectionsError}</div>
                     )}
                     {contentType.items.map((item, index) => (
                       <div
@@ -600,7 +689,7 @@ export default function CMS() {
                             >
                               <Edit className="w-4 h-4" />
                             </Button>
-                            {item.type === 'banners' && (
+                            {(item.type === 'banners' || item.type === 'section1') && (
                               <Button
                                 variant="ghost"
                                 size="sm"
