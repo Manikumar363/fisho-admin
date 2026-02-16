@@ -61,10 +61,11 @@ interface BulkOrder {
   };
   items: BulkOrderItem[];
   pricing: {
-    grandTotal: string;
-    tax: string;
-    discount: string;
-    shipping: string;
+    subTotal?: string | number;
+    grandTotal: string | number;
+    tax: string | number;
+    discount: string | number;
+    shipping: string | number;
   };
   payment: {
     method: string;
@@ -299,11 +300,18 @@ export default function BulkOrderDetails() {
   };
 
   const startEditingPricing = () => {
+    const subtotalValue = parseFloat(String(order?.pricing?.subTotal ?? order?.pricing?.grandTotal ?? '0'));
+    const toPercent = (amount: string | number | undefined) => {
+      const numeric = parseFloat(String(amount ?? '0'));
+      if (!subtotalValue) return 0;
+      return (numeric / subtotalValue) * 100;
+    };
+
     setEditingPricing({
-      subtotal: parseFloat(order?.pricing?.grandTotal || '0'),
-      discount: parseFloat(order?.pricing?.discount || '0'),
-      tax: parseFloat(order?.pricing?.tax || '0'),
-      shipping: parseFloat(order?.pricing?.shipping || '0'),
+      subtotal: subtotalValue,
+      discount: toPercent(order?.pricing?.discount),
+      tax: toPercent(order?.pricing?.tax),
+      shipping: toPercent(order?.pricing?.shipping),
     });
     setIsEditingPricing(true);
   };
@@ -312,8 +320,16 @@ export default function BulkOrderDetails() {
     setIsEditingPricing(false);
   };
 
-  const calculateGrandTotal = (subtotal: number, discount: number, tax: number, shipping: number) => {
-    return subtotal - discount + tax + shipping;
+  const calculatePercentAmount = (subtotal: number, percent: number) => {
+    if (!subtotal) return 0;
+    return (subtotal * percent) / 100;
+  };
+
+  const calculateGrandTotal = (subtotal: number, discountPercent: number, taxPercent: number, shippingPercent: number) => {
+    const discountAmount = calculatePercentAmount(subtotal, discountPercent);
+    const taxAmount = calculatePercentAmount(subtotal, taxPercent);
+    const shippingAmount = calculatePercentAmount(subtotal, shippingPercent);
+    return subtotal - discountAmount + taxAmount + shippingAmount;
   };
 
   const handlePricingChange = (field: string, value: string) => {
@@ -327,22 +343,61 @@ export default function BulkOrderDetails() {
   const savePricingChanges = async () => {
     if (!order) return;
     try {
-      // Here you can add API call to save pricing changes if needed
-      // For now, we'll just update the local state
-      setOrder((prevOrder) => {
-        if (!prevOrder) return prevOrder;
-        return {
-          ...prevOrder,
-          pricing: {
-            ...prevOrder.pricing,
-            grandTotal: editingPricing.subtotal.toString(),
-            discount: editingPricing.discount.toString(),
-            tax: editingPricing.tax.toString(),
-            shipping: editingPricing.shipping.toString(),
-          },
-        };
-      });
-      toast.success('Pricing updated successfully');
+      const discountAmount = calculatePercentAmount(editingPricing.subtotal, editingPricing.discount);
+      const taxAmount = calculatePercentAmount(editingPricing.subtotal, editingPricing.tax);
+      const shippingAmount = calculatePercentAmount(editingPricing.subtotal, editingPricing.shipping);
+      const pricingSummary = {
+        subTotal: editingPricing.subtotal,
+        grandTotal: calculateGrandTotal(
+          editingPricing.subtotal,
+          editingPricing.discount,
+          editingPricing.tax,
+          editingPricing.shipping
+        ),
+        discount: discountAmount,
+        shipping: shippingAmount,
+        tax: taxAmount,
+      };
+
+      const res = await apiFetch<{ success: boolean; message?: string; data?: BulkOrder }>(
+        '/api/bulk-order/pricing-update',
+        {
+          method: 'POST',
+          body: JSON.stringify({ orderId: order._id, pricingSummary }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      if (!res.success) throw new Error(res.message || 'Failed to update pricing');
+
+      if (res.data) {
+        setOrder((prevOrder) => {
+          const nextPricing = res.data?.pricing
+            ? {
+                subTotal: res.data.pricing.subTotal ?? res.data.pricing.grandTotal,
+                grandTotal: res.data.pricing.grandTotal,
+                tax: res.data.pricing.tax,
+                discount: res.data.pricing.discount,
+                shipping: res.data.pricing.shipping,
+              }
+            : prevOrder?.pricing;
+
+          if (!prevOrder) {
+            return {
+              ...res.data,
+              pricing: nextPricing as BulkOrder['pricing'],
+            } as BulkOrder;
+          }
+
+          return {
+            ...prevOrder,
+            ...res.data,
+            pricing: nextPricing as BulkOrder['pricing'],
+          } as BulkOrder;
+        });
+      }
+
+      toast.success(res.message || 'Pricing updated successfully');
       setIsEditingPricing(false);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to update pricing');
@@ -514,35 +569,35 @@ export default function BulkOrderDetails() {
                   <span className="text-sm text-gray-600">Subtotal</span>
                   <span className="font-medium">
                     <span className="dirham-symbol mr-2">&#xea;</span>
-                    {parseFloat(order.pricing?.grandTotal || '0').toFixed(2)}
+                    {parseFloat(String(order.pricing?.subTotal ?? order.pricing?.grandTotal ?? '0')).toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">Tax</span>
                   <span className="font-medium">
                     <span className="dirham-symbol mr-2">&#xea;</span>
-                    {parseFloat(order.pricing?.tax || '0').toFixed(2)}
+                    {parseFloat(String(order.pricing?.tax || '0')).toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">Discount</span>
                   <span className="font-medium">
                     <span className="dirham-symbol mr-2">&#xea;</span>
-                    {parseFloat(order.pricing?.discount || '0').toFixed(2)}
+                    {parseFloat(String(order.pricing?.discount || '0')).toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">Shipping</span>
                   <span className="font-medium">
                     <span className="dirham-symbol mr-2">&#xea;</span>
-                    {parseFloat(order.pricing?.shipping || '0').toFixed(2)}
+                    {parseFloat(String(order.pricing?.shipping || '0')).toFixed(2)}
                   </span>
                 </div>
                 <div className="border-t pt-3 flex justify-between">
                   <span className="font-semibold">Grand Total</span>
                   <span className="font-semibold text-lg">
                     <span className="dirham-symbol mr-2">&#xea;</span>
-                    {parseFloat(order.pricing?.grandTotal || '0').toFixed(2)}
+                    {parseFloat(String(order.pricing?.grandTotal || '0')).toFixed(2)}
                   </span>
                 </div>
                 <div className="pt-2">
@@ -577,7 +632,7 @@ export default function BulkOrderDetails() {
 
                   {/* Tax Input */}
                   <div>
-                    <label className="text-sm text-gray-600 block mb-2">Tax (Added)</label>
+                    <label className="text-sm text-gray-600 block mb-2">Tax % (Added)</label>
                     <div className="flex items-center gap-2">
                       <span className="dirham-symbol">&#xea;</span>
                       <input
@@ -593,7 +648,7 @@ export default function BulkOrderDetails() {
 
                   {/* Discount Input */}
                   <div>
-                    <label className="text-sm text-gray-600 block mb-2">Discount (Subtracted)</label>
+                    <label className="text-sm text-gray-600 block mb-2">Discount % (Subtracted)</label>
                     <div className="flex items-center gap-2">
                       <span className="dirham-symbol">&#xea;</span>
                       <input
@@ -609,7 +664,7 @@ export default function BulkOrderDetails() {
 
                   {/* Shipping Input */}
                   <div>
-                    <label className="text-sm text-gray-600 block mb-2">Shipping (Added)</label>
+                    <label className="text-sm text-gray-600 block mb-2">Shipping % (Added)</label>
                     <div className="flex items-center gap-2">
                       <span className="dirham-symbol">&#xea;</span>
                       <input
@@ -637,9 +692,6 @@ export default function BulkOrderDetails() {
                         ).toFixed(2)}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Formula: Subtotal - Discount + Tax + Shipping
-                    </p>
                   </div>
 
                   {/* Save and Cancel Buttons */}

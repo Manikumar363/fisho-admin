@@ -136,7 +136,7 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
       label: 'Bulk Orders',
       icon: ShoppingBag,
       path: '/bulk-orders',
-      roles: ['admin', 'subadmin']
+      roles: ['admin']
     },
     {
       id: 'pre-purchase',

@@ -12,6 +12,7 @@ import { Label } from '../ui/label';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import DeliveryPartnersSection from './DeliveryPartnersSection';
 
 
 export default function UserManagement() {
@@ -192,13 +193,6 @@ export default function UserManagement() {
       })
       .finally(() => setStoreManagersLoading(false));
   }, [activeTab, storeManagersPage, itemsPerPage]);
-
-  const deliveryPartners = [
-    { id: 'DP-001', name: 'Mohammed Ali', email: 'ali@fisho.com', phone: '+91 98765 11111', deliveries: 342, earnings: '₹68,400', rating: 4.8, status: 'Active' },
-    { id: 'DP-002', name: 'Suresh Babu', email: 'suresh@fisho.com', phone: '+91 98765 11112', deliveries: 298, earnings: '₹59,600', rating: 4.7, status: 'Active' },
-    { id: 'DP-003', name: 'Ramesh Kumar', email: 'ramesh@fisho.com', phone: '+91 98765 11113', deliveries: 456, earnings: '₹91,200', rating: 4.9, status: 'Active' },
-    { id: 'DP-004', name: 'Vikram Singh', email: 'vikram@fisho.com', phone: '+91 98765 11114', deliveries: 189, earnings: '₹37,800', rating: 4.6, status: 'Inactive' }
-  ];
 
   const vendorsStatic = [
     { id: 'VN-001', vendorName: 'Coastal Fisheries Ltd', companyName: 'Coastal Fisheries Private Limited', vatNumber: 'VAT123456789', email: 'info@coastalfisheries.com', phone: '+91 98765 33331', status: 'Active' },
@@ -787,48 +781,6 @@ export default function UserManagement() {
     return sorted;
   };
 
-  const getFilteredDeliveryPartners = () => {
-    let filtered = deliveryPartners;
-
-    // Apply search term filter
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase().trim();
-      filtered = filtered.filter(partner => 
-        partner.id?.toLowerCase().includes(term) ||
-        partner.name?.toLowerCase().includes(term) ||
-        partner.email?.toLowerCase().includes(term) ||
-        partner.phone?.toLowerCase().includes(term)
-      );
-    }
-
-    // Apply status filter
-    if (filters.status) {
-      filtered = filtered.filter(partner => {
-        const partnerStatus = partner.status?.toLowerCase();
-        return partnerStatus === filters.status;
-      });
-    }
-
-    // Apply sorting
-    const sorted = [...filtered];
-    if (filters.sortBy === 'name-asc') {
-      sorted.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
-    } else if (filters.sortBy === 'name-desc') {
-      sorted.sort((a, b) => b.name.toLowerCase().localeCompare(a.name.toLowerCase()));
-    }
-
-    return sorted;
-  };
-
-  const getPaginatedDeliveryPartners = () => {
-    const filtered = getFilteredDeliveryPartners();
-    const startIndex = (deliveryPartnersPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return filtered.slice(startIndex, endIndex);
-  };
-
-  const deliveryPartnersTotalPages = Math.ceil(getFilteredDeliveryPartners().length / itemsPerPage);
-
   const getFilteredStoreManagers = () => {
     let filtered = storeManagers;
 
@@ -1117,113 +1069,19 @@ export default function UserManagement() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="delivery-partners">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Delivery Partners</CardTitle>
-              <Button 
-                onClick={() => setShowAddDeliveryPartnerModal(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Delivery Partner
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-4">DP ID</th>
-                      <th className="text-left py-3 px-4">Name</th>
-                      <th className="text-left py-3 px-4">Phone Number</th>
-                      <th className="text-left py-3 px-4">Email ID</th>
-                      <th className="text-left py-3 px-4">Total Deliveries</th>
-                      <th className="text-left py-3 px-4">Earnings</th>
-                      <th className="text-left py-3 px-4">Rating</th>
-                      <th className="text-left py-3 px-4">Status</th>
-                      <th className="text-left py-3 px-4">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {getFilteredDeliveryPartners().length === 0 ? (
-                      <tr>
-                        <td colSpan={9} className="text-center py-8 text-gray-500">
-                          No delivery partners found
-                        </td>
-                      </tr>
-                    ) : (
-                      getPaginatedDeliveryPartners().map((partner) => (
-                      <tr key={partner.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-3 px-4 text-blue-600">{partner.id}</td>
-                        <td className="py-3 px-4">{partner.name}</td>
-                        <td className="py-3 px-4">{partner.phone}</td>
-                        <td className="py-3 px-4">{partner.email}</td>
-                        <td className="py-3 px-4">{partner.deliveries}</td>
-                        <td className="py-3 px-4">{partner.earnings}</td>
-                        <td className="py-3 px-4">⭐ {partner.rating}</td>
-                        <td className="py-3 px-4">
-                          <Badge variant={partner.status === 'Active' ? 'default' : 'secondary'}>
-                            {partner.status}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex gap-2">
-                            <button 
-                              className="p-1 hover:bg-gray-100 rounded"
-                              onClick={() => handleView(partner, 'delivery-partner')}
-                              title="View"
-                            >
-                              <Eye className="w-4 h-4 text-gray-600" />
-                            </button>
-                            <button 
-                              className="p-1 hover:bg-gray-100 rounded"
-                              onClick={() => handleDelete(partner, 'delivery-partner')}
-                              title="Delete"
-                            >
-                              <Trash2 className="w-4 h-4 text-red-600" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              {getFilteredDeliveryPartners().length > 0 && (
-                <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                  <div className="text-sm text-gray-600">
-                    Showing {((deliveryPartnersPage - 1) * itemsPerPage) + 1} to {Math.min(deliveryPartnersPage * itemsPerPage, getFilteredDeliveryPartners().length)} of {getFilteredDeliveryPartners().length} partners
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setDeliveryPartnersPage(prev => Math.max(1, prev - 1))}
-                      disabled={deliveryPartnersPage === 1}
-                    >
-                      Previous
-                    </Button>
-                    <div className="flex items-center gap-2 px-3">
-                      <span className="text-sm text-gray-600">
-                        Page {deliveryPartnersPage} of {deliveryPartnersTotalPages}
-                      </span>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setDeliveryPartnersPage(prev => Math.min(deliveryPartnersTotalPages, prev + 1))}
-                      disabled={deliveryPartnersPage === deliveryPartnersTotalPages}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+        <DeliveryPartnersSection
+          searchTerm={searchTerm}
+          filters={filters}
+          deliveryPartnersPage={deliveryPartnersPage}
+          setDeliveryPartnersPage={setDeliveryPartnersPage}
+          setShowAddDeliveryPartnerModal={setShowAddDeliveryPartnerModal}
+          showAddDeliveryPartnerModal={showAddDeliveryPartnerModal}
+          deliveryPartnerForm={deliveryPartnerForm}
+          setDeliveryPartnerForm={setDeliveryPartnerForm}
+          handleAddDeliveryPartner={handleAddDeliveryPartner}
+          handleView={handleView}
+          handleDelete={handleDelete}
+        />
 
         <TabsContent value="store-managers">
           <Card>
@@ -1759,96 +1617,6 @@ export default function UserManagement() {
                 }
               >
                 {isAddingEndUser ? 'Adding...' : 'Add User'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Delivery Partner Modal */}
-      <Dialog open={showAddDeliveryPartnerModal} onOpenChange={(open) => {
-  // Only close if the user explicitly closes it (open === false from close button)
-  // Prevent closing on outside click by not calling setShowXModal
-  if (!open) return;
-}}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add New Delivery Partner</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleAddDeliveryPartner}>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="partnerName">Name</Label>
-                <Input
-                  id="partnerName"
-                  value={deliveryPartnerForm.name}
-                  onChange={(e) => setDeliveryPartnerForm({ ...deliveryPartnerForm, name: e.target.value })}
-                  placeholder="Enter name"
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="partnerMobile">Mobile Number</Label>
-                <Input
-                  id="partnerMobile"
-                  type="tel"
-                  value={deliveryPartnerForm.mobileNumber}
-                  onChange={(e) => setDeliveryPartnerForm({ ...deliveryPartnerForm, mobileNumber: e.target.value })}
-                  placeholder="Enter mobile number"
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="drivingLicense">Driving License</Label>
-                <Input
-                  id="drivingLicense"
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={(e) => setDeliveryPartnerForm({ 
-                    ...deliveryPartnerForm, 
-                    drivingLicense: e.target.files?.[0] || null 
-                  })}
-                  required
-                />
-                <p className="text-sm text-gray-500">Upload PDF, JPG, or PNG (Max 5MB)</p>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="workPermit">Work Permit</Label>
-                <Input
-                  id="workPermit"
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={(e) => setDeliveryPartnerForm({ 
-                    ...deliveryPartnerForm, 
-                    workPermit: e.target.files?.[0] || null 
-                  })}
-                  required
-                />
-                <p className="text-sm text-gray-500">Upload PDF, JPG, or PNG (Max 5MB)</p>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="partnerEmail">Email ID</Label>
-                <Input
-                  id="partnerEmail"
-                  type="email"
-                  value={deliveryPartnerForm.email}
-                  onChange={(e) => setDeliveryPartnerForm({ ...deliveryPartnerForm, email: e.target.value })}
-                  placeholder="Enter email address"
-                  required
-                />
-              </div>
-            </div>
-            
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowAddDeliveryPartnerModal(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
-                Add Partner
               </Button>
             </DialogFooter>
           </form>
