@@ -6,7 +6,9 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { ImageWithFallback } from '../ui/ImageWithFallback';
 import { apiFetch } from '../../lib/api';
-import { toast } from 'sonner'; // or your preferred toast lib
+import { toast } from 'react-toastify';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 interface OrderItem {
   snapshot: {
@@ -60,7 +62,10 @@ interface Order {
 }
 
 // Helper for capitalizing the first letter
-const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
+const capitalize = (str: string | undefined | null) => {
+  if (!str || typeof str !== 'string') return '';
+  return str.charAt(0).toUpperCase() + str.slice(1);
+};
 
 // Helper for formatting prices to 2 decimal places
 const formatPrice = (value: any): string => {
@@ -70,7 +75,8 @@ const formatPrice = (value: any): string => {
 };
 
 // Helper for badge color
-const getStatusBadgeClass = (status: string) => {
+const getStatusBadgeClass = (status: string | undefined | null) => {
+  if (!status || typeof status !== 'string') return 'bg-gray-100 text-gray-700 border-gray-200';
   const statusLower = status.toLowerCase();
   if (statusLower === 'accepted' || statusLower === 'confirmed') return 'bg-green-100 text-green-700 border-green-200';
   if (statusLower === 'pending') return 'bg-orange-100 text-orange-700 border-orange-200';
@@ -79,6 +85,8 @@ const getStatusBadgeClass = (status: string) => {
   if (statusLower === 'out for delivery' || statusLower === 'shipping') return 'bg-purple-100 text-purple-700 border-purple-200';
   if (statusLower === 'delivered' || statusLower === 'completed') return 'bg-emerald-100 text-emerald-700 border-emerald-200';
   if (statusLower === 'processing') return 'bg-cyan-100 text-cyan-700 border-cyan-200';
+  if (statusLower === 'returned') return 'bg-orange-100 text-orange-700 border-orange-200';
+  if (statusLower === 'refunded') return 'bg-blue-100 text-blue-700 border-blue-200';
   return 'bg-gray-100 text-gray-700 border-gray-200';
 };
 
@@ -136,13 +144,15 @@ export default function OrderDetails() {
   };
 
   // Get timeline flow - normal delivery progression (without cancelled/returned/refunded)
-  const getTimelineFlow = (order: Order) => {
+  const getTimelineFlow = (order?: Order) => {
     // Normal sequential flow for timeline display
     return ['pending', 'accepted', 'ready_to_pickup', 'accepted_by_delivery_partner', 'picked_up', 'out_for_delivery', 'delivered'];
   };
 
   // Get all available statuses for editing (includes cancelled, returned, refunded)
-  const getStatusFlow = (order: Order) => {
+  const getStatusFlow = (order?: Order) => {
+    if (!order) return ['pending', 'accepted', 'ready_to_pickup', 'accepted_by_delivery_partner', 'picked_up', 'out_for_delivery', 'delivered', 'cancelled', 'returned', 'refunded'];
+    
     const deliveryType = order.deliveryType?.toLowerCase() || 'express';
     
     if (deliveryType === 'next-day-delivery' || deliveryType === 'nextday' || deliveryType === 'next-day') {
@@ -154,9 +164,10 @@ export default function OrderDetails() {
   };
 
   // Timeline logic - uses normal flow only
-  const buildTimeline = (order: Order) => {
+  const buildTimeline = (order?: Order) => {
+    if (!order) return [];
     const timelineFlow = getTimelineFlow(order);
-    const currentStatusIndex = timelineFlow.indexOf(order.status);
+    const currentStatusIndex = timelineFlow.indexOf(order?.status || '');
     
     const steps = timelineFlow.map((status, index) => {
       const isCompleted = currentStatusIndex >= index;
@@ -188,7 +199,16 @@ export default function OrderDetails() {
         }
       );
       if (!res.success) throw new Error(res.message || 'Failed to accept order');
-      setOrder(res.data);
+      if (res.data) setOrder(res.data);
+      
+      // Re-fetch to ensure complete data
+      if (orderId) {
+        const refreshRes = await apiFetch<{ success: boolean; data: Order }>(  
+          `/api/order/order-by-id/${orderId}`
+        );
+        if (refreshRes.success) setOrder(refreshRes.data);
+      }
+      
       toast.success(res.message || 'Order accepted successfully');
     } catch (err: any) {
       toast.error(err?.message || 'Failed to accept order');
@@ -202,7 +222,7 @@ export default function OrderDetails() {
     setUpdatingStatus(newStatus);
     try {
       const res = await apiFetch<{ success: boolean; data: Order; message?: string }>(
-        '/api/order/accept-order',
+        '/api/order/status-update',
         {
           method: 'POST',
           body: JSON.stringify({ 
@@ -214,9 +234,23 @@ export default function OrderDetails() {
         }
       );
       if (!res.success) throw new Error(res.message || 'Failed to update order status');
-      setOrder(res.data);
+      
+      // Show success toast immediately
+      toast.success(res.message || `Order status updated to ${getStatusLabel(newStatus)}`);
+      
+      if (res.data) setOrder(res.data);
+      
+      // Re-fetch complete order data to ensure all fields are present
+      if (orderId) {
+        const refreshRes = await apiFetch<{ success: boolean; data: Order }>(
+          `/api/order/order-by-id/${orderId}`
+        );
+        if (refreshRes.success) {
+          setOrder(refreshRes.data);
+        }
+      }
+      
       setIsEditingStatus(false);
-      toast.success(res.message || `Order status updated to ${newStatus}`);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to update order status');
     } finally {
@@ -351,7 +385,7 @@ export default function OrderDetails() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {order.items.map((item) => {
+                {(order.items || []).map((item) => {
                   // Resolve image URL
                   let imageUrl = item.variant?.image || item.product?.image || '';
                   if (imageUrl && imageUrl.startsWith('/')) {
@@ -386,28 +420,28 @@ export default function OrderDetails() {
               <div className="mt-4 pt-4 border-t border-gray-200 space-y-2">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Subtotal</span>
-                  <span><span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order.pricing?.grandTotal)}</span>
+                  <span><span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.grandTotal || '0')}</span>
                 </div>
                 
                 <div className="flex justify-between text-green-600">
                   <span>Discount</span>
-                  <span>-<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order.pricing?.discount)}</span>
+                  <span>-<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.discount || '0')}</span>
                 </div>
                 <div className="flex justify-between ">
                   <span>Loyalty Points</span>
-                  <span>-<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order.pricing?.loyaltyPoints)}</span>
+                  <span>-<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.loyaltyPoints || '0')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Tax</span>
-                  <span>+<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order.pricing?.tax)}</span>
+                  <span>+<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.tax || '0')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Shipping</span>
-                  <span>+<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order.pricing?.shipping)}</span>
+                  <span>+<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.shipping || '0')}</span>
                 </div>
                 <div className="flex justify-between font-semibold pt-2 border-t border-gray-200">
                   <span>Total Amount</span>
-                  <span><span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order.pricing?.grandTotal)}</span>
+                  <span><span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.grandTotal || '0')}</span>
                 </div>
               </div>
             </CardContent>
@@ -429,7 +463,7 @@ export default function OrderDetails() {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Accept Order Button */}
-          {order.status === 'pending' && (
+          {order?.status === 'pending' && (
             <Button
               className="w-full bg-green-600 hover:bg-green-700 text-white mb-4"
               onClick={handleAcceptOrder}
@@ -466,16 +500,16 @@ export default function OrderDetails() {
               </Button>
             </CardHeader>
             <CardContent>
-              <Badge className={`mb-4 px-4 py-2 font-semibold border ${getStatusBadgeClass(order.status)}`}>
-                {capitalize(order.status || '—')}
+              <Badge className={`mb-4 px-4 py-2 font-semibold border ${getStatusBadgeClass(order?.status)}`}>
+                {capitalize(order?.status || '—')}
               </Badge>
 
             {/* Status Selection Panel */}
-              {isEditingStatus && (
+              {isEditingStatus && order && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                   <p className="text-sm text-blue-800 mb-3">Select a new status:</p>
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {getStatusFlow(order).map((status) => (
+                    {(getStatusFlow(order) || []).map((status) => (
                       <Button
                         key={status}
                         size="sm"
@@ -519,7 +553,7 @@ export default function OrderDetails() {
 
               {/* Timeline */}
               <div className="space-y-4">
-                {buildTimeline(order).map((step, index) => (
+                {(buildTimeline(order) || []).map((step, index) => (
                   <div key={index} className="flex gap-3">
                     <div className="flex flex-col items-center">
                       <div
@@ -531,7 +565,7 @@ export default function OrderDetails() {
                           <CheckCircle className="w-5 h-5 text-green-600" />
                         )}
                       </div>
-                      {index < getTimelineFlow(order).length - 1 && (
+                      {index < (getTimelineFlow(order)?.length || 0) - 1 && (
                         <div
                           className={`w-0.5 h-8 ${
                             step.completed ? 'bg-green-200' : 'bg-gray-200'
@@ -564,27 +598,27 @@ export default function OrderDetails() {
             <CardContent className="space-y-3">
               <div>
                 <p className="text-sm font-semibold text-gray-800">Payment Method</p>
-                <p className='text-gray-600'>{order.payment?.method || '—'}</p>
+                <p className='text-gray-600'>{order?.payment?.method || '—'}</p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-gray-800">Payment Status</p>
                 <Badge
                   className={`px-4 py-2 mt-2 font-semibold border ${
-                    order.payment?.status === 'paid'
+                    order?.payment?.status === 'paid'
                       ? 'bg-green-100 text-green-700 border-green-200'
-                      : order.payment?.status === 'pending'
+                      : order?.payment?.status === 'pending'
                       ? 'bg-orange-100 text-orange-700 border-orange-200'
                       : 'bg-gray-100 text-gray-700 border-gray-200'
                   }`}
                 >
-                  {capitalize(order.payment?.status || '—')}
+                  {capitalize(order?.payment?.status || '—')}
                 </Badge>
               </div>
             </CardContent>
           </Card>
 
           {/* Refund Options - Show only for returned orders */}
-          {order.status?.toLowerCase() === 'returned' && (
+          {order?.status?.toLowerCase() === 'returned' && (
             <Card className="border-orange-200 bg-orange-50">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-orange-900">
@@ -639,6 +673,20 @@ export default function OrderDetails() {
           </Card>
         </div>
       </div>
+
+      {/* Toast Notifications */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </div>
   );
 }

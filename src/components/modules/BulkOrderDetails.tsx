@@ -5,7 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { apiFetch } from '../../lib/api';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const IMAGE_BASE_URL = import.meta.env.VITE_IMAGE_BASE_URL ;
 
@@ -139,17 +141,47 @@ export default function BulkOrderDetails() {
     });
   };
 
-  const capitalize = (str: string) => {
+  const capitalize = (str: string | undefined | null) => {
+    if (!str || typeof str !== 'string') return '';
     return str.charAt(0).toUpperCase() + str.slice(1);
+  };
+
+  // Map backend enum to display label
+  const getStatusLabel = (status: string) => {
+    const statusMap: Record<string, string> = {
+      'pending': 'Order Placed',
+      'accepted': 'Order Accepted',
+      'ready_to_pickup': 'Ready for Pickup',
+      'accepted_by_delivery_partner': 'Accepted by Delivery Agent',
+      'picked_up': 'Order Pickup',
+      'out_for_delivery': 'Out for Delivery',
+      'delivered': 'Delivered',
+      'cancelled': 'Cancelled',
+      'returned': 'Returned',
+      'refunded': 'Refunded',
+      'rejected': 'Rejected'
+    };
+    return statusMap[status] || status;
+  };
+
+  // Get timeline flow - normal delivery progression (without cancelled/returned/refunded)
+  const getTimelineFlow = () => {
+    return ['pending', 'accepted', 'ready_to_pickup', 'accepted_by_delivery_partner', 'picked_up', 'out_for_delivery', 'delivered'];
+  };
+
+  // Get all available statuses for editing (includes cancelled, returned, refunded)
+  const getStatusFlow = () => {
+    return ['pending', 'accepted', 'ready_to_pickup', 'accepted_by_delivery_partner', 'picked_up', 'out_for_delivery', 'delivered', 'cancelled', 'returned', 'refunded'];
   };
 
   const getStatusBadgeClass = (status: string) => {
     const statusLower = status.toLowerCase();
     if (statusLower === 'pending') return 'bg-orange-100 text-orange-700 border border-orange-300';
-    if (statusLower === 'accepted' || statusLower === 'accept') return 'bg-green-100 text-green-700 border border-green-300';
+    if (statusLower === 'accepted') return 'bg-green-100 text-green-700 border border-green-300';
     if (statusLower === 'rejected' || statusLower === 'cancelled') return 'bg-red-100 text-red-700 border border-red-300';
-    if (statusLower === 'processing') return 'bg-blue-100 text-blue-700 border border-blue-300';
-    if (statusLower === 'delivered') return 'bg-green-100 text-green-700 border border-green-300';
+    if (statusLower === 'delivered') return 'bg-emerald-100 text-emerald-700 border border-emerald-300';
+    if (statusLower === 'returned') return 'bg-orange-100 text-orange-700 border border-orange-300';
+    if (statusLower === 'refunded') return 'bg-blue-100 text-blue-700 border border-blue-300';
     return 'bg-gray-100 text-gray-700 border border-gray-300';
   };
 
@@ -218,8 +250,21 @@ export default function BulkOrderDetails() {
         }
       );
       if (!res.success) throw new Error(res.message || 'Failed to update order status');
+      
+      // Show success toast immediately
+      toast.success(res.message || `Order status updated to ${getStatusLabel(newStatus)}`);
+      
       if (res.data) setOrder(res.data);
-      toast.success(res.message || `Order status updated to ${newStatus}`);
+      
+      // Re-fetch complete order data to ensure all fields are present
+      if (id) {
+        const refreshRes = await apiFetch<{ success: boolean; data: BulkOrder }>(
+          `/api/bulk-order/order-by-id/${id}`
+        );
+        if (refreshRes.success) {
+          setOrder(refreshRes.data);
+        }
+      }
     } catch (err: any) {
       toast.error(err?.message || 'Failed to update order status');
     } finally {
@@ -336,7 +381,7 @@ export default function BulkOrderDetails() {
     );
   }
 
-  const isPending = order.status?.toLowerCase() === 'pending';
+  const isPending = order?.status?.toLowerCase() === 'pending';
 
   return (
     <div className="space-y-6">
@@ -346,9 +391,9 @@ export default function BulkOrderDetails() {
           Back to Orders
         </Button>
         <div className="flex items-center gap-3">
-          <h1 className="mb-0">Order {order._id.substring(0, 12)}...</h1>
-          <Badge className={getStatusBadgeClass(order.status)}>
-            {capitalize(order.status)}
+          <h1 className="mb-0">Order {order?._id?.substring(0, 12) || 'N/A'}...</h1>
+          <Badge className={getStatusBadgeClass(order?.status || '')}>
+            {capitalize(order?.status || '—')}
           </Badge>
         </div>
       </div>
@@ -394,15 +439,15 @@ export default function BulkOrderDetails() {
           <CardContent className="space-y-4">
             <div>
               <p className="text-sm text-gray-600">Order ID</p>
-              <p className="font-medium text-blue-600">{order._id}</p>
+              <p className="font-medium text-blue-600">{order?._id || 'N/A'}</p>
             </div>
             <div>
               <p className="text-sm text-gray-600">Order Type</p>
-              <p className="font-medium">{capitalize(order.orderType)}</p>
+              <p className="font-medium">{capitalize(order?.orderType || '—')}</p>
             </div>
             <div>
               <p className="text-sm text-gray-600">Created</p>
-              <p className="font-medium">{formatDateTime(order.createdAt)}</p>
+              <p className="font-medium">{order?.createdAt ? formatDateTime(order.createdAt) : '—'}</p>
             </div>
             <div>
               <p className="text-sm text-gray-600">Total Items</p>
@@ -502,12 +547,12 @@ export default function BulkOrderDetails() {
                 </div>
                 <div className="pt-2">
                   <p className="text-sm text-gray-600">Payment Method</p>
-                  <p className="font-medium">{capitalize(order.payment?.method)}</p>
+                  <p className="font-medium">{capitalize(order.payment?.method || '')}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Payment Status</p>
-                  <Badge className={getPaymentStatusBadgeClass(order.payment?.status)}>
-                    {capitalize(order.payment?.status)}
+                  <Badge className={getPaymentStatusBadgeClass(order.payment?.status || '')}>
+                    {capitalize(order.payment?.status || '')}
                   </Badge>
                 </div>
               </>
@@ -655,7 +700,7 @@ export default function BulkOrderDetails() {
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                 <p className="text-sm text-blue-800 mb-3">Select a new status:</p>
                 <div className="flex flex-wrap gap-2">
-                  {['Order laced', 'order accepted', 'ready for pickup', 'accepted by delivery agent', 'order pickup', 'delivered'].map((status) => (
+                  {getStatusFlow().map((status) => (
                     <Button
                       key={status}
                       size="sm"
@@ -664,9 +709,9 @@ export default function BulkOrderDetails() {
                         setIsEditingTimeline(false);
                       }}
                       disabled={updatingStatus !== null}
-                      className={`capitalize ${order.status?.toLowerCase() === status.toLowerCase() ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                      className={`${order?.status === status ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
                     >
-                      {updatingStatus === status ? 'Updating...' : status}
+                      {updatingStatus === status ? 'Updating...' : getStatusLabel(status)}
                     </Button>
                   ))}
                 </div>
@@ -675,9 +720,11 @@ export default function BulkOrderDetails() {
 
             {/* Status Flow */}
             <div className="flex flex-col space-y-3">
-              {['Order Placed', 'Order Accepted', 'Ready for Pickup', 'Accepted by Delivery Agent', 'Order Pickup', 'Delivered'].map((status, index) => {
-                const isCompleted = ['order placed', 'order accepted', 'ready for pickup', 'accepted by delivery agent', 'order pickup'].includes(order.status?.toLowerCase()) && index <= ['order placed', 'order accepted', 'ready for pickup', 'accepted by delivery agent', 'order pickup', 'delivered'].indexOf(order.status?.toLowerCase());
-                const isCurrent = status.toLowerCase() === order.status?.toLowerCase();
+              {getTimelineFlow().map((status, index) => {
+                const timelineFlow = getTimelineFlow();
+                const currentStatusIndex = timelineFlow.indexOf(order?.status || '');
+                const isCompleted = currentStatusIndex >= index;
+                const isCurrent = status === order?.status;
 
                 return (
                   <div key={status}>
@@ -687,12 +734,12 @@ export default function BulkOrderDetails() {
                       ) : (
                         <Circle className="w-6 h-6 text-gray-300 flex-shrink-0" />
                       )}
-                      <span className={`font-medium capitalize ${isCompleted || isCurrent ? 'text-green-700' : 'text-gray-500'}`}>
-                        {status}
+                      <span className={`font-medium ${isCompleted || isCurrent ? 'text-green-700' : 'text-gray-500'}`}>
+                        {getStatusLabel(status)}
                       </span>
                       {isCurrent && <Badge className="bg-blue-100 text-blue-700">Current</Badge>}
                     </div>
-                    {index < 5 && (
+                    {index < timelineFlow.length - 1 && (
                       <div className={`ml-3 h-6 w-0.5 ${isCompleted ? 'bg-green-600' : 'bg-gray-200'}`}></div>
                     )}
                   </div>
@@ -776,6 +823,21 @@ export default function BulkOrderDetails() {
           </div>
         </CardContent>
       </Card>
+
+
+      {/* Toast Notifications */}
+            <ToastContainer
+              position="top-right"
+              autoClose={3000}
+              hideProgressBar={false}
+              newestOnTop={false}
+              closeOnClick
+              rtl={false}
+              pauseOnFocusLoss
+              draggable
+              pauseOnHover
+              theme="light"
+            />
     </div>
   );
 }
