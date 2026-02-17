@@ -45,6 +45,8 @@ type DeliveryPartnerApiUser = {
   lastName?: string;
   isActive?: boolean;
   isBlocked?: boolean;
+  updatedAt?: string;
+  deleteReason?: string;
 };
 
 type DeliveryPartnerListItem = {
@@ -55,14 +57,13 @@ type DeliveryPartnerListItem = {
   status: 'Active' | 'Inactive';
   deliveries: number;
   earnings: string;
-  rating: number;
 };
 
 const staticMetrics = [
-  { deliveries: 342, earnings: '₹68,400', rating: 4.8 },
-  { deliveries: 298, earnings: '₹59,600', rating: 4.7 },
-  { deliveries: 456, earnings: '₹91,200', rating: 4.9 },
-  { deliveries: 189, earnings: '₹37,800', rating: 4.6 },
+  { deliveries: 342, earnings: '₹68,400' },
+  { deliveries: 298, earnings: '₹59,600' },
+  { deliveries: 456, earnings: '₹91,200' },
+  { deliveries: 189, earnings: '₹37,800' },
 ];
 
 export default function DeliveryPartnersSection({
@@ -84,6 +85,14 @@ export default function DeliveryPartnersSection({
   const [error, setError] = useState<string | null>(null);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [showDeletedUsersModal, setShowDeletedUsersModal] = useState(false);
+  const [deletedUsers, setDeletedUsers] = useState<DeliveryPartnerApiUser[]>([]);
+  const [deletedUsersLoading, setDeletedUsersLoading] = useState(false);
+  const [deletedUsersError, setDeletedUsersError] = useState<string | null>(null);
+  const [deletedUsersPage, setDeletedUsersPage] = useState(1);
+  const [deletedUsersTotalPages, setDeletedUsersTotalPages] = useState(1);
+  const [deletedUsersTotalCount, setDeletedUsersTotalCount] = useState(0);
+  const deletedUsersLimit = 10;
 
   useEffect(() => {
     let active = true;
@@ -118,7 +127,6 @@ export default function DeliveryPartnersSection({
             status,
             deliveries: metrics.deliveries,
             earnings: metrics.earnings,
-            rating: metrics.rating,
           };
         });
 
@@ -138,6 +146,35 @@ export default function DeliveryPartnersSection({
       active = false;
     };
   }, [deliveryPartnersPage]);
+
+  const fetchDeletedUsers = async () => {
+    setDeletedUsersLoading(true);
+    setDeletedUsersError(null);
+
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        users: DeliveryPartnerApiUser[];
+        pagination?: { page: number; limit: number; totalItems: number; totalPages: number };
+        message?: string;
+      }>(`/api/delivery-partner/deleted-users?page=${deletedUsersPage}&limit=${deletedUsersLimit}`);
+
+      if (!res.success) throw new Error(res.message || 'Failed to fetch deleted delivery partners');
+
+      setDeletedUsers(res.users || []);
+      setDeletedUsersTotalPages(res.pagination?.totalPages || 1);
+      setDeletedUsersTotalCount(res.pagination?.totalItems || 0);
+    } catch (err: any) {
+      setDeletedUsersError(err?.message || 'Failed to fetch deleted delivery partners');
+    } finally {
+      setDeletedUsersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!showDeletedUsersModal) return;
+    fetchDeletedUsers();
+  }, [showDeletedUsersModal, deletedUsersPage]);
 
   const getFilteredDeliveryPartners = () => {
     let filtered = deliveryPartners;
@@ -184,13 +221,25 @@ export default function DeliveryPartnersSection({
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Delivery Partners</CardTitle>
-            <Button
-              onClick={() => setShowAddDeliveryPartnerModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Delivery Partner
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setShowAddDeliveryPartnerModal(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Delivery Partner
+              </Button>
+              <Button
+                onClick={() => {
+                  setDeletedUsersPage(1);
+                  setShowDeletedUsersModal(true);
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Deleted Users
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -203,7 +252,6 @@ export default function DeliveryPartnersSection({
                     <th className="text-left py-3 px-4">Email ID</th>
                     <th className="text-left py-3 px-4">Total Deliveries</th>
                     <th className="text-left py-3 px-4">Earnings</th>
-                    <th className="text-left py-3 px-4">Rating</th>
                     <th className="text-left py-3 px-4">Status</th>
                     <th className="text-left py-3 px-4">Actions</th>
                   </tr>
@@ -211,19 +259,19 @@ export default function DeliveryPartnersSection({
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={9} className="text-center py-8 text-gray-500">
+                      <td colSpan={8} className="text-center py-8 text-gray-500">
                         Loading delivery partners...
                       </td>
                     </tr>
                   ) : error ? (
                     <tr>
-                      <td colSpan={9} className="text-center py-8 text-red-600">
+                      <td colSpan={8} className="text-center py-8 text-red-600">
                         {error}
                       </td>
                     </tr>
                   ) : getFilteredDeliveryPartners().length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="text-center py-8 text-gray-500">
+                      <td colSpan={8} className="text-center py-8 text-gray-500">
                         No delivery partners found
                       </td>
                     </tr>
@@ -236,7 +284,6 @@ export default function DeliveryPartnersSection({
                         <td className="py-3 px-4">{partner.email}</td>
                         <td className="py-3 px-4">{partner.deliveries}</td>
                         <td className="py-3 px-4">{partner.earnings}</td>
-                        <td className="py-3 px-4">⭐ {partner.rating}</td>
                         <td className="py-3 px-4">
                           <Badge variant={partner.status === 'Active' ? 'default' : 'secondary'}>
                             {partner.status}
@@ -391,6 +438,99 @@ export default function DeliveryPartnersSection({
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeletedUsersModal} onOpenChange={setShowDeletedUsersModal}>
+        <DialogContent className="max-w-4xl sm:max-w-5xl w-[80vw] sm:w-[70vw] max-h-[70vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="px-6 py-4 border-b bg-white">
+            <DialogTitle>Deleted Delivery Partners</DialogTitle>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            {deletedUsersLoading ? (
+              <div className="flex justify-center items-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : deletedUsersError ? (
+              <div className="py-8 text-center text-red-600">{deletedUsersError}</div>
+            ) : deletedUsers.length === 0 ? (
+              <div className="py-8 text-center text-gray-500">No deleted users found</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4">DP ID</th>
+                      <th className="text-left py-3 px-4">Name</th>
+                      <th className="text-left py-3 px-4">Email</th>
+                      <th className="text-left py-3 px-4">Phone</th>
+                      <th className="text-left py-3 px-4">Delete Reason</th>
+                      <th className="text-left py-3 px-4">Deleted At</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deletedUsers.map((user) => (
+                      <tr key={user._id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-3 px-4 text-blue-600">{user._id.substring(0, 8)}...</td>
+                        <td className="py-3 px-4">
+                          {`${user.firstName || ''} ${user.lastName || ''}`.trim() || '—'}
+                        </td>
+                        <td className="py-3 px-4">{user.email || '—'}</td>
+                        <td className="py-3 px-4">
+                          {`${user.countryCode || ''} ${user.phone || ''}`.trim() || '—'}
+                        </td>
+                        <td className="py-3 px-4">{user.deleteReason || '—'}</td>
+                        <td className="py-3 px-4 text-sm">
+                          {user.updatedAt ? new Date(user.updatedAt).toLocaleDateString('en-IN', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric'
+                          }) : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="border-t px-6 py-4 flex items-center justify-between bg-white">
+            <div className="text-sm text-gray-600">
+              {deletedUsersTotalCount > 0 ? (
+                <>
+                  Showing {(deletedUsersPage - 1) * deletedUsersLimit + 1} to {Math.min(deletedUsersPage * deletedUsersLimit, deletedUsersTotalCount)} of {deletedUsersTotalCount} deleted users
+                </>
+              ) : (
+                <span>No deleted users found</span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDeletedUsersPage((prev) => Math.max(1, prev - 1))}
+                disabled={deletedUsersPage === 1 || deletedUsersLoading}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDeletedUsersPage((prev) => Math.min(deletedUsersTotalPages, prev + 1))}
+                disabled={deletedUsersPage >= deletedUsersTotalPages || deletedUsersLoading}
+              >
+                Next
+              </Button>
+              <Button
+                onClick={() => setShowDeletedUsersModal(false)}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Close
+              </Button>
+            </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

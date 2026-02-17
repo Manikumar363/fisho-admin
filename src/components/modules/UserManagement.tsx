@@ -461,17 +461,56 @@ export default function UserManagement() {
     }
   };
 
-  const handleAddDeliveryPartner = (e: React.FormEvent) => {
+  const handleAddDeliveryPartner = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Adding delivery partner:', deliveryPartnerForm);
-    setShowAddDeliveryPartnerModal(false);
-    setDeliveryPartnerForm({
-      name: '',
-      mobileNumber: '',
-      drivingLicense: null,
-      workPermit: null,
-      email: ''
-    });
+
+    if (!deliveryPartnerForm.name.trim() || !deliveryPartnerForm.mobileNumber.trim() || !deliveryPartnerForm.email.trim()) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    const nameParts = deliveryPartnerForm.name.trim().split(/\s+/);
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ');
+    const normalizedPhone = deliveryPartnerForm.mobileNumber.replace(/[^0-9]/g, '');
+
+    if (!normalizedPhone) {
+      toast.error('Please enter a valid phone number');
+      return;
+    }
+
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        message?: string;
+        user?: any;
+      }>('/api/delivery-partner/create-user', {
+        method: 'POST',
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          phone: Number(normalizedPhone),
+          email: deliveryPartnerForm.email,
+        }),
+      });
+
+      if (!res.success) throw new Error(res.message || 'Failed to add delivery partner');
+
+      toast.success(res.message || 'Delivery partner added successfully');
+      setShowAddDeliveryPartnerModal(false);
+      setDeliveryPartnerForm({
+        name: '',
+        mobileNumber: '',
+        drivingLicense: null,
+        workPermit: null,
+        email: ''
+      });
+      setDeliveryPartnersPage(1);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to add delivery partner';
+      console.error('Add delivery partner error:', e);
+      toast.error(msg);
+    }
   };
 
   const handleView = async (item: any, type: string) => {
@@ -502,6 +541,44 @@ export default function UserManagement() {
       } catch (e: any) {
         const msg = e?.message || 'Failed to load user details';
         console.error('Fetch user details error:', e);
+        toast.error(msg);
+      } finally {
+        setIsLoadingView(false);
+      }
+    }
+
+    // Fetch full delivery partner details
+    if (type === 'delivery-partner') {
+      setIsLoadingView(true);
+      const partnerId = item.id || item._id;
+      try {
+        const res = await apiFetch<{
+          success: boolean;
+          user?: any;
+          message?: string;
+        }>(`/api/delivery-partner/user-by-id/${partnerId}`);
+
+        if (!res.success) throw new Error(res.message || 'Failed to fetch delivery partner details');
+
+        const fullName = `${res.user?.firstName || ''} ${res.user?.lastName || ''}`.trim() || 'Unnamed';
+        const fullPhone = `${res.user?.countryCode || ''} ${res.user?.phone || ''}`.trim();
+        const status = res.user?.isActive && !res.user?.isBlocked ? 'Active' : 'Inactive';
+
+        setSelectedItem({
+          ...item,
+          ...res.user,
+          type: 'delivery-partner',
+          id: res.user?._id || partnerId,
+          name: fullName,
+          phone: fullPhone || '—',
+          email: res.user?.email || item.email || '—',
+          status,
+          deliveries: item.deliveries,
+          earnings: item.earnings,
+        });
+      } catch (e: any) {
+        const msg = e?.message || 'Failed to load delivery partner details';
+        console.error('Fetch delivery partner details error:', e);
         toast.error(msg);
       } finally {
         setIsLoadingView(false);
@@ -616,6 +693,22 @@ export default function UserManagement() {
         if (refreshRes.success) {
           setVendors(refreshRes.vendors || []);
         }
+      } else if (selectedItem.type === 'delivery-partner') {
+        // Delete delivery partner
+        const partnerId = selectedItem.id || selectedItem._id;
+        const res = await apiFetch<{
+          success: boolean;
+          message?: string;
+        }>(`/api/delivery-partner/delete-user/${partnerId}`, {
+          method: 'DELETE',
+        });
+
+        if (!res.success) throw new Error(res.message || 'Failed to delete delivery partner');
+
+        toast.success(res.message || 'Delivery partner deleted successfully');
+        setShowDeleteDialog(false);
+        setSelectedItem(null);
+        setDeliveryPartnersPage(1);
       } else if (selectedItem.type === 'store-manager') {
         // Delete subadmin (store manager)
         const res = await apiFetch<{
@@ -1873,10 +1966,6 @@ export default function UserManagement() {
                       <div>
                         <Label className="text-gray-600">Earnings</Label>
                         <p>{selectedItem.earnings}</p>
-                      </div>
-                      <div>
-                        <Label className="text-gray-600">Rating</Label>
-                        <p>⭐ {selectedItem.rating}</p>
                       </div>
                       <div>
                         <Label className="text-gray-600">Status</Label>

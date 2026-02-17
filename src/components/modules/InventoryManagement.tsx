@@ -83,9 +83,9 @@ export default function InventoryManagement() {
   const [productForm, setProductForm] = useState({
     category: '',
     productName: '',
-    productImage: null as File | null,
-    existingImage: '',
-    existingImageUrl: '',
+    productImages: [] as File[],
+    existingImages: [] as string[],
+    existingImageUrls: [] as string[],
     description: '',
     nutritionFacts: '',
     cutTypes: [] as string[],
@@ -114,8 +114,8 @@ const [originalCategoryForm, setOriginalCategoryForm] = useState({
 const [originalProductForm, setOriginalProductForm] = useState({
   category: '',
   productName: '',
-  productImage: null as File | null,
-  existingImage: '',
+  productImages: [] as File[],
+  existingImages: [] as string[],
   description: '',
   nutritionFacts: '',
   cutTypes: [] as string[],
@@ -1399,9 +1399,9 @@ const handleRemoveWeight = (weight: number) => {
     setProductForm({
       category: '',
       productName: '',
-      productImage: null,
-      existingImage: '',
-      existingImageUrl: '',
+      productImages: [],
+      existingImages: [],
+      existingImageUrls: [],
       description: '',
       nutritionFacts: '',
       cutTypes: [],
@@ -1531,7 +1531,7 @@ const handleRemoveWeight = (weight: number) => {
         const validationErrors: string[] = [];
         if (!productForm.category) validationErrors.push('Please select a category');
         if (!productForm.productName.trim()) validationErrors.push('Please enter a product name');
-        if (!editingProductId && !productForm.productImage) validationErrors.push('Product image is required');
+        if (!editingProductId && productForm.productImages.length === 0) validationErrors.push('Product image is required');
         if (!productForm.description.trim()) validationErrors.push('Description is required');
         if (!productForm.nutritionFacts.trim()) validationErrors.push('Nutrition facts are required');
         if (productForm.cutTypes.length === 0) validationErrors.push('At least one cut type is required');
@@ -1597,20 +1597,23 @@ const handleRemoveWeight = (weight: number) => {
           })
         );
 
-        // Upload product image if available, or use existing image when editing
-        let productImageLocation = '';
-        if (productForm.productImage) {
+        // Upload product images if available, or use existing images when editing
+        let productImageLocations: string[] = [];
+        if (productForm.productImages.length > 0) {
           try {
-            console.log('Starting product image upload:', productForm.productImage.name);
-            productImageLocation = await uploadImage(productForm.productImage);
-            console.log('Product image uploaded successfully:', productImageLocation);
+            for (const imageFile of productForm.productImages) {
+              console.log('Starting product image upload:', imageFile.name);
+              const location = await uploadImage(imageFile);
+              productImageLocations.push(location);
+              console.log('Product image uploaded successfully:', location);
+            }
           } catch (err: any) {
             console.error('Product image upload failed:', err);
             throw new Error(`Failed to upload product image: ${err.message}`);
           }
-        } else if (editingProductId && productForm.existingImage) {
-          // When editing and no new image uploaded, use the existing image path
-          productImageLocation = productForm.existingImage;
+        } else if (editingProductId && productForm.existingImages.length > 0) {
+          // When editing and no new images uploaded, use the existing image paths
+          productImageLocations = [...productForm.existingImages];
         }
 
         // Upload variant images if available
@@ -1657,7 +1660,7 @@ const handleRemoveWeight = (weight: number) => {
             isExpressDelivery: productForm.isExpressDelivery,
             isNextDayDelivery: false,
             order: 1,
-            image: productImageLocation
+            images: productImageLocations
           },
           variants: variants
         };
@@ -1700,9 +1703,9 @@ const handleRemoveWeight = (weight: number) => {
         setProductForm({
           category: '',
           productName: '',
-          productImage: null,
-          existingImage: '',
-          existingImageUrl: '',
+          productImages: [],
+          existingImages: [],
+          existingImageUrls: [],
           description: '',
           nutritionFacts: '',
           cutTypes: [],
@@ -2162,27 +2165,91 @@ const handleRemoveWeight = (weight: number) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="productImage">Product Image</Label>
+          <Label htmlFor="productImages">Product Images</Label>
           <Input
-            id="productImage"
+            id="productImages"
             type="file"
             accept="image/*"
-            onChange={e => setProductForm({ ...productForm, productImage: e.target.files?.[0] || null })}
+            multiple
+            onChange={e =>
+              setProductForm({
+                ...productForm,
+                productImages: e.target.files ? Array.from(e.target.files) : [],
+              })
+            }
             disabled={isSubmitting}
           />
-          {productForm.productImage && (
-            <img
-              src={URL.createObjectURL(productForm.productImage)}
-              alt="Product preview"
-              className="w-20 h-20 object-cover rounded mt-2 border"
-            />
+          {productForm.productImages.length > 0 && (
+            <div className="mt-4">
+              <p className="text-sm text-gray-600 mb-3">
+                {productForm.productImages.length} image(s) selected
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {productForm.productImages.map((file, index) => (
+                  <div
+                    key={`${file.name}-${index}`}
+                    className="relative w-32 h-32 group"
+                  >
+                    <img
+                      src={URL.createObjectURL(file)}
+                      alt="Product preview"
+                      className="w-full h-full object-cover rounded border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setProductForm({
+                          ...productForm,
+                          productImages: productForm.productImages.filter(
+                            (_, i) => i !== index
+                          ),
+                        })
+                      }
+                      className="absolute top-1 right-1 bg-white hover:bg-gray-100 text-red-600 hover:text-red-700 rounded-full w-6 h-6 flex items-center justify-center transition-colors border border-red-300"
+                      disabled={isSubmitting}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
-          {productForm.existingImageUrl && !productForm.productImage && (
-            <img
-              src={productForm.existingImageUrl}
-              alt="Current product image"
-              className="w-20 h-20 object-cover rounded mt-2 border"
-            />
+          {productForm.existingImageUrls.length > 0 && (
+            <div className="mt-4">
+              <p className="text-sm text-gray-600 mb-3">
+                {productForm.existingImageUrls.length} existing image(s)
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {productForm.existingImageUrls.map((url, index) => (
+                  <div
+                    key={`${url}-${index}`}
+                    className="relative w-32 h-32 group"
+                  >
+                    <img
+                      src={url}
+                      alt="Current product"
+                      className="w-full h-full object-cover rounded border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setProductForm({
+                          ...productForm,
+                          existingImageUrls: productForm.existingImageUrls.filter(
+                            (_, i) => i !== index
+                          ),
+                        })
+                      }
+                      className="absolute top-1 right-2 rounded-full bg-white hover:bg-gray-100 text-red-600 hover:text-red-700 rounded-full w-6 h-6 flex items-center justify-center transition-colors border border-red-300"
+                      disabled={isSubmitting}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
         <div>
@@ -3555,9 +3622,9 @@ const handleRemoveWeight = (weight: number) => {
                                 const formData = {
                                   category: resolvedCategoryId,
                                   productName: product.name,
-                                  productImage: null,
-                                  existingImage: product.imagePath || '',
-                                  existingImageUrl: product.image || '',
+                                  productImages: [],
+                                  existingImages: product.imagePath ? [product.imagePath] : [],
+                                  existingImageUrls: product.image ? [product.image] : [],
                                   description: product.description || '',
                                   nutritionFacts: product.nutritionFacts || '',
                                   cutTypes: product.cutTypeIds || [],
@@ -3578,8 +3645,8 @@ const handleRemoveWeight = (weight: number) => {
                                 setOriginalProductForm({
                                   category: formData.category,
                                   productName: formData.productName,
-                                  productImage: null,
-                                  existingImage: formData.existingImage,
+                                  productImages: [],
+                                  existingImages: [...formData.existingImages],
                                   description: formData.description,
                                   nutritionFacts: formData.nutritionFacts,
                                   cutTypes: [...formData.cutTypes],
