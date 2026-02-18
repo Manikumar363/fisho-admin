@@ -114,7 +114,7 @@ export default function InventoryAlerts() {
         };
         message?: string;
       }>(`/api/products/${itemId}`, {
-        method: 'PATCH',
+        method: 'PUT',
         body: JSON.stringify({
           lowStockThreshold: newLimit
         })

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Package, CreditCard, MapPin, Clock, CheckCircle, Edit2, X, Wallet, CreditCard as CardIcon, RotateCcw } from 'lucide-react';
+import { ArrowLeft, User, Package, CreditCard, MapPin, Clock, CheckCircle, Edit2, X, Wallet, CreditCard as CardIcon, RotateCcw, Truck, Image as ImageIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -59,6 +59,15 @@ interface Order {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  deliveryPartner?: {
+    _id: string;
+    email: string;
+    phone: string;
+    firstName: string;
+    lastName: string;
+    profile_url: string;
+  };
+  deliveryProof?: string[];
 }
 
 // Helper for capitalizing the first letter
@@ -458,6 +467,39 @@ export default function OrderDetails() {
               </CardContent>
             </Card>
           )}
+
+          {/* Delivery Proofs */}
+          {order.deliveryProof && order.deliveryProof.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex font-semibold items-center">
+                  <ImageIcon className="w-5 h-5 mr-2" />
+                  Delivery Proofs
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {order.deliveryProof.map((proofPath, index) => {
+                    let imageUrl = proofPath;
+                    if (imageUrl && imageUrl.startsWith('/')) {
+                      imageUrl = `${import.meta.env.VITE_IMAGE_BASE_URL || ''}${imageUrl}`;
+                    }
+                    return (
+                      <div key={index} className="relative group">
+                        <ImageWithFallback
+                          src={imageUrl}
+                          alt={`Delivery proof ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => window.open(imageUrl, '_blank')}
+                        />
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-opacity rounded-lg" />
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Sidebar */}
@@ -616,6 +658,42 @@ export default function OrderDetails() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Delivery Partner Info */}
+          {order.deliveryPartner && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex font-semibold items-center">
+                  <Truck className="w-5 h-5 mr-2" />
+                  Delivery Partner
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center gap-3 mb-4">
+                  {order.deliveryPartner.profile_url && (
+                    <ImageWithFallback
+                      src={`${import.meta.env.VITE_IMAGE_BASE_URL || ''}${order.deliveryPartner.profile_url}`}
+                      alt={`${order.deliveryPartner.firstName} ${order.deliveryPartner.lastName}`}
+                      className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
+                    />
+                  )}
+                  <div>
+                    <p className="font-semibold text-gray-800">
+                      {order.deliveryPartner.firstName} {order.deliveryPartner.lastName}
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Email</p>
+                  <p className='text-gray-600'>{order.deliveryPartner.email || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Phone</p>
+                  <p className='text-gray-600'>{order.deliveryPartner.phone || '—'}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Refund Options - Show only for returned orders */}
           {order?.status?.toLowerCase() === 'returned' && (

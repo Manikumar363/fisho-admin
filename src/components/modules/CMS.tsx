@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FileText, Image, Plus, Edit, Trash2, Shield, ScrollText, ChevronUp, ChevronDown, Layers } from 'lucide-react';
+import { FileText, Image, Plus, Edit, Trash2, Shield, ScrollText, ChevronUp, ChevronDown, Layers, HelpCircle } from 'lucide-react';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -18,9 +18,12 @@ import 'react-toastify/dist/ReactToastify.css';
 import BannerManagement from './cms/BannerManagement';
 import TextContentEditor from './cms/TextContentEditor';
 import Section1Editor from './cms/Section1Editor';
+import WhyFishoSectionEditor from './cms/WhyFishoSectionEditor';
+import MarineProductsSectionEditor from './cms/MarineProductsSectionEditor';
+import FAQSectionEditor from './cms/FAQSectionEditor';
 import { apiFetch } from '../../lib/api';
 
-type ContentType = 'banners' | 'terms' | 'privacy' | 'about' | 'deliveryTc' | 'deliveryPrivacy' | 'returnRefund' | 'cancelPolicy' | 'section1';
+type ContentType = 'banners' | 'terms' | 'privacy' | 'about' | 'deliveryTc' | 'deliveryPrivacy' | 'returnRefund' | 'cancelPolicy' | 'section1' | 'whyFisho' | 'marineProducts' | 'faq';
 
 interface ContentItem {
   id: string;
@@ -46,6 +49,15 @@ export default function CMS() {
   const [sections, setSections] = useState<ContentItem[]>([]);
   const [sectionsLoading, setSectionsLoading] = useState(false);
   const [sectionsError, setSectionsError] = useState<string | null>(null);
+  const [whyFishoSection, setWhyFishoSection] = useState<ContentItem[]>([]);
+  const [whyFishoLoading, setWhyFishoLoading] = useState(false);
+  const [whyFishoError, setWhyFishoError] = useState<string | null>(null);
+  const [marineProductsSection, setMarineProductsSection] = useState<ContentItem[]>([]);
+  const [marineProductsLoading, setMarineProductsLoading] = useState(false);
+  const [marineProductsError, setMarineProductsError] = useState<string | null>(null);
+  const [faqSection, setFaqSection] = useState<ContentItem[]>([]);
+  const [faqLoading, setFaqLoading] = useState(false);
+  const [faqError, setFaqError] = useState<string | null>(null);
 
   const IMAGE_BASE = ((import.meta as any).env?.VITE_IMAGE_BASE_URL || (import.meta as any).env?.VITE_BASE_URL) as string | undefined;
 
@@ -120,6 +132,30 @@ export default function CMS() {
       icon: Layers,
       color: 'indigo',
       items: sections
+    },
+    {
+      id: 'whyFisho' as ContentType,
+      title: 'Why Fisho Section',
+      description: 'Manage Why Fisho.ae section with heading, description, and feature cards',
+      icon: Layers,
+      color: 'teal',
+      items: whyFishoSection
+    },
+    {
+      id: 'marineProducts' as ContentType,
+      title: 'Marine Products Section',
+      description: 'Manage marine products section with heading, description, and product cards',
+      icon: Image,
+      color: 'cyan',
+      items: marineProductsSection
+    },
+    {
+      id: 'faq' as ContentType,
+      title: 'FAQ Section',
+      description: 'Manage frequently asked questions with answers',
+      icon: HelpCircle,
+      color: 'rose',
+      items: faqSection
     },
     {
       id: 'terms' as ContentType,
@@ -211,6 +247,9 @@ export default function CMS() {
     loadBanners();
     loadPages();
     loadSections();
+    loadWhyFishoSection();
+    loadMarineProductsSection();
+    loadFaqSection();
   }, []);
 
   const handleAddContent = (type: ContentType) => {
@@ -261,6 +300,21 @@ export default function CMS() {
         setSections(sections.filter(section => section.id !== itemToDelete.id));
         toast.success('Section Successfully deleted');
         console.log('Section deleted:', itemToDelete.id);
+      } else if (itemToDelete.type === 'whyFisho') {
+        // For Why Fisho section - remove locally
+        setWhyFishoSection(whyFishoSection.filter(section => section.id !== itemToDelete.id));
+        toast.success('Why Fisho Section Successfully deleted');
+        console.log('Why Fisho Section deleted:', itemToDelete.id);
+      } else if (itemToDelete.type === 'marineProducts') {
+        // For Marine Products section - remove locally
+        setMarineProductsSection(marineProductsSection.filter(section => section.id !== itemToDelete.id));
+        toast.success('Marine Products Section Successfully deleted');
+        console.log('Marine Products Section deleted:', itemToDelete.id);
+      } else if (itemToDelete.type === 'faq') {
+        // For FAQ section - remove locally
+        setFaqSection(faqSection.filter(section => section.id !== itemToDelete.id));
+        toast.success('FAQ Section Successfully deleted');
+        console.log('FAQ Section deleted:', itemToDelete.id);
       } else {
         // For text content (delete locally)
         setTextContents(textContents.filter(content => content.id !== itemToDelete.id));
@@ -350,6 +404,84 @@ export default function CMS() {
       toast.error(msg);
     } finally {
       setSectionsLoading(false);
+    }
+  };
+
+  // Fetch Why Fisho section from API
+  const loadWhyFishoSection = async () => {
+    setWhyFishoLoading(true);
+    setWhyFishoError(null);
+    try {
+      // Load static content for now - API endpoint not yet developed
+      const staticWhyFisho: ContentItem[] = [
+        {
+          id: 'why-fisho-section',
+          title: 'Why Fisho.ae?',
+          lastUpdated: new Date().toISOString().split('T')[0],
+          status: 'Active',
+          type: 'whyFisho',
+        }
+      ];
+      setWhyFishoSection(staticWhyFisho);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to load Why Fisho section';
+      console.error('Load Why Fisho section error:', e);
+      setWhyFishoError(msg);
+      toast.error(msg);
+    } finally {
+      setWhyFishoLoading(false);
+    }
+  };
+
+  // Fetch Marine Products section from API
+  const loadMarineProductsSection = async () => {
+    setMarineProductsLoading(true);
+    setMarineProductsError(null);
+    try {
+      // Load static content for now - API endpoint not yet developed
+      const staticMarineProducts: ContentItem[] = [
+        {
+          id: 'marine-products-section',
+          title: 'Check Out Our Marine Products in Dubai',
+          lastUpdated: new Date().toISOString().split('T')[0],
+          status: 'Active',
+          type: 'marineProducts',
+        }
+      ];
+      setMarineProductsSection(staticMarineProducts);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to load Marine Products section';
+      console.error('Load Marine Products section error:', e);
+      setMarineProductsError(msg);
+      toast.error(msg);
+    } finally {
+      setMarineProductsLoading(false);
+    }
+  };
+
+  // Fetch FAQ section from API
+  const loadFaqSection = async () => {
+    setFaqLoading(true);
+    setFaqError(null);
+    try {
+      // Load static content for now - API endpoint not yet developed
+      const staticFaq: ContentItem[] = [
+        {
+          id: 'faq-section',
+          title: 'Frequently Asked Questions',
+          lastUpdated: new Date().toISOString().split('T')[0],
+          status: 'Active',
+          type: 'faq',
+        }
+      ];
+      setFaqSection(staticFaq);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to load FAQ section';
+      console.error('Load FAQ section error:', e);
+      setFaqError(msg);
+      toast.error(msg);
+    } finally {
+      setFaqLoading(false);
     }
   };
 
@@ -526,7 +658,10 @@ export default function CMS() {
       purple: { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200' },
       orange: { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200' },
       red: { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },
-      yellow: { bg: 'bg-yellow-50', text: 'text-yellow-600', border: 'border-yellow-200' }
+      yellow: { bg: 'bg-yellow-50', text: 'text-yellow-600', border: 'border-yellow-200' },
+      teal: { bg: 'bg-teal-50', text: 'text-teal-600', border: 'border-teal-200' },
+      cyan: { bg: 'bg-cyan-50', text: 'text-cyan-600', border: 'border-cyan-200' },
+      rose: { bg: 'bg-rose-50', text: 'text-rose-600', border: 'border-rose-200' }
     };
     return colors[color] || colors.blue;
   };
@@ -549,6 +684,33 @@ export default function CMS() {
   if (selectedContent === 'section1') {
     return (
       <Section1Editor
+        sectionItem={editingItem}
+        onCancel={handleCancel}
+      />
+    );
+  }
+
+  if (selectedContent === 'whyFisho') {
+    return (
+      <WhyFishoSectionEditor
+        sectionItem={editingItem}
+        onCancel={handleCancel}
+      />
+    );
+  }
+
+  if (selectedContent === 'marineProducts') {
+    return (
+      <MarineProductsSectionEditor
+        sectionItem={editingItem}
+        onCancel={handleCancel}
+      />
+    );
+  }
+
+  if (selectedContent === 'faq') {
+    return (
+      <FAQSectionEditor
         sectionItem={editingItem}
         onCancel={handleCancel}
       />
@@ -594,7 +756,7 @@ export default function CMS() {
                       <p className="text-gray-600 mt-1">{contentType.description}</p>
                     </div>
                   </div>
-                  {(contentType.id === 'banners' ) && (
+                  {(contentType.id === 'banners') && (
                     <Button
                       onClick={() => handleAddContent(contentType.id)}
                       size="sm"
@@ -621,6 +783,24 @@ export default function CMS() {
                     )}
                     {contentType.id === 'section1' && sectionsError && (
                       <div className="p-4 text-red-600">Error: {sectionsError}</div>
+                    )}
+                    {contentType.id === 'whyFisho' && whyFishoLoading && (
+                      <div className="p-4 text-gray-600">Loading Why Fisho section...</div>
+                    )}
+                    {contentType.id === 'whyFisho' && whyFishoError && (
+                      <div className="p-4 text-red-600">Error: {whyFishoError}</div>
+                    )}
+                    {contentType.id === 'marineProducts' && marineProductsLoading && (
+                      <div className="p-4 text-gray-600">Loading Marine Products section...</div>
+                    )}
+                    {contentType.id === 'marineProducts' && marineProductsError && (
+                      <div className="p-4 text-red-600">Error: {marineProductsError}</div>
+                    )}
+                    {contentType.id === 'faq' && faqLoading && (
+                      <div className="p-4 text-gray-600">Loading FAQ section...</div>
+                    )}
+                    {contentType.id === 'faq' && faqError && (
+                      <div className="p-4 text-red-600">Error: {faqError}</div>
                     )}
                     {contentType.items.map((item, index) => (
                       <div
@@ -689,7 +869,7 @@ export default function CMS() {
                             >
                               <Edit className="w-4 h-4" />
                             </Button>
-                            {(item.type === 'banners' || item.type === 'section1') && (
+                            {(item.type === 'banners' || item.type === 'section1' || item.type === 'whyFisho' || item.type === 'marineProducts' || item.type === 'faq') && (
                               <Button
                                 variant="ghost"
                                 size="sm"

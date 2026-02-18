@@ -43,6 +43,14 @@ export default function OrdersManagement() {
   const [search, setSearch] = useState('');
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  
+  // Stats state
+  const [stats, setStats] = useState({
+    totalOrders: 0,
+    ongoingOrders: 0,
+    expressOrders: 0,
+    nextDayOrders: 0
+  });
 
   // Get user role and store data on mount
   useEffect(() => {
@@ -90,14 +98,22 @@ export default function OrdersManagement() {
       success: boolean;
       data: Order[];
       pagination: { page: number; limit: number; total: number; pages: number };
+      stats?: { totalOrders: number; ongoingOrders: number; expressOrders: number; nextDayOrders: number };
       message?: string;
     }>(`/api/order/order-history?${params.toString()}`)
       .then((res) => {
         if (!active) return;
         if (!res.success) throw new Error(res.message || 'Failed to fetch order history');
-        setOrders(res.data || []);
+        // Sort orders by creation date (latest first)
+        const sortedOrders = (res.data || []).sort((a, b) => {
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+        setOrders(sortedOrders);
         setTotalPages(res.pagination?.pages || 1);
         setTotalOrders(res.pagination?.total || 0);
+        if (res.stats) {
+          setStats(res.stats);
+        }
       })
       .catch((err) => {
         if (!active) return;
@@ -138,7 +154,9 @@ export default function OrdersManagement() {
   };
 
   const capitalize = (str: string) => {
-    return str.charAt(0).toUpperCase() + str.slice(1);
+    return str.replace(/_/g, ' ').split(' ').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    ).join(' ');
   };
 
   const getStatusBadgeClass = (status: string) => {
@@ -230,6 +248,73 @@ export default function OrdersManagement() {
           <Download className="w-4 h-4 mr-2" />
           Export Orders
         </Button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Orders</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.totalOrders}</p>
+              </div>
+              <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                </svg>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Ongoing Orders</p>
+                <p className="text-2xl font-bold text-orange-600 mt-1">{stats.ongoingOrders}</p>
+              </div>
+              <div className="h-8 w-8 bg-orange-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Express Orders</p>
+                <p className="text-2xl font-bold text-purple-600 mt-1">{stats.expressOrders}</p>
+              </div>
+              <div className="h-8 w-8 bg-purple-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Next Day Orders</p>
+                <p className="text-2xl font-bold text-green-600 mt-1">{stats.nextDayOrders}</p>
+              </div>
+              <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Search and Filters */}
