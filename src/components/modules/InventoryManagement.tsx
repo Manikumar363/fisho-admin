@@ -138,6 +138,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
   variantImage: null as File | null,
   existingImage: '',
   cutType: '',
+  weight: '',
   featured: false,
   bestSeller: false,
   isExpressDelivery: false,
@@ -1376,6 +1377,27 @@ const handleRemoveWeight = (weight: number) => {
 
       console.log('Setting variant form:', formData);
       setVariantForm(formData);
+      setOriginalVariantForm({
+        species: formData.species,
+        product: formData.product,
+        productName: formData.productName,
+        variantImage: null,
+        existingImage: formData.existingImage,
+        cutType: formData.cutType,
+        weight: formData.weight,
+        featured: formData.featured,
+        bestSeller: formData.bestSeller,
+        isExpressDelivery: formData.isExpressDelivery,
+        isNextDayDelivery: formData.isNextDayDelivery,
+        isSpecial: formData.isSpecial,
+        costPrice: formData.costPrice,
+        profit: formData.profit,
+        displayPrice: formData.displayPrice,
+        discount: formData.discount,
+        sellingPrice: formData.sellingPrice,
+        notes: formData.notes,
+        availability: formData.availability
+      });
 
       setEditingVariantId(variantId);
       setShowAddModal(true);
@@ -2131,6 +2153,54 @@ const handleRemoveWeight = (weight: number) => {
     );
   };
 
+  // Helper to detect if product form has changed during editing
+  const hasProductFormChanged = () => {
+    if (!editingProductId) return true; // Allow submit for new products (add mode)
+    
+    return !(
+      productForm.category === originalProductForm.category &&
+      productForm.productName === originalProductForm.productName &&
+      productForm.description === originalProductForm.description &&
+      productForm.nutritionFacts === originalProductForm.nutritionFacts &&
+      JSON.stringify(productForm.cutTypes) === JSON.stringify(originalProductForm.cutTypes) &&
+      JSON.stringify(productForm.availableWeights) === JSON.stringify(originalProductForm.availableWeights) &&
+      productForm.availableStock === originalProductForm.availableStock &&
+      productForm.defaultProfit === originalProductForm.defaultProfit &&
+      productForm.defaultDiscount === originalProductForm.defaultDiscount &&
+      productForm.costPricePerKg === originalProductForm.costPricePerKg &&
+      productForm.availability === originalProductForm.availability &&
+      productForm.featured === originalProductForm.featured &&
+      productForm.bestseller === originalProductForm.bestseller &&
+      productForm.isExpressDelivery === originalProductForm.isExpressDelivery &&
+      productForm.productImages.length === 0 // No new images added
+    );
+  };
+
+  // Helper to detect if variant form has changed during editing
+  const hasVariantFormChanged = () => {
+    if (!editingVariantId) return true; // Allow submit for new variants (add mode)
+    
+    return !(
+      variantForm.species === originalVariantForm.species &&
+      variantForm.product === originalVariantForm.product &&
+      variantForm.cutType === originalVariantForm.cutType &&
+      variantForm.weight === originalVariantForm.weight &&
+      variantForm.costPrice === originalVariantForm.costPrice &&
+      variantForm.profit === originalVariantForm.profit &&
+      variantForm.displayPrice === originalVariantForm.displayPrice &&
+      variantForm.discount === originalVariantForm.discount &&
+      variantForm.sellingPrice === originalVariantForm.sellingPrice &&
+      variantForm.featured === originalVariantForm.featured &&
+      variantForm.bestSeller === originalVariantForm.bestSeller &&
+      variantForm.isExpressDelivery === originalVariantForm.isExpressDelivery &&
+      variantForm.isNextDayDelivery === originalVariantForm.isNextDayDelivery &&
+      variantForm.isSpecial === originalVariantForm.isSpecial &&
+      variantForm.notes === originalVariantForm.notes &&
+      variantForm.availability === originalVariantForm.availability &&
+      !variantForm.variantImage // No new image added
+    );
+  };
+
   const renderProductModal = () => (
     <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2702,11 +2772,13 @@ const handleRemoveWeight = (weight: number) => {
         </Button>
         <Button 
           type="submit" 
-          className="bg-blue-600 cursor-pointer hover:bg-blue-700" 
-          disabled={
+          className="bg-blue-600 cursor-pointer hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" 
+          disabled={Boolean(
             isSubmitting ||
-            !productForm.category || !productForm.productName.trim()
-          }
+            !productForm.category || 
+            !productForm.productName.trim() ||
+            (editingProductId ? !hasProductFormChanged() : false)
+          )}
         >
           {editingProductId ? 'Update Product' : 'Add Product'}
         </Button>
@@ -3026,15 +3098,16 @@ const handleRemoveWeight = (weight: number) => {
           </Button>
           <Button 
             type="submit" 
-            className="bg-blue-600 cursor-pointer hover:bg-blue-700" 
-            disabled={
+            className="bg-blue-600 cursor-pointer hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" 
+            disabled={Boolean(
               isSubmitting ||
               !variantForm.product ||
               !variantForm.costPrice ||
               !variantForm.profit ||
               !variantForm.displayPrice ||
-              !variantForm.discount
-            }
+              !variantForm.discount ||
+              (editingVariantId && !hasVariantFormChanged())
+            )}
           >
             {isSubmitting
               ? (editingVariantId ? 'Updating...' : 'Adding...')
@@ -3588,9 +3661,9 @@ const handleRemoveWeight = (weight: number) => {
                           </div>
                         </td>
                         <td className="py-3 px-4">{product.stock} KG</td>
-                        <td className="py-3 px-4"><div className="flex items-center"><span className="dirham-symbol mr-2">&#xea;</span>{product.costPrice}</div></td>
-                        <td className="py-3 px-4">{product.profit}%</td>
-                        <td className="py-3 px-4">{product.discount}%</td>
+                        <td className="py-3 px-4"><div className="flex items-center"><span className="dirham-symbol mr-2">&#xea;</span>{Number(product.costPrice).toFixed(2)}</div></td>
+                        <td className="py-3 px-4">{Number(product.profit).toFixed(2)}%</td>
+                        <td className="py-3 px-4">{Number(product.discount).toFixed(2)}%</td>
                         {/* <td className="py-3 px-4"> 
                           <Badge variant={product.featured ? 'default' : 'outline'} className={product.featured ? 'bg-yellow-100 text-yellow-800 text-xs' : 'bg-red-100 text-red-600'}>
                             {product.featured ? 'Yes' : 'No'}
@@ -3818,9 +3891,13 @@ const handleRemoveWeight = (weight: number) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedVariants.length === 0 ? (
+                    {variantsLoading ? (
                       <tr>
-                        <td colSpan={20} className="py-8 text-center text-gray-500">Variants Loading</td>
+                        <td colSpan={20} className="py-8 text-center text-gray-500">Loading variants...</td>
+                      </tr>
+                    ) : sortedVariants.length === 0 ? (
+                      <tr>
+                        <td colSpan={20} className="py-8 text-center text-gray-500">No Data Found</td>
                       </tr>
                     ) : displayVariantsPage.map((variant, pageIndex) => {
                       const originalIndex = variants.findIndex((v) => v.id === variant.id);
@@ -3901,10 +3978,10 @@ const handleRemoveWeight = (weight: number) => {
                             <Badge  className="text-white bg-red-600 font-medium text-xs">No</Badge>
                           )}
                         </td>
-                        <td className="py-3 px-4"><div className="flex items-center"><span className="dirham-symbol mr-2">&#xea;</span>{variant.costPrice}</div></td>
-                        <td className="py-3 px-4">{variant.profit}%</td>
-                        <td className="py-3 px-4"><div className="flex items-center"><span className="dirham-symbol mr-2">&#xea;</span>{variant.displayPrice}</div></td>
-                        <td className="py-3 px-4">{variant.discount}%</td>
+                        <td className="py-3 px-4"><div className="flex items-center"><span className="dirham-symbol mr-2">&#xea;</span>{Number(variant.costPrice).toFixed(2)}</div></td>
+                        <td className="py-3 px-4">{Number(variant.profit).toFixed(2)}%</td>
+                        <td className="py-3 px-4"><div className="flex items-center"><span className="dirham-symbol mr-2">&#xea;</span>{Number(variant.displayPrice).toFixed(2)}</div></td>
+                        <td className="py-3 px-4">{Number(variant.discount).toFixed(2)}%</td>
                         <td className="py-3 px-4"><div className="flex items-center"><span className="dirham-symbol mr-2">&#xea;</span>{Number(variant.sellingPrice).toFixed(2)}</div></td>
                         <td className="py-3 px-4">
                           <Badge variant={variant.status === 'Active' ? 'default' : 'destructive'}>

@@ -209,6 +209,12 @@ export default function UserManagement() {
       return;
     }
 
+    // Validate phone number
+    if (!/^\d{10}$/.test(vendorForm.contactNumber)) {
+      toast.error('Contact number must be exactly 10 digits');
+      return;
+    }
+
     try {
       const res = await apiFetch<{
         success: boolean;
@@ -265,6 +271,12 @@ export default function UserManagement() {
       return;
     }
 
+    // Validate phone number
+    if (!/^\d{10}$/.test(vendorForm.contactNumber)) {
+      toast.error('Contact number must be exactly 10 digits');
+      return;
+    }
+
     try {
       const res = await apiFetch<{
         success: boolean;
@@ -318,6 +330,12 @@ export default function UserManagement() {
       return;
     }
 
+    // Validate phone number
+    if (!/^\d{10}$/.test(endUserForm.contactNumber)) {
+      toast.error('Contact number must be exactly 10 digits');
+      return;
+    }
+
     setIsAddingEndUser(true);
     try {
       const res = await apiFetch<{
@@ -363,6 +381,12 @@ export default function UserManagement() {
     e.preventDefault();
     if (!subadminForm.name || !subadminForm.email || !subadminForm.phone) {
       toast.error('Please fill in all required fields');
+      return;
+    }
+
+    // Validate phone number
+    if (!/^\d{10}$/.test(subadminForm.phone)) {
+      toast.error('Contact number must be exactly 10 digits');
       return;
     }
 
@@ -424,6 +448,12 @@ export default function UserManagement() {
       return;
     }
 
+    // Validate phone number
+    if (!/^\d{10}$/.test(subadminForm.phone)) {
+      toast.error('Contact number must be exactly 10 digits');
+      return;
+    }
+
     try {
       const res = await apiFetch<{
         success: boolean;
@@ -466,6 +496,12 @@ export default function UserManagement() {
 
     if (!deliveryPartnerForm.name.trim() || !deliveryPartnerForm.mobileNumber.trim() || !deliveryPartnerForm.email.trim()) {
       toast.error('Please fill in all required fields');
+      return;
+    }
+
+    // Validate phone number
+    if (!/^\d{10}$/.test(deliveryPartnerForm.mobileNumber)) {
+      toast.error('Mobile number must be exactly 10 digits');
       return;
     }
 
@@ -1474,10 +1510,11 @@ export default function UserManagement() {
                   type="tel"
                   value={vendorForm.contactNumber}
                   onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9]/g, '');
+                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
                     setVendorForm({ ...vendorForm, contactNumber: value });
                   }}
                   placeholder="Enter 10-digit phone number"
+                  maxLength={10}
                   required
                 />
               </div>
@@ -1568,7 +1605,11 @@ export default function UserManagement() {
                   id="editContactNumber"
                   type="tel"
                   value={vendorForm.contactNumber}
-                  onChange={(e) => setVendorForm({ ...vendorForm, contactNumber: e.target.value })}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                    setVendorForm({ ...vendorForm, contactNumber: value });
+                  }}
+                  maxLength={10}
                   placeholder="Enter 10 digit contact number"
                   required
                 />
@@ -1666,10 +1707,11 @@ export default function UserManagement() {
                   type="tel"
                   value={endUserForm.contactNumber}
                   onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9]/g, '');
+                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
                     setEndUserForm({ ...endUserForm, contactNumber: value });
                   }}
                   placeholder="Enter 10-digit phone number"
+                  maxLength={10}
                   required
                 />
               </div>
@@ -1835,8 +1877,12 @@ export default function UserManagement() {
                   id="editSubadminPhone"
                   type="tel"
                   value={subadminForm.phone}
-                  onChange={(e) => setSubadminForm({ ...subadminForm, phone: e.target.value })}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                    setSubadminForm({ ...subadminForm, phone: value });
+                  }}
                   placeholder="Enter 10-digit phone number"
+                  maxLength={10}
                   required
                 />
               </div>
@@ -1907,10 +1953,7 @@ export default function UserManagement() {
                         <Label className="text-gray-600">Role</Label>
                         <p className="font-medium capitalize">{selectedItem.role ? selectedItem.role.charAt(0).toUpperCase() + selectedItem.role.slice(1) : '—'}</p>
                       </div>
-                      <div>
-                        <Label className="text-gray-600">Verified</Label>
-                        <p><Badge variant={selectedItem.isVerified ? 'default' : 'secondary'}>{selectedItem.isVerified ? 'Yes' : 'No'}</Badge></p>
-                      </div>
+                      
           
                       <div>
                         <Label className="text-gray-600">Status</Label>

@@ -376,8 +376,12 @@ export default function DeliveryPartnersSection({
                   id="partnerMobile"
                   type="tel"
                   value={deliveryPartnerForm.mobileNumber}
-                  onChange={(e) => setDeliveryPartnerForm({ ...deliveryPartnerForm, mobileNumber: e.target.value })}
-                  placeholder="Enter mobile number"
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                    setDeliveryPartnerForm({ ...deliveryPartnerForm, mobileNumber: value });
+                  }}
+                  placeholder="Enter 10-digit phone number"
+                  maxLength={10}
                   required
                 />
               </div>

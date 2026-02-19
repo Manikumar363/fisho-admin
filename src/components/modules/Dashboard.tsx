@@ -20,7 +20,7 @@ import { Button } from '../ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'react-toastify';
-import { getAdminData, getUserRole } from '../../lib/api';
+import { getAdminData, getUserRole, apiFetch } from '../../lib/api';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -29,6 +29,14 @@ export default function Dashboard() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [selectedDeliveryPartner, setSelectedDeliveryPartner] = useState<string>('');
+  const [dashboardStats, setDashboardStats] = useState<any>({
+    activeUsers: 0,
+    totalOrders: 0,
+    inventoryAlerts: [],
+    expressOrders: 0,
+    nextDayOrders: 0,
+    bulkOrders: 0
+  });
 
   // List of delivery partners
   const deliveryPartners = [
@@ -46,6 +54,21 @@ export default function Dashboard() {
     if (role) {
       setUserRole(role);
     }
+  }, []);
+
+  useEffect(() => {
+    const fetchDashboardStats = async () => {
+      try {
+        const response = await apiFetch('/api/admin/dashboard-stats');
+        if (response.success && response.data) {
+          setDashboardStats(response.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch dashboard stats:', error);
+        // Keep static values on error
+      }
+    };
+    fetchDashboardStats();
   }, []);
 
   useEffect(() => {
@@ -88,14 +111,14 @@ export default function Dashboard() {
   };
 
   const kpiData = [
-    { label: 'Active Users', value: '15,234', icon: Users, color: 'text-indigo-600', bgColor: 'bg-indigo-100', onClick: () => navigate('/user-management?filter=end-users'), roles: ['admin', 'subadmin'] },
-    { label: 'Total Orders', value: '2,543', icon: ShoppingBag, color: 'text-blue-600', bgColor: 'bg-blue-100', onClick: () => navigate('/orders'), roles: ['admin', 'subadmin'] },
+    { label: 'Active Users', value: (dashboardStats?.activeUsers ?? 0).toLocaleString(), icon: Users, color: 'text-indigo-600', bgColor: 'bg-indigo-100', onClick: () => navigate('/user-management?filter=end-users'), roles: ['admin', 'subadmin'] },
+    { label: 'Total Orders', value: (dashboardStats?.totalOrders ?? 0).toLocaleString(), icon: ShoppingBag, color: 'text-blue-600', bgColor: 'bg-blue-100', onClick: () => navigate('/orders'), roles: ['admin', 'subadmin'] },
     { label: 'Transactions', value: '3,245', icon: CreditCard, color: 'text-pink-600', bgColor: 'bg-pink-100', roles: ['admin', 'subadmin'] },
     { label: 'Total Revenue', value: '₹8.2L', icon: DollarSign, color: 'text-emerald-600', bgColor: 'bg-emerald-100', roles: ['admin', 'subadmin'] },
-    { label: 'Inventory Alerts', value: '8', icon: AlertTriangle, color: 'text-amber-600', bgColor: 'bg-amber-100', onClick: () => navigate('/inventory-management?filter=low-stock'), roles: ['admin'] },
-    { label: 'Express Orders', value: '856', icon: Zap, color: 'text-orange-600', bgColor: 'bg-orange-100', onClick: () => navigate('/orders?type=express'), roles: ['admin', 'subadmin'] },
-    { label: 'Next-Day Orders', value: '1,423', icon: Calendar, color: 'text-green-600', bgColor: 'bg-green-100', onClick: () => navigate('/orders?type=next-day'), roles: ['admin', 'subadmin'] },
-    { label: 'Bulk Orders', value: '264', icon: PackageIcon, color: 'text-purple-600', bgColor: 'bg-purple-100', onClick: () => navigate('/orders?type=bulk'), roles: ['admin', 'subadmin'] },
+    { label: 'Inventory Alerts', value: (dashboardStats?.inventoryAlerts?.length ?? 0).toString(), icon: AlertTriangle, color: 'text-amber-600', bgColor: 'bg-amber-100', onClick: () => navigate('/inventory-management?filter=low-stock'), roles: ['admin'] },
+    { label: 'Express Orders', value: (dashboardStats?.expressOrders ?? 0).toLocaleString(), icon: Zap, color: 'text-orange-600', bgColor: 'bg-orange-100', onClick: () => navigate('/orders?type=express'), roles: ['admin', 'subadmin'] },
+    { label: 'Next-Day Orders', value: (dashboardStats?.nextDayOrders ?? 0).toLocaleString(), icon: Calendar, color: 'text-green-600', bgColor: 'bg-green-100', onClick: () => navigate('/orders?type=next-day'), roles: ['admin', 'subadmin'] },
+    { label: 'Bulk Orders', value: (dashboardStats?.bulkOrders ?? 0).toLocaleString(), icon: PackageIcon, color: 'text-purple-600', bgColor: 'bg-purple-100', onClick: () => navigate('/orders?type=bulk'), roles: ['admin', 'subadmin'] },
     { label: 'Waste Management', value: '3.2%', icon: AlertTriangle, color: 'text-red-600', bgColor: 'bg-red-100', onClick: () => navigate('/waste-management'), roles: ['admin', 'subadmin'] },
     { label: "Today's Revenue", value: '₹1.8L', icon: Receipt, color: 'text-teal-600', bgColor: 'bg-teal-100', onClick: () => navigate('/transactions'), roles: ['admin', 'subadmin'] }
   ];
