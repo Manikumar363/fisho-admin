@@ -45,11 +45,19 @@ export default function OrdersManagement() {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   
   // Stats state
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<{
+    totalOrders: number;
+    statusCounts: Record<string, number>;
+    ongoingOrders: number;
+    deliveryTypeCounts: {
+      express: number;
+      nextDay: number;
+    };
+  }>({
     totalOrders: 0,
+    statusCounts: {},
     ongoingOrders: 0,
-    expressOrders: 0,
-    nextDayOrders: 0
+    deliveryTypeCounts: { express: 0, nextDay: 0 }
   });
 
   // Get user role and store data on mount
@@ -98,7 +106,12 @@ export default function OrdersManagement() {
       success: boolean;
       data: Order[];
       pagination: { page: number; limit: number; total: number; pages: number };
-      stats?: { totalOrders: number; ongoingOrders: number; expressOrders: number; nextDayOrders: number };
+      stats?: {
+        totalOrders: number;
+        statusCounts: Record<string, number>;
+        ongoingOrders: number;
+        deliveryTypeCounts: { express: number; nextDay: number };
+      };
       message?: string;
     }>(`/api/order/order-history?${params.toString()}`)
       .then((res) => {
@@ -153,13 +166,15 @@ export default function OrdersManagement() {
     return date.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
-  const capitalize = (str: string) => {
+  const capitalize = (str?: string) => {
+    if (!str) return 'N/A';
     return str.replace(/_/g, ' ').split(' ').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
     ).join(' ');
   };
 
-  const getStatusBadgeClass = (status: string) => {
+  const getStatusBadgeClass = (status?: string) => {
+    if (!status) return 'bg-gray-100 text-gray-700 border border-gray-300';
     const statusLower = status.toLowerCase();
     if (statusLower === 'pending') return 'bg-orange-100 text-orange-700 border border-orange-300';
     if (statusLower === 'accepted' || statusLower === 'accept') return 'bg-green-100 text-green-700 border border-green-300';
@@ -179,22 +194,30 @@ export default function OrdersManagement() {
     }
     setAcceptingId(order._id);
     try {
-      const res = await apiFetch<{ success: boolean; data?: Order; message?: string }>(
-        '/api/order/accept-order',
+      const payload = { 
+        orderId: order._id, 
+        storeId: storeId,
+        status: 'accepted' 
+      };
+      console.log('Accepting order with payload:', payload);
+      const res = await apiFetch<{ success: boolean; data?: { order: Partial<Order> }; message?: string }>(
+        '/api/order/status-update',
         {
           method: 'POST',
-          body: JSON.stringify({ orderId: order._id, storeId }),
+          body: JSON.stringify(payload),
           headers: { 'Content-Type': 'application/json' },
         }
       );
       if (!res.success) throw new Error(res.message || 'Failed to accept order');
-      if (res.data) {
-        setOrders((prev) => prev.map((o) => (o._id === order._id ? res.data! : o)));
+      // Merge the partial order data from API with existing order data
+      if (res.data?.order) {
+        setOrders((prev) => prev.map((o) => (o._id === order._id ? { ...o, ...res.data!.order } : o)));
       } else {
         setOrders((prev) => prev.map((o) => (o._id === order._id ? { ...o, status: 'accepted' } : o)));
       }
-      toast.success(res.message || 'Order accepted successfully');
+      toast.success('Order accepted successfully');
     } catch (err: any) {
+      console.error('Accept order error:', err);
       toast.error(err?.message || 'Failed to accept order');
     } finally {
       setAcceptingId(null);
@@ -209,23 +232,31 @@ export default function OrdersManagement() {
     }
     setRejectingId(order._id);
     try {
-      const res = await apiFetch<{ success: boolean; data?: Order; message?: string }>(
-        '/api/order/reject-order',
+      const payload = { 
+        orderId: order._id, 
+        storeId: storeId,
+        status: 'rejected' 
+      };
+      console.log('Rejecting order with payload:', payload);
+      const res = await apiFetch<{ success: boolean; data?: { order: Partial<Order> }; message?: string }>(
+        '/api/order/status-update',
         {
           method: 'POST',
-          body: JSON.stringify({ orderId: order._id, storeId }),
+          body: JSON.stringify(payload),
           headers: { 'Content-Type': 'application/json' },
         }
       );
-      if (!res.success) throw new Error(res.message || 'Failed to cancel order');
-      if (res.data) {
-        setOrders((prev) => prev.map((o) => (o._id === order._id ? res.data! : o)));
+      if (!res.success) throw new Error(res.message || 'Failed to reject order');
+      // Merge the partial order data from API with existing order data
+      if (res.data?.order) {
+        setOrders((prev) => prev.map((o) => (o._id === order._id ? { ...o, ...res.data!.order } : o)));
       } else {
-        setOrders((prev) => prev.map((o) => (o._id === order._id ? { ...o, status: 'cancelled' } : o)));
+        setOrders((prev) => prev.map((o) => (o._id === order._id ? { ...o, status: 'rejected' } : o)));
       }
-      toast.success(res.message || 'Order cancelled successfully');
+      toast.success('Order rejected successfully');
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to cancel order');
+      console.error('Reject order error:', err);
+      toast.error(err?.message || 'Failed to reject order');
     } finally {
       setRejectingId(null);
     }
@@ -250,71 +281,181 @@ export default function OrdersManagement() {
         </Button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Orders</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.totalOrders}</p>
+      {/* Stats Cards - Horizontal Scroll */}
+      <div className="relative">
+        <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+          {/* Total Orders */}
+          <Card className="flex-shrink-0 w-30">
+            <CardContent className="p-4">
+              <div className="flex flex-col">
+                <p className="text-xs font-medium text-gray-600 mb-1">Total Orders</p>
+                <p className="text-2xl font-bold text-blue-600">{stats.totalOrders}</p>
               </div>
-              <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                </svg>
+            </CardContent>
+          </Card>
+
+          {/* Ongoing Orders */}
+          <Card className="flex-shrink-5 w-28">
+            <CardContent className="p-4">
+              <div className="flex flex-col">
+                <p className="text-xs font-medium text-gray-600 mb-1">Ongoing Orders</p>
+                <p className="text-2xl font-bold text-orange-600">{stats.ongoingOrders}</p>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Ongoing Orders</p>
-                <p className="text-2xl font-bold text-orange-600 mt-1">{stats.ongoingOrders}</p>
+            </CardContent>
+          </Card>
+
+          {/* Pending Orders */}
+          {stats.statusCounts.pending !== undefined && (
+            <Card className="flex-shrink-0 w-36">
+              <CardContent className="p-4">
+                <div className="flex flex-col">
+                  <p className="text-xs font-medium text-gray-600 mb-1">Pending</p>
+                  <p className="text-2xl font-bold text-yellow-600">{stats.statusCounts.pending || 0}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Accepted Orders */}
+          {stats.statusCounts.accepted !== undefined && (
+            <Card className="flex-shrink-0 w-36">
+              <CardContent className="p-4">
+                <div className="flex flex-col">
+                  <p className="text-xs font-medium text-gray-600 mb-1">Accepted</p>
+                  <p className="text-2xl font-bold text-green-600">{stats.statusCounts.accepted || 0}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Rejected Orders */}
+          {stats.statusCounts.rejected !== undefined && (
+            <Card className="flex-shrink-0 w-36">
+              <CardContent className="p-4">
+                <div className="flex flex-col">
+                  <p className="text-xs font-medium text-gray-600 mb-1">Rejected</p>
+                  <p className="text-2xl font-bold text-red-600">{stats.statusCounts.rejected || 0}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Ready to Pickup */}
+          {stats.statusCounts.ready_to_pickup !== undefined && (
+            <Card className="flex-shrink-0 w-36">
+              <CardContent className="p-4">
+                <div className="flex flex-col">
+                  <p className="text-xs font-medium text-gray-600 mb-1">Ready to Pickup</p>
+                  <p className="text-2xl font-bold text-indigo-600">{stats.statusCounts.ready_to_pickup || 0}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Accepted by Delivery Partner */}
+          {stats.statusCounts.accepted_by_delivery_partner !== undefined && (
+            <Card className="flex-shrink-0 w-36">
+              <CardContent className="p-4">
+                <div className="flex flex-col">
+                  <p className="text-xs font-medium text-gray-600 mb-1">Accepted by Partner</p>
+                  <p className="text-2xl font-bold text-cyan-600">{stats.statusCounts.accepted_by_delivery_partner || 0}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Picked Up */}
+          {stats.statusCounts.picked_up !== undefined && (
+            <Card className="flex-shrink-0 w-36">
+              <CardContent className="p-4">
+                <div className="flex flex-col">
+                  <p className="text-xs font-medium text-gray-600 mb-1">Picked Up</p>
+                  <p className="text-2xl font-bold text-teal-600">{stats.statusCounts.picked_up || 0}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Out for Delivery */}
+          {stats.statusCounts.out_for_delivery !== undefined && (
+            <Card className="flex-shrink-0 w-36">
+              <CardContent className="p-4">
+                <div className="flex flex-col">
+                  <p className="text-xs font-medium text-gray-600 mb-1">Out for Delivery</p>
+                  <p className="text-2xl font-bold text-purple-600">{stats.statusCounts.out_for_delivery || 0}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Delivered Orders */}
+          {stats.statusCounts.delivered !== undefined && (
+            <Card className="flex-shrink-0 w-36">
+              <CardContent className="p-4">
+                <div className="flex flex-col">
+                  <p className="text-xs font-medium text-gray-600 mb-1">Delivered</p>
+                  <p className="text-2xl font-bold text-emerald-600">{stats.statusCounts.delivered || 0}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Cancelled Orders */}
+          {stats.statusCounts.cancelled !== undefined && (
+            <Card className="flex-shrink-0 w-36">
+              <CardContent className="p-4">
+                <div className="flex flex-col">
+                  <p className="text-xs font-medium text-gray-600 mb-1">Cancelled</p>
+                  <p className="text-2xl font-bold text-gray-600">{stats.statusCounts.cancelled || 0}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Returned Orders */}
+          {stats.statusCounts.returned !== undefined && (
+            <Card className="flex-shrink-0 w-36">
+              <CardContent className="p-4">
+                <div className="flex flex-col">
+                  <p className="text-xs font-medium text-gray-600 mb-1">Returned</p>
+                  <p className="text-2xl font-bold text-amber-600">{stats.statusCounts.returned || 0}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Refunded Orders */}
+          {stats.statusCounts.refunded !== undefined && (
+            <Card className="flex-shrink-0 w-36">
+              <CardContent className="p-4">
+                <div className="flex flex-col">
+                  <p className="text-xs font-medium text-gray-600 mb-1">Refunded</p>
+                  <p className="text-2xl font-bold text-pink-600">{stats.statusCounts.refunded || 0}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Express Orders */}
+          <Card className="flex-shrink-0 w-36">
+            <CardContent className="p-4">
+              <div className="flex flex-col">
+                <p className="text-xs font-medium text-gray-600 mb-1">Express Orders</p>
+                <p className="text-2xl font-bold text-violet-600">{stats.deliveryTypeCounts.express || 0}</p>
               </div>
-              <div className="h-8 w-8 bg-orange-100 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+            </CardContent>
+          </Card>
+
+          {/* Next Day Orders */}
+          <Card className="flex-shrink-0 w-36">
+            <CardContent className="p-4">
+              <div className="flex flex-col">
+                <p className="text-xs font-medium text-gray-600 mb-1">Next Day Orders</p>
+                <p className="text-2xl font-bold text-sky-600">{stats.deliveryTypeCounts.nextDay || 0}</p>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Express Orders</p>
-                <p className="text-2xl font-bold text-purple-600 mt-1">{stats.expressOrders}</p>
-              </div>
-              <div className="h-8 w-8 bg-purple-100 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Next Day Orders</p>
-                <p className="text-2xl font-bold text-green-600 mt-1">{stats.nextDayOrders}</p>
-              </div>
-              <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {/* Search and Filters */}
@@ -449,12 +590,18 @@ export default function OrdersManagement() {
                 ) : (
                   orders.map((order) => {
                     const isPending = order.status?.toLowerCase() === 'pending';
+                    const paymentMethod = order.payment?.method?.toLowerCase() || '';
+                    const paymentStatus = order.payment?.status?.toLowerCase() || '';
+                    const isOfflinePayment = paymentMethod === 'cod' || paymentMethod === 'cash' || paymentMethod === 'offline';
+                    // Show accept/reject buttons only if order is pending AND (payment is offline OR payment is already paid)
+                    const canShowButtons = isPending && (isOfflinePayment || paymentStatus === 'paid');
+                    
                     return (
                       <tr key={order._id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-3 px-4 text-blue-600">{order.invoiceNo || order._id}</td>
                         <td className="py-3 px-4">{order.shippingAddress?.name || '—'}</td>
                         <td className="py-3 px-4">{order.items?.length || 0}</td>
-                        <td className="py-3 px-4"><span className="dirham-symbol mr-1">&#xea;</span>{parseFloat(order.pricing?.grandTotal || '0').toFixed(2)}</td>
+                        <td className="py-3 px-4"><span className="dirham-symbol mr-2">&#xea;</span>{parseFloat(order.pricing?.grandTotal || '0').toFixed(2)}</td>
                         <td className="py-3 px-4">
                           <Badge className={getStatusBadgeClass(order.status)}>
                             {capitalize(order.status)}
@@ -472,7 +619,7 @@ export default function OrdersManagement() {
                         <td className="py-3 px-4">{formatDate(order.createdAt)}</td>
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2">
-                            {isPending && (
+                            {canShowButtons && (
                               <>
                                 <Button
                                   size="sm"

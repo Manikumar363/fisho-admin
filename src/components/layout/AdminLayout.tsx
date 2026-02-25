@@ -9,7 +9,6 @@ import {
   FileText,
   MapPin,
   ChevronDown,
-  ChevronRight,
   Menu,
   X,
   LogOut,
@@ -19,9 +18,11 @@ import {
   Navigation,
   MessageSquare,
   KeyRound,
-  ShoppingBag, // add
+  ShoppingBag,
+  Bell,
 } from 'lucide-react';
-import { getAdminData, getUserRole, clearAuthData } from '../../lib/api';
+import { getAdminData, getUserRole, clearAuthData, apiFetch } from '../../lib/api';
+import { useNotifications } from '../../contexts/notifications';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,7 +38,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '../ui/dropdown-menu'; // add
+} from '../ui/dropdown-menu';
+import { Badge } from '../ui/badge';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -52,6 +54,9 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
   const [adminName, setAdminName] = useState('Admin User');
   const [userRole, setUserRole] = useState('admin');
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  
+  // Use notification context
+  const { unreadCount, setNotifications, setUnreadCount } = useNotifications();
 
   useEffect(() => {
     const adminData = getAdminData();
@@ -65,15 +70,36 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
     }
   }, []);
 
+  // Fetch notifications on mount (socket will handle real-time updates)
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const response = await apiFetch<{
+          success: boolean;
+          message: string;
+          notifications: any[];
+        }>('/api/admin/notification/get-all');
+
+        if (response.success && response.notifications) {
+          setNotifications(response.notifications);
+          const unread = response.notifications.filter((n: any) => !n.isRead).length;
+          setUnreadCount(unread);
+        }
+      } catch (error) {
+        console.error('Failed to fetch notifications:', error);
+      }
+    };
+
+    fetchNotifications();
+  }, [setNotifications, setUnreadCount]);
+
   const handleConfirmLogout = () => {
     setShowLogoutDialog(false);
     onLogout();
     navigate('/login');
   };
 
-  const handleLogoutClick = () => {
-    setShowLogoutDialog(true);
-  };
+
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev =>
@@ -238,7 +264,24 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
             {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
 
-          <DropdownMenu>
+          <div className="flex items-center gap-4">
+            {/* Notification Icon */}
+            <button 
+              onClick={() => navigate('/notifications')}
+              className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <Bell className="w-5 h-5 text-gray-600" />
+              {unreadCount > 0 && (
+                <Badge 
+                  className="absolute -top-1 -right-1 h-5 min-w-5 flex items-center justify-center p-0 px-1 text-xs bg-red-500 hover:bg-red-600"
+                >
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Badge>
+              )}
+            </button>
+
+            {/* Profile Dropdown */}
+            <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-3 p-2 rounded-lg border border-transparent hover:bg-gray-100 transition-colors">
                 <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
@@ -272,6 +315,7 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         </header>
 
         {/* Content Area */}

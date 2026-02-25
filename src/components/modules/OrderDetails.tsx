@@ -30,10 +30,12 @@ interface Order {
   invoiceNo: string;
   pricing: {
     grandTotal: string;
+    subTotal: string;
     tax: string;
     discount: string;
     shipping: string;
     loyaltyPoints: string;
+    couponDiscount?: string;
   };
   shippingAddress: {
     name: string;
@@ -158,17 +160,17 @@ export default function OrderDetails() {
     return ['pending', 'accepted', 'ready_to_pickup', 'accepted_by_delivery_partner', 'picked_up', 'out_for_delivery', 'delivered'];
   };
 
-  // Get all available statuses for editing (includes cancelled, returned, refunded)
+  // Get all available statuses for editing
   const getStatusFlow = (order?: Order) => {
-    if (!order) return ['pending', 'accepted', 'ready_to_pickup', 'accepted_by_delivery_partner', 'picked_up', 'out_for_delivery', 'delivered', 'cancelled', 'returned', 'refunded'];
+    if (!order) return ['pending', 'accepted', 'ready_to_pickup', 'accepted_by_delivery_partner', 'picked_up', 'out_for_delivery', 'delivered', 'cancelled'];
     
     const deliveryType = order.deliveryType?.toLowerCase() || 'express';
     
     if (deliveryType === 'next-day-delivery' || deliveryType === 'nextday' || deliveryType === 'next-day') {
-      return ['pending', 'accepted', 'ready_to_pickup', 'accepted_by_delivery_partner', 'picked_up', 'out_for_delivery', 'delivered', 'cancelled', 'returned', 'refunded'];
+      return ['pending', 'accepted', 'ready_to_pickup', 'accepted_by_delivery_partner', 'picked_up', 'out_for_delivery', 'delivered', 'cancelled'];
     } else {
       // Express and default flow
-      return ['pending', 'accepted', 'ready_to_pickup', 'accepted_by_delivery_partner', 'picked_up', 'out_for_delivery', 'delivered', 'cancelled', 'returned', 'refunded'];
+      return ['pending', 'accepted', 'ready_to_pickup', 'accepted_by_delivery_partner', 'picked_up', 'out_for_delivery', 'delivered', 'cancelled'];
     }
   };
 
@@ -196,19 +198,21 @@ export default function OrderDetails() {
     if (!order) return;
     setAccepting(true);
     try {
-      const res = await apiFetch<{ success: boolean; data: Order; message?: string }>(
-        '/api/order/accept-order',
+      const payload = {
+        orderId: order._id,
+        storeId: order.store?._id || order.store?.id,
+        status: 'accepted'
+      };
+      console.log('Accepting order with payload:', payload);
+      const res = await apiFetch<{ success: boolean; data?: { order: Partial<Order> }; message?: string }>(
+        '/api/order/status-update',
         {
           method: 'POST',
-          body: JSON.stringify({
-            orderId: order._id,
-            storeId: order.store?._id || order.store?.id,
-          }),
+          body: JSON.stringify(payload),
           headers: { 'Content-Type': 'application/json' },
         }
       );
       if (!res.success) throw new Error(res.message || 'Failed to accept order');
-      if (res.data) setOrder(res.data);
       
       // Re-fetch to ensure complete data
       if (orderId) {
@@ -218,8 +222,9 @@ export default function OrderDetails() {
         if (refreshRes.success) setOrder(refreshRes.data);
       }
       
-      toast.success(res.message || 'Order accepted successfully');
+      toast.success('Order accepted successfully');
     } catch (err: any) {
+      console.error('Accept order error:', err);
       toast.error(err?.message || 'Failed to accept order');
     } finally {
       setAccepting(false);
@@ -419,7 +424,7 @@ export default function OrderDetails() {
                       </div>
                       <div className="text-right">
                         <p><span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(item.snapshot.priceAtPurchase)} × {item.quantity}</p>
-                        <p><span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(item.snapshot.subtotal)}</p>
+                        <p><span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(item.snapshot.priceAtPurchase)}</p>
                       </div>
                     </div>
                   );
@@ -428,25 +433,30 @@ export default function OrderDetails() {
 
               <div className="mt-4 pt-4 border-t border-gray-200 space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Subtotal</span>
-                  <span><span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.grandTotal || '0')}</span>
+                  <span className="text-gray-600">Base price</span>
+                  <span><span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.subTotal || '0')}</span>
                 </div>
                 
-                <div className="flex justify-between text-green-600">
-                  <span>Discount</span>
-                  <span>-<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.discount || '0')}</span>
+                  <div className="flex justify-between">
+                    <span>Product Discount</span>
+                    <span>-<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.discount)}</span>
+                  </div>
+                
+                <div className="flex justify-between">
+                  <span>Coupon Discount</span>
+                  <span>-<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.couponDiscount || '0')}</span>
                 </div>
                 <div className="flex justify-between ">
                   <span>Loyalty Points</span>
                   <span>-<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.loyaltyPoints || '0')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Tax</span>
-                  <span>+<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.tax || '0')}</span>
+                  <span>Delivery charges</span>
+                  <span>+<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.shipping || '0')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Shipping</span>
-                  <span>+<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.shipping || '0')}</span>
+                  <span>Tax</span>
+                  <span>+<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.tax || '0')}</span>
                 </div>
                 <div className="flex justify-between font-semibold pt-2 border-t border-gray-200">
                   <span>Total Amount</span>
@@ -505,15 +515,24 @@ export default function OrderDetails() {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Accept Order Button */}
-          {order?.status === 'pending' && (
-            <Button
-              className="w-full bg-green-600 hover:bg-green-700 text-white mb-4"
-              onClick={handleAcceptOrder}
-              disabled={accepting}
-            >
-              {accepting ? 'Accepting...' : 'Accept Order'}
-            </Button>
-          )}
+          {(() => {
+            const isPending = order?.status === 'pending';
+            const paymentMethod = order?.payment?.method?.toLowerCase() || '';
+            const paymentStatus = order?.payment?.status?.toLowerCase() || '';
+            const isOfflinePayment = paymentMethod === 'cod' || paymentMethod === 'cash' || paymentMethod === 'offline';
+            // Show accept button only if order is pending AND (payment is offline OR payment is already paid)
+            const canShowAcceptButton = isPending && (isOfflinePayment || paymentStatus === 'paid');
+            
+            return canShowAcceptButton ? (
+              <Button
+                className="w-full bg-green-600 hover:bg-green-700 text-white mb-4"
+                onClick={handleAcceptOrder}
+                disabled={accepting}
+              >
+                {accepting ? 'Accepting...' : 'Accept Order'}
+              </Button>
+            ) : null;
+          })()}
 
           {/* Order Status */}
           <Card>
@@ -656,6 +675,42 @@ export default function OrderDetails() {
                   {capitalize(order?.payment?.status || '—')}
                 </Badge>
               </div>
+
+              {/* Refund Options for Cancelled Orders */}
+              {(() => {
+                const isCancelled = order?.status?.toLowerCase() === 'cancelled';
+                const paymentMethod = order?.payment?.method?.toLowerCase() || '';
+                const paymentStatus = order?.payment?.status?.toLowerCase() || '';
+                const isOnlinePayment = paymentMethod !== 'cod' && paymentMethod !== 'cash' && paymentMethod !== 'offline';
+                const isPaymentSuccessful = paymentStatus === 'paid' || paymentStatus === 'successful' || paymentStatus === 'success';
+                
+                // Show refund buttons only if order is cancelled AND payment is online AND payment is successful
+                const canShowRefundButtons = isCancelled && isOnlinePayment && isPaymentSuccessful;
+                
+                return canShowRefundButtons ? (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <p className="text-sm font-semibold text-gray-800 mb-3">Initiate Refund</p>
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
+                        onClick={() => handleRefund('wallet')}
+                        disabled={refundingType !== null}
+                      >
+                        <Wallet className="w-4 h-4" />
+                        {refundingType === 'wallet' ? 'Processing...' : 'Refund to Wallet'}
+                      </Button>
+                      <Button
+                        className="w-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center gap-2"
+                        onClick={() => handleRefund('account')}
+                        disabled={refundingType !== null}
+                      >
+                        <CardIcon className="w-4 h-4" />
+                        {refundingType === 'account' ? 'Processing...' : 'Refund to Account'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null;
+              })()}
             </CardContent>
           </Card>
 
@@ -690,41 +745,6 @@ export default function OrderDetails() {
                 <div>
                   <p className="text-sm font-semibold text-gray-800">Phone</p>
                   <p className='text-gray-600'>{order.deliveryPartner.phone || '—'}</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Refund Options - Show only for returned orders */}
-          {order?.status?.toLowerCase() === 'returned' && (
-            <Card className="border-orange-200 bg-orange-50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-orange-900">
-                  <RotateCcw className="w-5 h-5" />
-                  Refund Options
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-orange-800">
-                  Order has been returned. Please select a refund option:
-                </p>
-                <div className="flex gap-3">
-                  <Button
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
-                    onClick={() => handleRefund('wallet')}
-                    disabled={refundingType !== null}
-                  >
-                    <Wallet className="w-4 h-4" />
-                    {refundingType === 'wallet' ? 'Processing...' : 'Refund to Wallet'}
-                  </Button>
-                  <Button
-                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2"
-                    onClick={() => handleRefund('account')}
-                    disabled={refundingType !== null}
-                  >
-                    <CardIcon className="w-4 h-4" />
-                    {refundingType === 'account' ? 'Processing...' : 'Refund to Account'}
-                  </Button>
                 </div>
               </CardContent>
             </Card>

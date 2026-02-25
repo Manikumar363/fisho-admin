@@ -47,6 +47,8 @@ type DeliveryPartnerApiUser = {
   isBlocked?: boolean;
   updatedAt?: string;
   deleteReason?: string;
+  totalDeliveries?: number;
+  totalEarnings?: number;
 };
 
 type DeliveryPartnerListItem = {
@@ -56,15 +58,8 @@ type DeliveryPartnerListItem = {
   phone: string;
   status: 'Active' | 'Inactive';
   deliveries: number;
-  earnings: string;
+  earnings: number;
 };
-
-const staticMetrics = [
-  { deliveries: 342, earnings: '₹68,400' },
-  { deliveries: 298, earnings: '₹59,600' },
-  { deliveries: 456, earnings: '₹91,200' },
-  { deliveries: 189, earnings: '₹37,800' },
-];
 
 export default function DeliveryPartnersSection({
   searchTerm,
@@ -114,7 +109,6 @@ export default function DeliveryPartnersSection({
         if (!res.success) throw new Error(res.message || 'Failed to fetch delivery partners');
 
         const mapped = (res.users || []).map((user, index) => {
-          const metrics = staticMetrics[index % staticMetrics.length];
           const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unnamed';
           const phone = `${user.countryCode || ''} ${user.phone || ''}`.trim();
           const status: 'Active' | 'Inactive' = user.isActive && !user.isBlocked ? 'Active' : 'Inactive';
@@ -125,8 +119,8 @@ export default function DeliveryPartnersSection({
             email: user.email || '—',
             phone: phone || '—',
             status,
-            deliveries: metrics.deliveries,
-            earnings: metrics.earnings,
+            deliveries: user.totalDeliveries || 0,
+            earnings: user.totalEarnings || 0,
           };
         });
 
@@ -283,7 +277,10 @@ export default function DeliveryPartnersSection({
                         <td className="py-3 px-4">{partner.phone}</td>
                         <td className="py-3 px-4">{partner.email}</td>
                         <td className="py-3 px-4">{partner.deliveries}</td>
-                        <td className="py-3 px-4">{partner.earnings}</td>
+                        <td className="py-3 px-4">
+                          <span className="dirham-symbol mr-2">&#xea;</span>
+                          {partner.earnings.toLocaleString()}
+                        </td>
                         <td className="py-3 px-4">
                           <Badge variant={partner.status === 'Active' ? 'default' : 'secondary'}>
                             {partner.status}

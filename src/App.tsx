@@ -30,6 +30,8 @@ import Profile from './components/modules/Profile';
 import ChangePassword from './components/modules/ChangePassword';
 import BulkOrders from './components/modules/BulkOrders';
 import BulkOrderDetails from './components/modules/BulkOrderDetails';
+import Notifications from './components/modules/Notifications';
+import { NotificationProvider } from './contexts/notifications';
 
 function EditStoreWrapper() {
   const { storeId } = useParams<{ storeId: string }>();
@@ -94,36 +96,39 @@ export default function App() {
           <Route
             path="/*"
             element={
-              <AdminLayout onLogout={handleLogout}>
-                <Routes>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/user-management" element={<UserManagement />} />
-                  <Route path="/inventory-management" element={<InventoryManagement />} />
-                  <Route path="/inventory/add" element={<AddInventoryItem />} />
-                  <Route path="/inventory/add-variant" element={<AddProductVariant />} />
-                  <Route path="/orders" element={<OrdersManagement />} />
-                  <Route path="/orders/:orderId" element={<OrderDetails />} />
-                  <Route path='/bulk-orders' element={<BulkOrders />} />
-                  <Route path='/bulk-order/:id' element={<BulkOrderDetails />} />
-                  <Route path="/transactions" element={<Transactions />} />
-                  <Route path="/store-billing" element={<StoreBilling />} />
-                  <Route path="/waste-management" element={<WasteManagement />} />
-                  <Route path="/store-mapping" element={<StoreMapping />} />
-                  <Route path="/store-mapping/add" element={<AddStore onBack={() => window.history.back()} />} />
-                  <Route 
-                    path="/store-mapping/edit/:storeId" 
-                    element={<EditStoreWrapper />} 
-                  />
-                  <Route path="/pre-purchase-orders" element={<PrePurchaseOrders />} />
-                   <Route path="/offers" element={<Offers />} />
-                  <Route path="/delivery-locations" element={<DeliveryLocations />} />
-                  <Route path="/enquiries" element={<Enquiries />} />
-                  <Route path="/cms" element={<CMS />} />
-                  <Route path="/profile" element={<Profile />} />
-                  <Route path="/change-password" element={<ChangePassword />} />
-                </Routes>
-              </AdminLayout>
+              <NotificationProvider>
+                <AdminLayout onLogout={handleLogout}>
+                  <Routes>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/user-management" element={<UserManagement />} />
+                    <Route path="/inventory-management" element={<InventoryManagement />} />
+                    <Route path="/inventory/add" element={<AddInventoryItem />} />
+                    <Route path="/inventory/add-variant" element={<AddProductVariant />} />
+                    <Route path="/orders" element={<OrdersManagement />} />
+                    <Route path="/orders/:orderId" element={<OrderDetails />} />
+                    <Route path='/bulk-orders' element={<BulkOrders />} />
+                    <Route path='/bulk-order/:id' element={<BulkOrderDetails />} />
+                    <Route path="/transactions" element={<Transactions />} />
+                    <Route path="/store-billing" element={<StoreBilling />} />
+                    <Route path="/waste-management" element={<WasteManagement />} />
+                    <Route path="/store-mapping" element={<StoreMapping />} />
+                    <Route path="/store-mapping/add" element={<AddStore onBack={() => window.history.back()} />} />
+                    <Route 
+                      path="/store-mapping/edit/:storeId" 
+                      element={<EditStoreWrapper />} 
+                    />
+                    <Route path="/pre-purchase-orders" element={<PrePurchaseOrders />} />
+                     <Route path="/offers" element={<Offers />} />
+                    <Route path="/delivery-locations" element={<DeliveryLocations />} />
+                    <Route path="/enquiries" element={<Enquiries />} />
+                    <Route path="/cms" element={<CMS />} />
+                    <Route path="/profile" element={<Profile />} />
+                    <Route path="/change-password" element={<ChangePassword />} />
+                    <Route path="/notifications" element={<Notifications />} />
+                  </Routes>
+                </AdminLayout>
+              </NotificationProvider>
             }
           />
         ) : (

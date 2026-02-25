@@ -113,8 +113,8 @@ export default function Dashboard() {
   const kpiData = [
     { label: 'Active Users', value: (dashboardStats?.activeUsers ?? 0).toLocaleString(), icon: Users, color: 'text-indigo-600', bgColor: 'bg-indigo-100', onClick: () => navigate('/user-management?filter=end-users'), roles: ['admin', 'subadmin'] },
     { label: 'Total Orders', value: (dashboardStats?.totalOrders ?? 0).toLocaleString(), icon: ShoppingBag, color: 'text-blue-600', bgColor: 'bg-blue-100', onClick: () => navigate('/orders'), roles: ['admin', 'subadmin'] },
-    { label: 'Transactions', value: '3,245', icon: CreditCard, color: 'text-pink-600', bgColor: 'bg-pink-100', roles: ['admin', 'subadmin'] },
-    { label: 'Total Revenue', value: '₹8.2L', icon: DollarSign, color: 'text-emerald-600', bgColor: 'bg-emerald-100', roles: ['admin', 'subadmin'] },
+    { label: 'Transactions', value: '3,245', icon: CreditCard, color: 'text-pink-600', bgColor: 'bg-pink-100', onClick: () => navigate('/transactions'), roles: ['admin', 'subadmin'] },
+    { label: 'Total Revenue', value: '₹8.2L', icon: DollarSign, color: 'text-emerald-600', bgColor: 'bg-emerald-100', onClick: () => navigate('/transactions?filter=revenue'), roles: ['admin', 'subadmin'] },
     { label: 'Inventory Alerts', value: (dashboardStats?.inventoryAlerts?.length ?? 0).toString(), icon: AlertTriangle, color: 'text-amber-600', bgColor: 'bg-amber-100', onClick: () => navigate('/inventory-management?filter=low-stock'), roles: ['admin'] },
     { label: 'Express Orders', value: (dashboardStats?.expressOrders ?? 0).toLocaleString(), icon: Zap, color: 'text-orange-600', bgColor: 'bg-orange-100', onClick: () => navigate('/orders?type=express'), roles: ['admin', 'subadmin'] },
     { label: 'Next-Day Orders', value: (dashboardStats?.nextDayOrders ?? 0).toLocaleString(), icon: Calendar, color: 'text-green-600', bgColor: 'bg-green-100', onClick: () => navigate('/orders?type=next-day'), roles: ['admin', 'subadmin'] },
@@ -163,7 +163,7 @@ export default function Dashboard() {
         {filteredKpiData.map((kpi, index) => (
           <Card 
             key={index} 
-            className={kpi.onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}
+            className={kpi.onClick !== undefined ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}
             onClick={kpi.onClick}
           >
             <CardContent className="p-6">

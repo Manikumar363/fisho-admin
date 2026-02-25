@@ -609,8 +609,8 @@ export default function UserManagement() {
           phone: fullPhone || '—',
           email: res.user?.email || item.email || '—',
           status,
-          deliveries: item.deliveries,
-          earnings: item.earnings,
+          deliveries: res.user?.totalDeliveries || item.deliveries || 0,
+          earnings: res.user?.totalEarnings || item.earnings || 0,
         });
       } catch (e: any) {
         const msg = e?.message || 'Failed to load delivery partner details';
@@ -1486,7 +1486,7 @@ export default function UserManagement() {
                   id="vatNumber"
                   value={vendorForm.vatNumber}
                   onChange={(e) => setVendorForm({ ...vendorForm, vatNumber: e.target.value })}
-                  placeholder="Enter VAT number"
+                  placeholder="Enter 15 digit VAT number"
                   required
                 />
               </div>
