@@ -117,20 +117,27 @@ export default function BulkOrders() {
     return date.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
-  const capitalize = (str: string) => {
+  const capitalize = (str: string | undefined | null) => {
+    if (!str) return '—';
     return str.charAt(0).toUpperCase() + str.slice(1);
   };
 
-  const getStatusBadgeClass = (status: string) => {
+  const getStatusBadgeClass = (status: string | undefined) => {
+    if (!status) return 'bg-gray-100 text-gray-700 border border-gray-300';
     const statusLower = status.toLowerCase();
-    if (statusLower === 'pending') return 'bg-orange-100 text-orange-700 border border-orange-300';
-    if (statusLower === 'accepted' || statusLower === 'accept') return 'bg-green-100 text-green-700 border border-green-300';
+    if (statusLower === 'requested') return 'bg-orange-100 text-orange-700 border border-orange-300';
+    if (statusLower === 'accepted') return 'bg-green-100 text-green-700 border border-green-300';
+    if (statusLower === 'quotation_added') return 'bg-purple-100 text-purple-700 border border-purple-300';
+    if (statusLower === 'payment_confirmed') return 'bg-blue-100 text-blue-700 border border-blue-300';
+    if (statusLower === 'processing') return 'bg-cyan-100 text-cyan-700 border border-cyan-300';
+    if (statusLower === 'order_ready') return 'bg-indigo-100 text-indigo-700 border border-indigo-300';
+    if (statusLower === 'order_delivered') return 'bg-emerald-100 text-emerald-700 border border-emerald-300';
     if (statusLower === 'rejected' || statusLower === 'cancelled') return 'bg-red-100 text-red-700 border border-red-300';
-    if (statusLower === 'delivered') return 'bg-blue-100 text-blue-700 border border-blue-300';
     return 'bg-gray-100 text-gray-700 border border-gray-300';
   };
 
-  const getPaymentStatusBadgeClass = (status: string) => {
+  const getPaymentStatusBadgeClass = (status: string | undefined) => {
+    if (!status) return 'bg-gray-100 text-gray-700 border border-gray-300';
     const statusLower = status.toLowerCase();
     if (statusLower === 'pending') return 'bg-yellow-100 text-yellow-700 border border-yellow-300';
     if (statusLower === 'completed' || statusLower === 'paid') return 'bg-green-100 text-green-700 border border-green-300';
@@ -142,19 +149,15 @@ export default function BulkOrders() {
     setAcceptingId(order._id);
     try {
       const res = await apiFetch<{ success: boolean; data?: BulkOrder; message?: string }>(
-        '/api/bulk-order/accept-order',
+        '/api/bulk-order/status-update',
         {
           method: 'POST',
-          body: JSON.stringify({ orderId: order._id }),
+          body: JSON.stringify({ orderId: order._id, status: 'accepted' }),
           headers: { 'Content-Type': 'application/json' },
         }
       );
       if (!res.success) throw new Error(res.message || 'Failed to accept order');
-      if (res.data) {
-        setOrders((prev) => prev.map((o) => (o._id === order._id ? res.data! : o)));
-      } else {
-        setOrders((prev) => prev.map((o) => (o._id === order._id ? { ...o, status: 'accepted' } : o)));
-      }
+      setOrders((prev) => prev.map((o) => (o._id === order._id ? { ...o, status: 'accepted' } : o)));
       toast.success(res.message || 'Order accepted successfully');
     } catch (err: any) {
       toast.error(err?.message || 'Failed to accept order');
@@ -167,19 +170,15 @@ export default function BulkOrders() {
     setRejectingId(order._id);
     try {
       const res = await apiFetch<{ success: boolean; data?: BulkOrder; message?: string }>(
-        '/api/bulk-order/reject-order',
+        '/api/bulk-order/status-update',
         {
           method: 'POST',
-          body: JSON.stringify({ orderId: order._id }),
+          body: JSON.stringify({ orderId: order._id, status: 'rejected' }),
           headers: { 'Content-Type': 'application/json' },
         }
       );
       if (!res.success) throw new Error(res.message || 'Failed to reject order');
-      if (res.data) {
-        setOrders((prev) => prev.map((o) => (o._id === order._id ? res.data! : o)));
-      } else {
-        setOrders((prev) => prev.map((o) => (o._id === order._id ? { ...o, status: 'rejected' } : o)));
-      }
+      setOrders((prev) => prev.map((o) => (o._id === order._id ? { ...o, status: 'rejected' } : o)));
       toast.success(res.message || 'Order rejected successfully');
     } catch (err: any) {
       toast.error(err?.message || 'Failed to reject order');
@@ -262,13 +261,13 @@ export default function BulkOrders() {
                   </tr>
                 ) : (
                   orders.map((order) => {
-                    const isPending = order.status?.toLowerCase() === 'pending';
+                    const isPending = order.status?.toLowerCase() === 'requested';
                     const firstItem = order.items?.[0];
 
                     return (
                       <tr key={order._id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-3 px-4 text-blue-600 font-medium">
-                          {order._id.substring(0, 12)}...
+                          {order._id ? order._id.substring(0, 12) + '...' : 'N/A'}
                         </td>
                         <td className="py-3 px-4">
                           <div>

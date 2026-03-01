@@ -150,39 +150,39 @@ export default function BulkOrderDetails() {
   // Map backend enum to display label
   const getStatusLabel = (status: string) => {
     const statusMap: Record<string, string> = {
-      'pending': 'Order Placed',
+      'requested': 'Order Requested',
       'accepted': 'Order Accepted',
-      'ready_to_pickup': 'Ready for Pickup',
-      'accepted_by_delivery_partner': 'Accepted by Delivery Agent',
-      'picked_up': 'Order Pickup',
-      'out_for_delivery': 'Out for Delivery',
-      'delivered': 'Delivered',
+      'quotation_added': 'Quotation Added',
+      'payment_confirmed': 'Payment Confirmed',
+      'processing': 'Processing',
+      'order_ready': 'Order Ready',
+      'order_delivered': 'Order Delivered',
       'cancelled': 'Cancelled',
-      'returned': 'Returned',
-      'refunded': 'Refunded',
       'rejected': 'Rejected'
     };
     return statusMap[status] || status;
   };
 
-  // Get timeline flow - normal delivery progression (without cancelled/returned/refunded)
+  // Get timeline flow - normal delivery progression (without cancelled/rejected)
   const getTimelineFlow = () => {
-    return ['pending', 'accepted', 'ready_to_pickup', 'accepted_by_delivery_partner', 'picked_up', 'out_for_delivery', 'delivered'];
+    return ['requested', 'accepted', 'quotation_added', 'payment_confirmed', 'processing', 'order_ready', 'order_delivered'];
   };
 
-  // Get all available statuses for editing (includes cancelled, returned, refunded)
+  // Get all available statuses for editing (includes cancelled, rejected)
   const getStatusFlow = () => {
-    return ['pending', 'accepted', 'ready_to_pickup', 'accepted_by_delivery_partner', 'picked_up', 'out_for_delivery', 'delivered', 'cancelled', 'returned', 'refunded'];
+    return ['requested', 'accepted', 'quotation_added', 'payment_confirmed', 'processing', 'order_ready', 'order_delivered', 'cancelled', 'rejected'];
   };
 
   const getStatusBadgeClass = (status: string) => {
     const statusLower = status.toLowerCase();
-    if (statusLower === 'pending') return 'bg-orange-100 text-orange-700 border border-orange-300';
+    if (statusLower === 'requested') return 'bg-orange-100 text-orange-700 border border-orange-300';
     if (statusLower === 'accepted') return 'bg-green-100 text-green-700 border border-green-300';
+    if (statusLower === 'quotation_added') return 'bg-purple-100 text-purple-700 border border-purple-300';
+    if (statusLower === 'payment_confirmed') return 'bg-blue-100 text-blue-700 border border-blue-300';
+    if (statusLower === 'processing') return 'bg-cyan-100 text-cyan-700 border border-cyan-300';
+    if (statusLower === 'order_ready') return 'bg-indigo-100 text-indigo-700 border border-indigo-300';
+    if (statusLower === 'order_delivered') return 'bg-emerald-100 text-emerald-700 border border-emerald-300';
     if (statusLower === 'rejected' || statusLower === 'cancelled') return 'bg-red-100 text-red-700 border border-red-300';
-    if (statusLower === 'delivered') return 'bg-emerald-100 text-emerald-700 border border-emerald-300';
-    if (statusLower === 'returned') return 'bg-orange-100 text-orange-700 border border-orange-300';
-    if (statusLower === 'refunded') return 'bg-blue-100 text-blue-700 border border-blue-300';
     return 'bg-gray-100 text-gray-700 border border-gray-300';
   };
 
@@ -436,7 +436,7 @@ export default function BulkOrderDetails() {
     );
   }
 
-  const isPending = order?.status?.toLowerCase() === 'pending';
+  const isPending = order?.status?.toLowerCase() === 'requested';
 
   return (
     <div className="space-y-6">

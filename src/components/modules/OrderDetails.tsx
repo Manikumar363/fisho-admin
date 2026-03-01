@@ -276,16 +276,35 @@ export default function OrderDetails() {
     if (!order) return;
     setRefundingType(refundType);
     try {
-      const res = await apiFetch<{ success: boolean; message?: string }>(
-        '/api/order/process-refund',
-        {
-          method: 'POST',
-          body: JSON.stringify({ orderId: order._id, refundType }),
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-      if (!res.success) throw new Error(res.message || 'Failed to process refund');
-      toast.success(res.message || `Refund processed to ${refundType}`);
+      if (refundType === 'wallet') {
+        // Use return-to-wallet API for wallet refunds
+        const res = await apiFetch<{ success: boolean; message?: string }>(
+          '/api/order/return-to-wallet',
+          {
+            method: 'POST',
+            body: JSON.stringify({ 
+              orderId: order._id, 
+              amount: order.pricing.grandTotal 
+            }),
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+        if (!res.success) throw new Error(res.message || 'Failed to process wallet refund');
+        toast.success(res.message || 'Refund processed to wallet successfully');
+      } else {
+        // Use process-refund API for account refunds
+        const res = await apiFetch<{ success: boolean; message?: string }>(
+          '/api/order/process-refund',
+          {
+            method: 'POST',
+            body: JSON.stringify({ orderId: order._id, refundType }),
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+        if (!res.success) throw new Error(res.message || 'Failed to process account refund');
+        toast.success(res.message || 'Refund processed to account successfully');
+      }
+      
       // Refresh order data
       const refreshRes = await apiFetch<{ success: boolean; data: Order }>(
         `/api/order/order-by-id/${order._id}`

@@ -99,10 +99,13 @@ export default function StoreBilling() {
   const [customerNumber, setCustomerNumber] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('instore');
   
+  // Sub-admin logic: set isSubAdmin and currentStoreId as needed
+  const isSubAdmin = false; // TODO: Replace with actual logic
+  const currentStoreId = '';
   const [stores, setStores] = useState<Array<{ id: string; name: string }>>([]);
   const [storesLoading, setStoresLoading] = useState(false);
   const [storesError, setStoresError] = useState<string | null>(null);
-  const [selectedStoreId, setSelectedStoreId] = useState<string>('');
+  const [selectedStoreId, setSelectedStoreId] = useState<string>(isSubAdmin ? currentStoreId : '');
   
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
@@ -122,8 +125,9 @@ export default function StoreBilling() {
     weightUnit: '',
   });
 
-  // Fetch stores on mount
+  // Fetch stores only for super-admin
   useEffect(() => {
+    if (isSubAdmin) return;
     let active = true;
     setStoresLoading(true);
     setStoresError(null);
@@ -148,7 +152,7 @@ export default function StoreBilling() {
         setStoresLoading(false);
       });
     return () => { active = false; };
-  }, []);
+  }, [isSubAdmin]);
 
   // Fetch categories when store is selected
   useEffect(() => {
@@ -473,32 +477,34 @@ export default function StoreBilling() {
             </CardHeader>
             <CardContent className="!pb-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Store Dropdown */}
-                <div className="space-y-2">
-                  <label className="text-sm text-gray-600">Store</label>
-                  <Select
-                    value={selectedStoreId}
-                    onValueChange={(val) => {
-                      setSelectedStoreId(val);
-                      setSelectedCategoryId('all');
-                      setCart([]);
-                    }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder={storesLoading ? 'Loading stores...' : 'Select store'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {storesLoading && <SelectItem value="__loading" disabled>Loading...</SelectItem>}
-                      {storesError && <SelectItem value="__error" disabled>{storesError}</SelectItem>}
-                      {!storesLoading && !storesError && stores.length === 0 && (
-                        <SelectItem value="__none" disabled>No stores</SelectItem>
-                      )}
-                      {stores.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Store Dropdown: Only for super-admin */}
+                {!isSubAdmin && (
+                  <div className="space-y-2">
+                    <label className="text-sm text-gray-600">Store</label>
+                    <Select
+                      value={selectedStoreId}
+                      onValueChange={(val) => {
+                        setSelectedStoreId(val);
+                        setSelectedCategoryId('all');
+                        setCart([]);
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder={storesLoading ? 'Loading stores...' : 'Select store'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {storesLoading && <SelectItem value="__loading" disabled>Loading...</SelectItem>}
+                        {storesError && <SelectItem value="__error" disabled>{storesError}</SelectItem>}
+                        {!storesLoading && !storesError && stores.length === 0 && (
+                          <SelectItem value="__none" disabled>No stores</SelectItem>
+                        )}
+                        {stores.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {/* Category Dropdown */}
                 <div className="space-y-2">
@@ -508,10 +514,10 @@ export default function StoreBilling() {
                     onValueChange={(val) => {
                       setSelectedCategoryId(val === 'all' ? '' : val);
                     }}
-                    disabled={!selectedStoreId || categoriesLoading || !!categoriesError}
+                    disabled={(!isSubAdmin && !selectedStoreId) || categoriesLoading || !!categoriesError}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder={categoriesLoading ? 'Loading categories...' : (!selectedStoreId ? 'Select store first' : 'All categories')} />
+                      <SelectValue placeholder={categoriesLoading ? 'Loading categories...' : ((!isSubAdmin && !selectedStoreId) ? 'Select store first' : 'All categories')} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Categories</SelectItem>
@@ -529,7 +535,7 @@ export default function StoreBilling() {
                   <label className="text-sm text-gray-600">Products</label>
                   <div className="flex items-center h-10 px-3 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600">
                     {inventoryLoading ? 'Loading...' : 
-                     !selectedStoreId ? 'Select store' :
+                     (!isSubAdmin && !selectedStoreId) ? 'Select store' :
                      `${filteredInventory.length} available`}
                   </div>
                 </div>
