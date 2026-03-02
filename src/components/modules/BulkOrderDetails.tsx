@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Package, Truck, CreditCard, User, MapPin, Calendar, Clock, CheckCircle, Circle, RotateCcw, Wallet, CreditCard as CardIcon, Edit2, X } from 'lucide-react';
+import { ArrowLeft, Package, Truck, CreditCard, User, MapPin, Calendar, Clock, CheckCircle, Circle, XCircle, RotateCcw, Wallet, CreditCard as CardIcon, Edit2, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -89,10 +89,10 @@ export default function BulkOrderDetails() {
   const [isEditingTimeline, setIsEditingTimeline] = useState(false);
   const [isEditingPricing, setIsEditingPricing] = useState(false);
   const [editingPricing, setEditingPricing] = useState({
-    subtotal: 0,
-    discount: 0,
-    tax: 0,
-    shipping: 0,
+    subtotal: '',
+    discount: '',
+    tax: '',
+    shipping: '',
   });
 
   // Fetch order details
@@ -207,8 +207,18 @@ export default function BulkOrderDetails() {
         }
       );
       if (!res.success) throw new Error(res.message || 'Failed to accept order');
-      if (res.data) setOrder(res.data);
+      
       toast.success(res.message || 'Order accepted successfully');
+      
+      // Re-fetch complete order data to ensure all fields (including product details) are present
+      if (id) {
+        const refreshRes = await apiFetch<{ success: boolean; data: BulkOrder }>(
+          `/api/bulk-order/order-by-id/${id}`
+        );
+        if (refreshRes.success) {
+          setOrder(refreshRes.data);
+        }
+      }
     } catch (err: any) {
       toast.error(err?.message || 'Failed to accept order');
     } finally {
@@ -229,8 +239,18 @@ export default function BulkOrderDetails() {
         }
       );
       if (!res.success) throw new Error(res.message || 'Failed to reject order');
-      if (res.data) setOrder(res.data);
+      
       toast.success(res.message || 'Order rejected successfully');
+      
+      // Re-fetch complete order data to ensure all fields (including product details) are present
+      if (id) {
+        const refreshRes = await apiFetch<{ success: boolean; data: BulkOrder }>(
+          `/api/bulk-order/order-by-id/${id}`
+        );
+        if (refreshRes.success) {
+          setOrder(refreshRes.data);
+        }
+      }
     } catch (err: any) {
       toast.error(err?.message || 'Failed to reject order');
     } finally {
@@ -308,10 +328,10 @@ export default function BulkOrderDetails() {
     };
 
     setEditingPricing({
-      subtotal: subtotalValue,
-      discount: toPercent(order?.pricing?.discount),
-      tax: toPercent(order?.pricing?.tax),
-      shipping: toPercent(order?.pricing?.shipping),
+      subtotal: String(subtotalValue),
+      discount: String(toPercent(order?.pricing?.discount)),
+      tax: String(toPercent(order?.pricing?.tax)),
+      shipping: String(toPercent(order?.pricing?.shipping)),
     });
     setIsEditingPricing(true);
   };
@@ -333,26 +353,30 @@ export default function BulkOrderDetails() {
   };
 
   const handlePricingChange = (field: string, value: string) => {
-    const numValue = parseFloat(value) || 0;
     setEditingPricing((prev) => ({
       ...prev,
-      [field]: numValue,
+      [field]: value,
     }));
   };
 
   const savePricingChanges = async () => {
     if (!order) return;
     try {
-      const discountAmount = calculatePercentAmount(editingPricing.subtotal, editingPricing.discount);
-      const taxAmount = calculatePercentAmount(editingPricing.subtotal, editingPricing.tax);
-      const shippingAmount = calculatePercentAmount(editingPricing.subtotal, editingPricing.shipping);
+      const subtotal = parseFloat(editingPricing.subtotal) || 0;
+      const discount = parseFloat(editingPricing.discount) || 0;
+      const tax = parseFloat(editingPricing.tax) || 0;
+      const shipping = parseFloat(editingPricing.shipping) || 0;
+      
+      const discountAmount = calculatePercentAmount(subtotal, discount);
+      const taxAmount = calculatePercentAmount(subtotal, tax);
+      const shippingAmount = calculatePercentAmount(subtotal, shipping);
       const pricingSummary = {
-        subTotal: editingPricing.subtotal,
+        subTotal: subtotal,
         grandTotal: calculateGrandTotal(
-          editingPricing.subtotal,
-          editingPricing.discount,
-          editingPricing.tax,
-          editingPricing.shipping
+          subtotal,
+          discount,
+          tax,
+          shipping
         ),
         discount: discountAmount,
         shipping: shippingAmount,
@@ -409,7 +433,7 @@ export default function BulkOrderDetails() {
       <div className="space-y-6">
         <Button variant="outline" onClick={() => navigate('/bulk-orders')}>
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Orders
+          Back to Bulk Orders
         </Button>
         <Card>
           <CardContent className="p-8 text-center text-gray-600">
@@ -446,7 +470,7 @@ export default function BulkOrderDetails() {
           Back to Orders
         </Button>
         <div className="flex items-center gap-3">
-          <h1 className="mb-0">Order {order?._id?.substring(0, 12) || 'N/A'}...</h1>
+          <h1 className="mb-0"> Bulk Order {order?._id?.substring(0, 12) || 'N/A'}...</h1>
           <Badge className={getStatusBadgeClass(order?.status || '')}>
             {capitalize(order?.status || '—')}
           </Badge>
@@ -458,7 +482,7 @@ export default function BulkOrderDetails() {
         <Card className="border-orange-200 bg-orange-50">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <p className="text-orange-800">This order is pending and requires your action.</p>
+              <p className="text-orange-800">This bulk order is pending and requires your action.</p>
               <div className="flex gap-2">
                 <Button
                   size="sm"
@@ -488,7 +512,7 @@ export default function BulkOrderDetails() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Package className="w-5 h-5" />
-              Order Summary
+              Bulk Order Summary
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -685,10 +709,10 @@ export default function BulkOrderDetails() {
                       <span className="font-bold text-lg text-blue-600">
                         <span className="dirham-symbol mr-2">&#xea;</span>
                         {calculateGrandTotal(
-                          editingPricing.subtotal,
-                          editingPricing.discount,
-                          editingPricing.tax,
-                          editingPricing.shipping
+                          parseFloat(editingPricing.subtotal) || 0,
+                          parseFloat(editingPricing.discount) || 0,
+                          parseFloat(editingPricing.tax) || 0,
+                          parseFloat(editingPricing.shipping) || 0
                         ).toFixed(2)}
                       </span>
                     </div>
@@ -777,24 +801,47 @@ export default function BulkOrderDetails() {
                 const currentStatusIndex = timelineFlow.indexOf(order?.status || '');
                 const isCompleted = currentStatusIndex >= index;
                 const isCurrent = status === order?.status;
+                const isRejectedOrCancelled = order?.status === 'rejected' || order?.status === 'cancelled';
+                
+                // Show only first status if order is rejected/cancelled
+                if (isRejectedOrCancelled && index > 0) {
+                  return null;
+                }
 
                 return (
-                  <div key={status}>
-                    <div className="flex items-center gap-3">
-                      {isCompleted || isCurrent ? (
-                        <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
-                      ) : (
-                        <Circle className="w-6 h-6 text-gray-300 flex-shrink-0" />
+                  <React.Fragment key={status}>
+                    <div>
+                      <div className="flex items-center gap-3">
+                        {isCompleted || isCurrent ? (
+                          <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
+                        ) : (
+                          <Circle className="w-6 h-6 text-gray-300 flex-shrink-0" />
+                        )}
+                        <span className={`font-medium ${isCompleted || isCurrent ? 'text-green-700' : 'text-gray-500'}`}>
+                          {getStatusLabel(status)}
+                        </span>
+                        {isCurrent && <Badge className="bg-blue-100 text-blue-700">Current</Badge>}
+                      </div>
+                      {index < timelineFlow.length - 1 && !isRejectedOrCancelled && (
+                        <div className={`ml-3 h-6 w-0.5 ${isCompleted ? 'bg-green-600' : 'bg-gray-200'}`}></div>
                       )}
-                      <span className={`font-medium ${isCompleted || isCurrent ? 'text-green-700' : 'text-gray-500'}`}>
-                        {getStatusLabel(status)}
-                      </span>
-                      {isCurrent && <Badge className="bg-blue-100 text-blue-700">Current</Badge>}
                     </div>
-                    {index < timelineFlow.length - 1 && (
-                      <div className={`ml-3 h-6 w-0.5 ${isCompleted ? 'bg-green-600' : 'bg-gray-200'}`}></div>
+                    {/* Show rejection/cancellation after first status */}
+                    {index === 0 && isRejectedOrCancelled && (
+                      <>
+                        <div className="ml-3 h-6 w-0.5 bg-red-600"></div>
+                        <div>
+                          <div className="flex items-center gap-3">
+                            <XCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
+                            <span className="font-medium text-red-700">
+                              {getStatusLabel(order.status)}
+                            </span>
+                            <Badge className="bg-red-100 text-red-700">Current</Badge>
+                          </div>
+                        </div>
+                      </>
                     )}
-                  </div>
+                  </React.Fragment>
                 );
               })}
             </div>
@@ -834,7 +881,7 @@ export default function BulkOrderDetails() {
                     <h3 className="font-semibold text-lg">{item.product?.name}</h3>
                     <p className="text-sm text-gray-600">{item.product?.description}</p>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      <Badge variant="outline">Weight: {item.weight}g</Badge>
+                      <Badge variant="outline">Weight: {item.weight}kg</Badge>
                       <Badge variant="outline">
                         Price: <span className="dirham-symbol mr-2">&#xea;</span>
                         {item.variant?.sellingPrice || '—'}

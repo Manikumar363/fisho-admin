@@ -64,6 +64,7 @@ export default function InventoryManagement() {
       notes: string;
     }
   }>({});
+  const [originalProductVariantRows, setOriginalProductVariantRows] = useState<typeof productVariantRows>({});
   const CATEGORIES_PAGE_SIZE = 20;
   const PRODUCTS_PAGE_SIZE = 20;
   const VARIANTS_PAGE_SIZE = 20;
@@ -1442,6 +1443,7 @@ const handleRemoveWeight = (weight: number) => {
     setProductCutTypeImages({});
     setExistingCutTypeImages({});
     setProductVariantRows({});
+    setOriginalProductVariantRows({});
     setExistingVariantIds({});
     setVariantForm({
       species: '',
@@ -2172,7 +2174,8 @@ const handleRemoveWeight = (weight: number) => {
       productForm.featured === originalProductForm.featured &&
       productForm.bestseller === originalProductForm.bestseller &&
       productForm.isExpressDelivery === originalProductForm.isExpressDelivery &&
-      productForm.productImages.length === 0 // No new images added
+      productForm.productImages.length === 0 && // No new images added
+      JSON.stringify(productVariantRows) === JSON.stringify(originalProductVariantRows) // Check if variant rows changed
     );
   };
 
@@ -3778,6 +3781,7 @@ const handleRemoveWeight = (weight: number) => {
                                   });
 
                                   setProductVariantRows(variantRows);
+                                  setOriginalProductVariantRows(JSON.parse(JSON.stringify(variantRows))); // Deep copy for comparison
                                   setProductCutTypeImages(cutTypeImages);
                                   setExistingCutTypeImages(existingImages);
                                   setExistingVariantIds(variantIds);

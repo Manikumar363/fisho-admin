@@ -11,6 +11,8 @@ import { toast } from 'sonner';
 interface Order {
   _id: string;
   invoiceNo: string;
+  invoiceUrl?: string;
+  receiptUrl?: string;
   createdAt: string;
   shippingAddress: { name: string; phone: string };
   items: any[];
@@ -27,6 +29,7 @@ export default function OrdersManagement() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [selectedType, setSelectedType] = useState<string>('all');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [showFilterMenu, setShowFilterMenu] = useState(false);
 
   // User and store state
@@ -40,9 +43,10 @@ export default function OrdersManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalOrders, setTotalOrders] = useState(0);
-  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<string | null>(null);
   
   // Stats state
   const [stats, setStats] = useState<{
@@ -99,9 +103,13 @@ export default function OrdersManagement() {
       params.append('storeId', storeId);
     }
     
-    if (selectedType !== 'all') params.append('deliveryType', selectedType);
-    if (search.trim()) params.append('search', search.trim());
-
+    if (selectedType !== 'all') {
+      const apiDeliveryType = selectedType === 'next-day' ? 'nextDay' : selectedType;
+      params.append('deliveryType', apiDeliveryType);
+    }
+    if (selectedStatus !== 'all') {
+      params.append('status', selectedStatus);
+    }
     apiFetch<{
       success: boolean;
       data: Order[];
@@ -137,13 +145,40 @@ export default function OrdersManagement() {
       });
 
     return () => { active = false; };
-  }, [selectedType, currentPage, search, userRole, storeId]);
+  }, [selectedType, selectedStatus, currentPage, userRole, storeId]);
+
+  const normalizeDeliveryType = (type?: string) => {
+    const normalized = (type || '').toLowerCase().replace(/[_\s]/g, '-');
+    if (normalized === 'nextday' || normalized === 'next-day') return 'next-day';
+    if (normalized === 'express') return 'express';
+    return normalized || 'other';
+  };
+
+  const filteredOrders = React.useMemo(() => {
+    const query = searchInput.trim().toLowerCase();
+
+    return orders.filter((order) => {
+      const normalizedType = normalizeDeliveryType(order.deliveryType);
+      const matchesType = selectedType === 'all' || normalizedType === selectedType;
+      if (!matchesType) return false;
+
+      const orderStatus = (order.status || '').toLowerCase();
+      const matchesStatus = selectedStatus === 'all' || orderStatus === selectedStatus;
+      if (!matchesStatus) return false;
+
+      const orderId = (order.invoiceNo || order._id || '').toLowerCase();
+      const customerName = (order.shippingAddress?.name || '').toLowerCase();
+      if (!query) return true;
+
+      return orderId.includes(query) || customerName.includes(query);
+    });
+  }, [orders, searchInput, selectedType, selectedStatus]);
 
   // Delivery type stats (for filter counts)
   const deliveryTypeStats = React.useMemo(() => {
     const stats: Record<string, number> = {};
     orders.forEach((order) => {
-      const type = (order as any).deliveryType || 'other';
+      const type = normalizeDeliveryType((order as any).deliveryType);
       stats[type] = (stats[type] || 0) + 1;
     });
     return stats;
@@ -155,9 +190,21 @@ export default function OrdersManagement() {
     setCurrentPage(1);
   };
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value);
+  const handleStatusFilterSelect = (status: string) => {
+    setSelectedStatus(status);
+    setShowFilterMenu(false);
     setCurrentPage(1);
+  };
+
+  const clearFilters = () => {
+    setSelectedType('all');
+    setSelectedStatus('all');
+    setCurrentPage(1);
+    setShowFilterMenu(false);
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchInput(e.target.value);
   };
 
   // Format helpers
@@ -259,6 +306,56 @@ export default function OrdersManagement() {
       toast.error(err?.message || 'Failed to reject order');
     } finally {
       setRejectingId(null);
+    }
+  };
+
+  const downloadFileFromUrl = async (fileUrl: string, filename: string) => {
+    const token = localStorage.getItem('token');
+    const response = await fetch(fileUrl, {
+      method: 'GET',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to download invoice');
+    }
+
+    const blob = await response.blob();
+    const objectUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(objectUrl);
+  };
+
+  const handleDownloadInvoice = async (order: Order) => {
+    setDownloadingInvoiceId(order._id);
+    try {
+      let invoiceUrl = order.invoiceUrl || order.receiptUrl;
+
+      if (!invoiceUrl) {
+        const detailRes = await apiFetch<{ success: boolean; data?: Order; message?: string }>(
+          `/api/order/order-by-id/${order._id}`
+        );
+        if (!detailRes.success) throw new Error(detailRes.message || 'Failed to fetch invoice details');
+        invoiceUrl = detailRes.data?.invoiceUrl || detailRes.data?.receiptUrl;
+      }
+
+      if (!invoiceUrl) {
+        toast.info('Invoice not available for this order');
+        return;
+      }
+
+      const filename = `${order.invoiceNo || order._id}.pdf`;
+      await downloadFileFromUrl(invoiceUrl, filename);
+      toast.success('Invoice downloaded successfully');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to download invoice');
+    } finally {
+      setDownloadingInvoiceId(null);
     }
   };
 
@@ -465,11 +562,9 @@ export default function OrdersManagement() {
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <Input
-                placeholder={userRole === 'subadmin' 
-                  ? "Search by order ID, customer name, or phone..." 
-                  : "Search by order ID, customer name, or phone..."}
+                placeholder="Search by order ID or customer name..."
                 className="pl-10"
-                value={search}
+                value={searchInput}
                 onChange={handleSearchChange}
               />
             </div>
@@ -478,13 +573,13 @@ export default function OrdersManagement() {
                 <Button 
                   variant="outline"
                   onClick={() => setShowFilterMenu(!showFilterMenu)}
-                  className={selectedType !== 'all' ? 'border-blue-600 text-blue-600' : ''}
+                  className={selectedType !== 'all' || selectedStatus !== 'all' ? 'border-blue-600 text-blue-600' : ''}
                 >
                   <Filter className="w-4 h-4 mr-2" />
                   Filters
-                  {selectedType !== 'all' && (
+                  {(selectedType !== 'all' || selectedStatus !== 'all') && (
                     <Badge variant="default" className="ml-2 bg-blue-600">
-                      1
+                      {(selectedType !== 'all' ? 1 : 0) + (selectedStatus !== 'all' ? 1 : 0)}
                     </Badge>
                   )}
                 </Button>
@@ -501,24 +596,42 @@ export default function OrdersManagement() {
                           <X className="w-4 h-4" />
                         </button>
                       </div>
-                      {selectedType !== 'all' && (
+                      {(selectedType !== 'all' || selectedStatus !== 'all') && (
                         <button
-                          onClick={() => handleFilterSelect('all')}
+                          onClick={clearFilters}
                           className="text-sm text-blue-600 hover:underline"
                         >
-                          Clear filter
+                          Clear filters
                         </button>
                       )}
                     </div>
                     <div className="p-2">
                       <button
-                        onClick={() => handleFilterSelect('all')}
+                        onClick={clearFilters}
                         className={`w-full text-left px-3 py-2 rounded hover:bg-gray-50 ${
-                          selectedType === 'all' ? 'bg-blue-50 text-blue-600' : ''
+                          selectedType === 'all' && selectedStatus === 'all' ? 'bg-blue-50 text-blue-600' : ''
                         }`}
                       >
                         All Orders ({totalOrders})
                       </button>
+                      <div className="px-3 pt-3 pb-1 text-xs font-semibold text-gray-500">Status</div>
+                      <button
+                        onClick={() => handleStatusFilterSelect('pending')}
+                        className={`w-full text-left px-3 py-2 rounded hover:bg-gray-50 ${
+                          selectedStatus === 'pending' ? 'bg-blue-50 text-blue-600' : ''
+                        }`}
+                      >
+                        Pending
+                      </button>
+                      <button
+                        onClick={() => handleStatusFilterSelect('delivered')}
+                        className={`w-full text-left px-3 py-2 rounded hover:bg-gray-50 ${
+                          selectedStatus === 'delivered' ? 'bg-blue-50 text-blue-600' : ''
+                        }`}
+                      >
+                        Delivered
+                      </button>
+                      <div className="px-3 pt-3 pb-1 text-xs font-semibold text-gray-500">Delivery Type</div>
                       <button
                         onClick={() => handleFilterSelect('express')}
                         className={`w-full text-left px-3 py-2 rounded hover:bg-gray-50 ${
@@ -535,14 +648,6 @@ export default function OrdersManagement() {
                       >
                         Next-Day Orders ({deliveryTypeStats['next-day'] || 0})
                       </button>
-                      <button
-                        onClick={() => handleFilterSelect('bulk')}
-                        className={`w-full text-left px-3 py-2 rounded hover:bg-gray-50 ${
-                          selectedType === 'bulk' ? 'bg-blue-50 text-blue-600' : ''
-                        }`}
-                      >
-                        Bulk Orders ({deliveryTypeStats['bulk'] || 0})
-                      </button>
                     </div>
                   </div>
                 )}
@@ -556,7 +661,7 @@ export default function OrdersManagement() {
       <Card>
         <CardHeader>
           <CardTitle>
-            Online Orders ({totalOrders})
+            Online Orders ({searchInput.trim() ? filteredOrders.length : totalOrders})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -583,12 +688,14 @@ export default function OrdersManagement() {
                   <tr>
                     <td colSpan={8} className="py-4 px-4 text-center text-red-600">{error}</td>
                   </tr>
-                ) : orders.length === 0 ? (
+                ) : filteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-4 px-4 text-center text-gray-500">No orders found</td>
+                    <td colSpan={8} className="py-4 px-4 text-center text-gray-500">
+                      {searchInput.trim() ? 'No matching orders found' : 'No orders found'}
+                    </td>
                   </tr>
                 ) : (
-                  orders.map((order) => {
+                  filteredOrders.map((order) => {
                     const isPending = order.status?.toLowerCase() === 'pending';
                     const paymentMethod = order.payment?.method?.toLowerCase() || '';
                     const paymentStatus = order.payment?.status?.toLowerCase() || '';
@@ -641,7 +748,16 @@ export default function OrdersManagement() {
                             )}
                             <button
                               className="p-1 hover:bg-gray-100 rounded"
+                              onClick={() => handleDownloadInvoice(order)}
+                              disabled={downloadingInvoiceId === order._id}
+                              title="Download Invoice"
+                            >
+                              <Download className="w-4 h-4 text-gray-600" />
+                            </button>
+                            <button
+                              className="p-1 hover:bg-gray-100 rounded"
                               onClick={() => navigate(`/orders/${order._id}`)}
+                              title="View Order"
                             >
                               <Eye className="w-4 h-4 text-blue-600" />
                             </button>
@@ -655,7 +771,7 @@ export default function OrdersManagement() {
             </table>
           </div>
           {/* Pagination */}
-          {!loading && !error && orders.length > 0 && totalPages > 1 && (
+          {!loading && !error && filteredOrders.length > 0 && totalPages > 1 && (
             <div className="flex items-center justify-between mt-4 pt-4 border-t">
               <div className="text-sm text-gray-600">
                 Page {currentPage} of {totalPages}

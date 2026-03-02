@@ -40,6 +40,12 @@ interface Order {
   shippingAddress: {
     name: string;
     phone: string;
+    communityId?: string;
+    building?: string;
+    floor?: string;
+    flat?: string;
+    lat?: string;
+    lng?: string;
     addressLine1?: string;
     city?: string;
     state?: string;
@@ -85,6 +91,30 @@ const formatPrice = (value: any): string => {
   return num.toFixed(2);
 };
 
+const formatShippingAddress = (shippingAddress?: Order['shippingAddress']) => {
+  if (!shippingAddress) return '—';
+
+  const parts = [
+    shippingAddress.flat ? `${shippingAddress.flat}` : '',
+    shippingAddress.floor ? ` ${shippingAddress.floor}` : '',
+    shippingAddress.building ? ` ${shippingAddress.building}` : '',
+    shippingAddress.addressLine1 || '',
+    shippingAddress.landmark ? ` ${shippingAddress.landmark}` : '',
+    shippingAddress.city || '',
+    shippingAddress.state || '',
+    shippingAddress.country || '',
+    shippingAddress.pincode || '',
+  ].filter(Boolean);
+
+  if (parts.length > 0) return parts.join(', ');
+
+  if (shippingAddress.lat && shippingAddress.lng) {
+    return `${shippingAddress.lat}, ${shippingAddress.lng}`;
+  }
+
+  return '—';
+};
+
 // Helper for badge color
 const getStatusBadgeClass = (status: string | undefined | null) => {
   if (!status || typeof status !== 'string') return 'bg-gray-100 text-gray-700 border-gray-200';
@@ -118,6 +148,7 @@ export default function OrderDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [accepting, setAccepting] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
   const [isEditingStatus, setIsEditingStatus] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
@@ -228,6 +259,43 @@ export default function OrderDetails() {
       toast.error(err?.message || 'Failed to accept order');
     } finally {
       setAccepting(false);
+    }
+  };
+
+  const handleRejectOrder = async () => {
+    if (!order) return;
+    setRejecting(true);
+    try {
+      const payload = {
+        orderId: order._id,
+        storeId: order.store?._id || order.store?.id,
+        status: 'rejected'
+      };
+      console.log('Rejecting order with payload:', payload);
+      const res = await apiFetch<{ success: boolean; data?: { order: Partial<Order> }; message?: string }>(
+        '/api/order/status-update',
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+      if (!res.success) throw new Error(res.message || 'Failed to reject order');
+      
+      // Re-fetch to ensure complete data
+      if (orderId) {
+        const refreshRes = await apiFetch<{ success: boolean; data: Order }>(
+          `/api/order/order-by-id/${orderId}`
+        );
+        if (refreshRes.success) setOrder(refreshRes.data);
+      }
+      
+      toast.success('Order rejected successfully');
+    } catch (err: any) {
+      console.error('Reject order error:', err);
+      toast.error(err?.message || 'Failed to reject order');
+    } finally {
+      setRejecting(false);
     }
   };
 
@@ -381,14 +449,7 @@ export default function OrderDetails() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className='text-gray-600'>
-                {order.shippingAddress?.addressLine1 || ''}
-                {order.shippingAddress?.landmark ? `, ${order.shippingAddress.landmark}` : ''}
-                {order.shippingAddress?.city ? `, ${order.shippingAddress.city}` : ''}
-                {order.shippingAddress?.state ? `, ${order.shippingAddress.state}` : ''}
-                {order.shippingAddress?.country ? `, ${order.shippingAddress.country}` : ''}
-                {order.shippingAddress?.pincode ? `, ${order.shippingAddress.pincode}` : ''}
-              </p>
+              <p className='text-gray-600'>{formatShippingAddress(order.shippingAddress)}</p>
               <div className="mt-3 flex justify-between gap-4">
                 <div className="flex flex-col items-start">
                   <p className="text-md font-semibold text-gray-800">Delivery Type</p>
@@ -533,23 +594,32 @@ export default function OrderDetails() {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Accept Order Button */}
+          {/* Accept and Reject Order Buttons */}
           {(() => {
             const isPending = order?.status === 'pending';
             const paymentMethod = order?.payment?.method?.toLowerCase() || '';
             const paymentStatus = order?.payment?.status?.toLowerCase() || '';
             const isOfflinePayment = paymentMethod === 'cod' || paymentMethod === 'cash' || paymentMethod === 'offline';
-            // Show accept button only if order is pending AND (payment is offline OR payment is already paid)
-            const canShowAcceptButton = isPending && (isOfflinePayment || paymentStatus === 'paid');
+            // Show buttons only if order is pending AND (payment is offline OR payment is already paid)
+            const canShowButtons = isPending && (isOfflinePayment || paymentStatus === 'paid');
             
-            return canShowAcceptButton ? (
-              <Button
-                className="w-full bg-green-600 hover:bg-green-700 text-white mb-4"
-                onClick={handleAcceptOrder}
-                disabled={accepting}
-              >
-                {accepting ? 'Accepting...' : 'Accept Order'}
-              </Button>
+            return canShowButtons ? (
+              <div className="flex gap-3 mb-4">
+                <Button
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                  onClick={handleAcceptOrder}
+                  disabled={accepting || rejecting}
+                >
+                  {accepting ? 'Accepting...' : 'Accept'}
+                </Button>
+                <Button
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                  onClick={handleRejectOrder}
+                  disabled={accepting || rejecting}
+                >
+                  {rejecting ? 'Rejecting...' : 'Reject'}
+                </Button>
+              </div>
             ) : null;
           })()}
 
@@ -780,7 +850,7 @@ export default function OrderDetails() {
             <CardContent className="space-y-3">
               <div>
                 <p className="text-sm font-semibold text-gray-800">Order ID</p>
-                <p className='text-gray-600'>{order._id}</p>
+                <p className='text-gray-600'>{order.invoiceNo}</p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-gray-800">Order Date</p>

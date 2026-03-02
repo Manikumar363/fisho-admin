@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Download, Eye } from 'lucide-react';
+import { Search, Download, Eye, Filter, X, ArrowUp, ArrowDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -58,9 +58,13 @@ export default function BulkOrders() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalOrders, setTotalOrders] = useState(0);
-  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [sortType, setSortType] = useState<'date-desc' | 'date-asc' | 'name-asc' | 'name-desc'>('date-desc');
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [showSortMenu, setShowSortMenu] = useState(false);
 
   // Fetch bulk orders from API
   useEffect(() => {
@@ -73,7 +77,6 @@ export default function BulkOrders() {
     const params = new URLSearchParams();
     params.append('page', String(currentPage));
     params.append('limit', '20');
-    if (search.trim()) params.append('search', search.trim());
 
     apiFetch<{
       success: boolean;
@@ -99,12 +102,76 @@ export default function BulkOrders() {
     return () => {
       active = false;
     };
-  }, [currentPage, search]);
+  }, [currentPage]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value);
+    setSearchInput(e.target.value);
+  };
+
+  const handleStatusFilterSelect = (status: string) => {
+    setSelectedStatus(status);
+    setShowFilterMenu(false);
     setCurrentPage(1);
   };
+
+  const clearFilters = () => {
+    setSelectedStatus('all');
+    setShowFilterMenu(false);
+    setCurrentPage(1);
+  };
+
+  const handleSortSelect = (sortOption: 'date-desc' | 'date-asc' | 'name-asc' | 'name-desc') => {
+    setSortType(sortOption);
+    setShowSortMenu(false);
+  };
+
+  const getSortLabel = () => {
+    switch (sortType) {
+      case 'date-desc':
+        return 'Date (Newest First)';
+      case 'date-asc':
+        return 'Date (Oldest First)';
+      case 'name-asc':
+        return 'Name (A-Z)';
+      case 'name-desc':
+        return 'Name (Z-A)';
+      default:
+        return 'Sort';
+    }
+  };
+
+  const filteredAndSortedOrders = React.useMemo(() => {
+    const query = searchInput.trim().toLowerCase();
+
+    let filtered = orders.filter((order) => {
+      const orderStatus = (order.status || '').toLowerCase();
+      const matchesStatus = selectedStatus === 'all' || orderStatus === selectedStatus;
+      if (!matchesStatus) return false;
+
+      if (!query) return true;
+
+      const orderId = (order._id || '').toLowerCase();
+      const customerName = (order.shippingAddress?.name || '').toLowerCase();
+      return orderId.includes(query) || customerName.includes(query);
+    });
+
+    filtered.sort((a, b) => {
+      if (sortType === 'date-desc' || sortType === 'date-asc') {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return sortType === 'date-desc' ? dateB - dateA : dateA - dateB;
+      } else if (sortType === 'name-asc' || sortType === 'name-desc') {
+        const nameA = (a.shippingAddress?.name || '').toLowerCase();
+        const nameB = (b.shippingAddress?.name || '').toLowerCase();
+        if (nameA < nameB) return sortType === 'name-asc' ? -1 : 1;
+        if (nameA > nameB) return sortType === 'name-asc' ? 1 : -1;
+        return 0;
+      }
+      return 0;
+    });
+
+    return filtered;
+  }, [orders, searchInput, selectedStatus, sortType]);
 
   // Format helpers
   const formatDate = (dateString: string) => {
@@ -196,22 +263,175 @@ export default function BulkOrders() {
         </div>
         <Button variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-50">
           <Download className="w-4 h-4 mr-2" />
-          Export Orders
+          Export Bulk Orders
         </Button>
       </div>
 
-      {/* Search */}
+      {/* Search and Filters */}
       <Card>
         <CardContent className="p-4">
           <div className="flex gap-4 items-center">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <Input
-                placeholder="Search by order ID, customer name, or phone..."
+                placeholder="Search by order ID or customer name..."
                 className="pl-10"
-                value={search}
+                value={searchInput}
                 onChange={handleSearchChange}
               />
+            </div>
+            <div className="relative">
+              <Button
+                variant="outline"
+                onClick={() => setShowSortMenu(!showSortMenu)}
+              >
+                {sortType.startsWith('date') ? (
+                  sortType === 'date-desc' ? (
+                    <ArrowDown className="w-4 h-4 mr-2" />
+                  ) : (
+                    <ArrowUp className="w-4 h-4 mr-2" />
+                  )
+                ) : null}
+                {getSortLabel()}
+              </Button>
+              {showSortMenu && (
+                <div className="absolute left-0 top-full mt-2 w-56 bg-white border rounded-lg shadow-lg z-10">
+                  <div className="p-3 border-b">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-semibold">Sort By</span>
+                      <button
+                        onClick={() => setShowSortMenu(false)}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="p-2">
+                    <button
+                      onClick={() => handleSortSelect('date-desc')}
+                      className={sortType === 'date-desc' ? 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 bg-blue-50 text-blue-600 flex items-center gap-2' : 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 flex items-center gap-2'}
+                    >
+                      <ArrowDown className="w-4 h-4" />
+                      Date (Newest First)
+                    </button>
+                    <button
+                      onClick={() => handleSortSelect('date-asc')}
+                      className={sortType === 'date-asc' ? 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 bg-blue-50 text-blue-600 flex items-center gap-2' : 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 flex items-center gap-2'}
+                    >
+                      <ArrowUp className="w-4 h-4" />
+                      Date (Oldest First)
+                    </button>
+                    <button
+                      onClick={() => handleSortSelect('name-asc')}
+                      className={sortType === 'name-asc' ? 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 bg-blue-50 text-blue-600' : 'w-full text-left px-3 py-2 rounded hover:bg-gray-50'}
+                    >
+                      Name (A-Z)
+                    </button>
+                    <button
+                      onClick={() => handleSortSelect('name-desc')}
+                      className={sortType === 'name-desc' ? 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 bg-blue-50 text-blue-600' : 'w-full text-left px-3 py-2 rounded hover:bg-gray-50'}
+                    >
+                      Name (Z-A)
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="relative">
+              <Button
+                variant="outline"
+                onClick={() => setShowFilterMenu(!showFilterMenu)}
+                className={selectedStatus !== 'all' ? 'border-blue-600 text-blue-600' : ''}
+              >
+                <Filter className="w-4 h-4 mr-2" />
+                Filter
+              </Button>
+              {showFilterMenu && (
+                <div className="absolute right-0 top-full mt-2 w-56 bg-white border rounded-lg shadow-lg z-10">
+                  <div className="p-3 border-b">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-semibold">Filter by Status</span>
+                      <button
+                        onClick={() => setShowFilterMenu(false)}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    {selectedStatus !== 'all' && (
+                      <button
+                        onClick={clearFilters}
+                        className="text-sm text-blue-600 hover:underline"
+                      >
+                        Clear filter
+                      </button>
+                    )}
+                  </div>
+                  <div className="p-2 max-h-80 overflow-y-auto">
+                    <button
+                      onClick={clearFilters}
+                      className={selectedStatus === 'all' ? 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 bg-blue-50 text-blue-600' : 'w-full text-left px-3 py-2 rounded hover:bg-gray-50'}
+                    >
+                      All Orders ({totalOrders})
+                    </button>
+                    <button
+                      onClick={() => handleStatusFilterSelect('requested')}
+                      className={selectedStatus === 'requested' ? 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 bg-blue-50 text-blue-600' : 'w-full text-left px-3 py-2 rounded hover:bg-gray-50'}
+                    >
+                      Requested
+                    </button>
+                    <button
+                      onClick={() => handleStatusFilterSelect('accepted')}
+                      className={selectedStatus === 'accepted' ? 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 bg-blue-50 text-blue-600' : 'w-full text-left px-3 py-2 rounded hover:bg-gray-50'}
+                    >
+                      Accepted
+                    </button>
+                    <button
+                      onClick={() => handleStatusFilterSelect('quotation_added')}
+                      className={selectedStatus === 'quotation_added' ? 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 bg-blue-50 text-blue-600' : 'w-full text-left px-3 py-2 rounded hover:bg-gray-50'}
+                    >
+                      Quotation Added
+                    </button>
+                    <button
+                      onClick={() => handleStatusFilterSelect('payment_confirmed')}
+                      className={selectedStatus === 'payment_confirmed' ? 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 bg-blue-50 text-blue-600' : 'w-full text-left px-3 py-2 rounded hover:bg-gray-50'}
+                    >
+                      Payment Confirmed
+                    </button>
+                    <button
+                      onClick={() => handleStatusFilterSelect('processing')}
+                      className={selectedStatus === 'processing' ? 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 bg-blue-50 text-blue-600' : 'w-full text-left px-3 py-2 rounded hover:bg-gray-50'}
+                    >
+                      Processing
+                    </button>
+                    <button
+                      onClick={() => handleStatusFilterSelect('order_ready')}
+                      className={selectedStatus === 'order_ready' ? 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 bg-blue-50 text-blue-600' : 'w-full text-left px-3 py-2 rounded hover:bg-gray-50'}
+                    >
+                      Order Ready
+                    </button>
+                    <button
+                      onClick={() => handleStatusFilterSelect('order_delivered')}
+                      className={selectedStatus === 'order_delivered' ? 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 bg-blue-50 text-blue-600' : 'w-full text-left px-3 py-2 rounded hover:bg-gray-50'}
+                    >
+                      Delivered
+                    </button>
+                    <button
+                      onClick={() => handleStatusFilterSelect('rejected')}
+                      className={selectedStatus === 'rejected' ? 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 bg-blue-50 text-blue-600' : 'w-full text-left px-3 py-2 rounded hover:bg-gray-50'}
+                    >
+                      Rejected
+                    </button>
+                    <button
+                      onClick={() => handleStatusFilterSelect('cancelled')}
+                      className={selectedStatus === 'cancelled' ? 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 bg-blue-50 text-blue-600' : 'w-full text-left px-3 py-2 rounded hover:bg-gray-50'}
+                    >
+                      Cancelled
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </CardContent>
@@ -221,7 +441,7 @@ export default function BulkOrders() {
       <Card>
         <CardHeader>
           <CardTitle>
-            Bulk Orders ({totalOrders})
+            Bulk Orders ({searchInput.trim() ? filteredAndSortedOrders.length : totalOrders})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -253,14 +473,14 @@ export default function BulkOrders() {
                       {error}
                     </td>
                   </tr>
-                ) : orders.length === 0 ? (
+                ) : filteredAndSortedOrders.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="py-4 px-4 text-center text-gray-500">
-                      No orders found
+                      {searchInput.trim() ? 'No matching orders found' : 'No orders found'}
                     </td>
                   </tr>
                 ) : (
-                  orders.map((order) => {
+                  filteredAndSortedOrders.map((order) => {
                     const isPending = order.status?.toLowerCase() === 'requested';
                     const firstItem = order.items?.[0];
 
@@ -343,7 +563,7 @@ export default function BulkOrders() {
             </table>
           </div>
           {/* Pagination */}
-          {!loading && !error && orders.length > 0 && totalPages > 1 && (
+          {!loading && !error && filteredAndSortedOrders.length > 0 && totalPages > 1 && (
             <div className="flex items-center justify-between mt-4 pt-4 border-t">
               <div className="text-sm text-gray-600">
                 Page {currentPage} of {totalPages}
