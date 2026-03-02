@@ -73,6 +73,9 @@ interface BulkOrder {
   };
   orderType: string;
   status: string;
+  preferredDeliveryDate?: string;
+  preferredDeliveryTime?: string;
+  notes?: string;
 }
 
 export default function BulkOrderDetails() {
@@ -88,6 +91,7 @@ export default function BulkOrderDetails() {
   const [refundingType, setRefundingType] = useState<string | null>(null);
   const [isEditingTimeline, setIsEditingTimeline] = useState(false);
   const [isEditingPricing, setIsEditingPricing] = useState(false);
+  const [isSavingPricing, setIsSavingPricing] = useState(false);
   const [editingPricing, setEditingPricing] = useState({
     subtotal: '',
     discount: '',
@@ -361,6 +365,7 @@ export default function BulkOrderDetails() {
 
   const savePricingChanges = async () => {
     if (!order) return;
+    setIsSavingPricing(true);
     try {
       const subtotal = parseFloat(editingPricing.subtotal) || 0;
       const discount = parseFloat(editingPricing.discount) || 0;
@@ -394,37 +399,23 @@ export default function BulkOrderDetails() {
 
       if (!res.success) throw new Error(res.message || 'Failed to update pricing');
 
-      if (res.data) {
-        setOrder((prevOrder) => {
-          const nextPricing = res.data?.pricing
-            ? {
-                subTotal: res.data.pricing.subTotal ?? res.data.pricing.grandTotal,
-                grandTotal: res.data.pricing.grandTotal,
-                tax: res.data.pricing.tax,
-                discount: res.data.pricing.discount,
-                shipping: res.data.pricing.shipping,
-              }
-            : prevOrder?.pricing;
+      toast.success(res.message || 'Pricing updated successfully');
 
-          if (!prevOrder) {
-            return {
-              ...res.data,
-              pricing: nextPricing as BulkOrder['pricing'],
-            } as BulkOrder;
-          }
-
-          return {
-            ...prevOrder,
-            ...res.data,
-            pricing: nextPricing as BulkOrder['pricing'],
-          } as BulkOrder;
-        });
+      // Re-fetch complete order data to ensure all fields (including product details) are present
+      if (id) {
+        const refreshRes = await apiFetch<{ success: boolean; data: BulkOrder }>(
+          `/api/bulk-order/order-by-id/${id}`
+        );
+        if (refreshRes.success) {
+          setOrder(refreshRes.data);
+        }
       }
 
-      toast.success(res.message || 'Pricing updated successfully');
       setIsEditingPricing(false);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to update pricing');
+    } finally {
+      setIsSavingPricing(false);
     }
   };
 
@@ -722,16 +713,18 @@ export default function BulkOrderDetails() {
                   <div className="flex gap-2 pt-4 border-t">
                     <Button
                       size="sm"
-                      className="bg-green-600 text-white hover:bg-green-700 flex-1"
+                      className="bg-green-600 text-white hover:bg-green-700 flex-1 disabled:opacity-70"
                       onClick={savePricingChanges}
+                      disabled={isSavingPricing}
                     >
-                      Save Changes
+                      {isSavingPricing ? 'Saving...' : 'Save Changes'}
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={cancelEditingPricing}
                       className="flex-1"
+                      disabled={isSavingPricing}
                     >
                       Cancel
                     </Button>
@@ -849,6 +842,42 @@ export default function BulkOrderDetails() {
         </CardContent>
       </Card>
 
+      {/* Delivery Preferences */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Truck className="w-5 h-5" />
+            Delivery Preferences
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+                <Calendar className="w-4 h-4" />
+                Preferred Delivery Date
+              </div>
+              <p className="font-medium text-base">
+                {order.preferredDeliveryDate ? formatDate(order.preferredDeliveryDate) : '—'}
+              </p>
+            </div>
+            <div>
+              <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+                <Clock className="w-4 h-4" />
+                Preferred Delivery Time
+              </div>
+              <p className="font-medium text-base">{order.preferredDeliveryTime || '—'}</p>
+            </div>
+          </div>
+          {order.notes && (
+            <div className="mt-4 pt-4 border-t">
+              <p className="text-sm text-gray-600 mb-2">Special Notes</p>
+              <p className="text-sm bg-gray-50 p-3 rounded">{order.notes}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Order Items */}
       <Card>
         <CardHeader>
@@ -882,31 +911,11 @@ export default function BulkOrderDetails() {
                     <p className="text-sm text-gray-600">{item.product?.description}</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <Badge variant="outline">Weight: {item.weight}kg</Badge>
-                      <Badge variant="outline">
+                      {/* <Badge variant="outline">
                         Price: <span className="dirham-symbol mr-2">&#xea;</span>
                         {item.variant?.sellingPrice || '—'}
-                      </Badge>
+                      </Badge> */}
                     </div>
-                  </div>
-                </div>
-
-                {/* Delivery Preferences */}
-                <div className="border-t pt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
-                      <Calendar className="w-4 h-4" />
-                      Preferred Delivery Date
-                    </div>
-                    <p className="font-medium">
-                      {item.preferredDeliveryDate ? formatDate(item.preferredDeliveryDate) : '—'}
-                    </p>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
-                      <Clock className="w-4 h-4" />
-                      Preferred Delivery Time
-                    </div>
-                    <p className="font-medium">{item.preferredDeliveryTime || '—'}</p>
                   </div>
                 </div>
 

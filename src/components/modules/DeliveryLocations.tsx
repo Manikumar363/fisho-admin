@@ -37,7 +37,13 @@ interface ApiCommunity {
   name: string;
   expressDelivery: boolean;
   isActive: boolean;
-  nearByStore?: string;
+  nearByStore?: {
+    _id: string;
+    name: string;
+    id?: string;
+    location?: any;
+    formattedHours?: string;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -127,10 +133,8 @@ export default function DeliveryLocations() {
   // Map communities to locations with store name
   useEffect(() => {
     const mapped: DeliveryLocation[] = (communities || []).map((c) => {
-      const storeObj = c.nearByStore
-        ? stores.find(s => s._id === c.nearByStore)
-        : null;
-      const storeName = storeObj ? storeObj.name : (typeof c.nearByStore === 'string' ? c.nearByStore : '-');
+      // nearByStore is now a populated object from the API
+      const storeName = c.nearByStore?.name || '-';
       return {
         id: `LOC-${String(c.id ?? c._id).padStart(3, '0')}`,
         code: String(c._id || ''),
@@ -142,7 +146,7 @@ export default function DeliveryLocations() {
       };
     });
     setLocations(mapped);
-  }, [communities, stores]);
+  }, [communities]);
 
   const handleAddLocation = (newLocation: {
     id: string;
@@ -395,13 +399,10 @@ export default function DeliveryLocations() {
                           <td className="py-3 px-4">{location.locationName}</td>
                           <td className="py-3 px-4">
                             <Badge
-                              variant="outline"
                               className={
-                                location.deliveryType.length === 2
-                                  ? 'border-blue-600 text-blue-600'
-                                  : location.deliveryType[0] === 'Express Delivery'
-                                  ? 'border-orange-600 text-orange-600'
-                                  : 'border-green-600 text-green-600'
+                                location.deliveryType[0] === 'Express Delivery'
+                                  ? 'bg-purple-100 text-purple-700 border border-purple-300'
+                                  : 'bg-blue-100 text-blue-700 border border-blue-300'
                               }
                             >
                               {getDeliveryTypeDisplay(location.deliveryType)}

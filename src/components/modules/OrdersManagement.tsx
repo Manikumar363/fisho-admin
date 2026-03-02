@@ -230,6 +230,15 @@ export default function OrdersManagement() {
     return 'bg-gray-100 text-gray-700 border border-gray-300';
   };
 
+  const getPaymentStatusBadgeClass = (status?: string) => {
+    if (!status) return 'bg-gray-100 text-gray-700 border border-gray-300';
+    const statusLower = status.toLowerCase();
+    if (statusLower === 'pending') return 'bg-yellow-100 text-yellow-700 border border-yellow-300';
+    if (statusLower === 'paid') return 'bg-green-100 text-green-700 border border-green-300';
+    if (statusLower === 'failed') return 'bg-red-100 text-red-700 border border-red-300';
+    return 'bg-gray-100 text-gray-700 border border-gray-300';
+  };
+
   const getStoreId = (order: Order) =>
     (order as any).store?._id || (order as any).store?.id || (order as any).storeId;
 
@@ -674,6 +683,7 @@ export default function OrdersManagement() {
                   <th className="text-left py-3 px-4">Items</th>
                   <th className="text-left py-3 px-4">Amount</th>
                   <th className="text-left py-3 px-4">Status</th>
+                  <th className="text-left py-3 px-4">Payment Status</th>
                   <th className="text-left py-3 px-4">Delivery Type</th>
                   <th className="text-left py-3 px-4">Date</th>
                   <th className="text-left py-3 px-4">Actions</th>
@@ -682,15 +692,15 @@ export default function OrdersManagement() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="py-4 px-4 text-center text-gray-600">Loading orders...</td>
+                    <td colSpan={9} className="py-4 px-4 text-center text-gray-600">Loading orders...</td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan={8} className="py-4 px-4 text-center text-red-600">{error}</td>
+                    <td colSpan={9} className="py-4 px-4 text-center text-red-600">{error}</td>
                   </tr>
                 ) : filteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-4 px-4 text-center text-gray-500">
+                    <td colSpan={9} className="py-4 px-4 text-center text-gray-500">
                       {searchInput.trim() ? 'No matching orders found' : 'No orders found'}
                     </td>
                   </tr>
@@ -712,6 +722,11 @@ export default function OrdersManagement() {
                         <td className="py-3 px-4">
                           <Badge className={getStatusBadgeClass(order.status)}>
                             {capitalize(order.status)}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4">
+                          <Badge className={getPaymentStatusBadgeClass(order.payment?.status)}>
+                            {capitalize(order.payment?.status)}
                           </Badge>
                         </td>
                         <td className="py-3 px-4">

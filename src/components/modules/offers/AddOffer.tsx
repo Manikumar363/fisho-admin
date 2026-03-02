@@ -70,11 +70,7 @@ export default function AddOffer({ onBack, onSave }: AddOfferProps) {
       newErrors.usageLimitPerUser = 'Usage limit must be greater than 0';
     }
 
-    if (!formData.totalUsageLimit) {
-      newErrors.totalUsageLimit = 'Total usage limit is required';
-    } else if (Number(formData.totalUsageLimit) <= 0) {
-      newErrors.totalUsageLimit = 'Total usage limit must be greater than 0';
-    }
+    
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -262,7 +258,7 @@ export default function AddOffer({ onBack, onSave }: AddOfferProps) {
               )}
             </div>
 
-            {/* Total Usage Limit */}
+            {/* Total Usage Limit 
             <div className="space-y-2">
               <Label htmlFor="totalUsageLimit">
                 Total Usage Limit <span className="text-red-500">*</span>
@@ -280,7 +276,7 @@ export default function AddOffer({ onBack, onSave }: AddOfferProps) {
               {errors.totalUsageLimit && (
                 <p className="text-sm text-red-500">{errors.totalUsageLimit}</p>
               )}
-            </div>
+            </div>*/}
 
             {/* Action Buttons */}
             <div className="flex justify-end gap-3 pt-4">

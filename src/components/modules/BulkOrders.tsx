@@ -46,6 +46,9 @@ interface BulkOrder {
   orderType: string;
   status: string;
   updatedAt: string;
+  preferredDeliveryDate?: string;
+  preferredDeliveryTime?: string;
+  notes?: string;
 }
 
 export default function BulkOrders() {
@@ -482,7 +485,6 @@ export default function BulkOrders() {
                 ) : (
                   filteredAndSortedOrders.map((order) => {
                     const isPending = order.status?.toLowerCase() === 'requested';
-                    const firstItem = order.items?.[0];
 
                     return (
                       <tr key={order._id} className="border-b border-gray-100 hover:bg-gray-50">
@@ -505,12 +507,12 @@ export default function BulkOrders() {
                         <td className="py-3 px-4">
                           <div className="text-sm">
                             <p>
-                              {firstItem?.preferredDeliveryDate
-                                ? formatDeliveryDate(firstItem.preferredDeliveryDate)
+                              {order.preferredDeliveryDate
+                                ? formatDeliveryDate(order.preferredDeliveryDate)
                                 : '—'}
                             </p>
                             <p className="text-gray-600 text-xs">
-                              {firstItem?.preferredDeliveryTime || '—'}
+                              {order.preferredDeliveryTime || '—'}
                             </p>
                           </div>
                         </td>

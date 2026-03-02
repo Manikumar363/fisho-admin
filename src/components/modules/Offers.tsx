@@ -275,7 +275,7 @@ const Offers: React.FC = () => {
                     <th className="text-left py-3 px-4">Min Order Value</th>
                     <th className="text-left py-3 px-4">Expiry Date</th>
                     <th className="text-left py-3 px-4">Usage Limit/User</th>
-                    <th className="text-left py-3 px-4">Total Limit</th>
+                    {/* <th className="text-left py-3 px-4">Total Limit</th> */}
                     <th className="text-left py-3 px-4">Current Usage</th>
                     <th className="text-left py-3 px-4">Status</th>
                     <th className="text-left py-3 px-4">Actions</th>
@@ -306,7 +306,7 @@ const Offers: React.FC = () => {
                           })}
                         </td>
                         <td className="py-3 px-4">{offer.usageLimitPerUser}</td>
-                        <td className="py-3 px-4">{offer.totalUsageLimit}</td>
+                        {/* <td className="py-3 px-4">{offer.totalUsageLimit}</td> */}
                         <td className="py-3 px-4">{offer.currentUsageCount}</td>
                         <td className="py-3 px-4">
                           <Badge className={getStatusBadgeClass(offer.status)}>

@@ -37,6 +37,12 @@ interface Order {
     loyaltyPoints: string;
     couponDiscount?: string;
   };
+  appliedCoupon?: {
+    couponId: string;
+    couponCode: string;
+    discountPercentage: number;
+    discountAmount: number;
+  };
   shippingAddress: {
     name: string;
     phone: string;
@@ -519,24 +525,31 @@ export default function OrderDetails() {
                 
                   <div className="flex justify-between">
                     <span>Product Discount</span>
-                    <span>-<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.discount)}</span>
+                    <span className="text-green-600 font-medium">-<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.discount)}</span>
                   </div>
                 
-                <div className="flex justify-between">
-                  <span>Coupon Discount</span>
-                  <span>-<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.couponDiscount || '0')}</span>
+                <div className="flex justify-between items-center">
+                  <span className="flex items-center gap-2">
+                    Coupon Discount
+                    {order?.appliedCoupon?.couponCode && (
+                      <Badge className="bg-purple-100 text-purple-700 border-purple-300 text-xs px-2 py-0.5">
+                        {order.appliedCoupon.couponCode}
+                      </Badge>
+                    )}
+                  </span>
+                  <span className="text-green-600 font-medium">-<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.appliedCoupon?.discountAmount || '0')}</span>
                 </div>
                 <div className="flex justify-between ">
                   <span>Loyalty Points</span>
-                  <span>-<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.loyaltyPoints || '0')}</span>
+                  <span className="text-green-600 font-medium">-<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.loyaltyPoints || '0')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Delivery charges</span>
-                  <span>+<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.shipping || '0')}</span>
+                  <span className="text-red-600 font-medium">+<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.shipping || '0')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Tax</span>
-                  <span>+<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.tax || '0')}</span>
+                  <span className="text-red-600 font-medium">+<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(order?.pricing?.tax || '0')}</span>
                 </div>
                 <div className="flex justify-between font-semibold pt-2 border-t border-gray-200">
                   <span>Total Amount</span>

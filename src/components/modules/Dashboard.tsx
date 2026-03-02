@@ -276,39 +276,43 @@ export default function Dashboard() {
                 <tbody>
                   {activeOrders.map((order: any) => {
                     // Map delivery type for color
-                    let typeColor = 'bg-purple-100 text-purple-700';
-                    if (order.deliveryType === 'express') typeColor = 'bg-orange-100 text-orange-700';
-                    else if (order.deliveryType === 'next-day') typeColor = 'bg-green-100 text-green-700';
+                    let typeColor = 'bg-purple-100 text-purple-700 border border-purple-300';
+                    if (order.deliveryType?.toLowerCase() === 'express') typeColor = 'bg-purple-100 text-purple-700 border border-purple-300';
+                    else if (order.deliveryType?.toLowerCase() === 'next-day' || order.deliveryType?.toLowerCase() === 'nextday') typeColor = 'bg-blue-100 text-blue-700 border border-blue-300';
 
                     // Map status for color (distinct for each status)
-                    let statusColor = 'bg-gray-100 text-gray-700';
+                    let statusColor = 'bg-gray-100 text-gray-700 border border-gray-300';
                     switch ((order.status || '').toLowerCase()) {
                       case 'pending':
-                        statusColor = 'bg-orange-100 text-orange-700';
+                        statusColor = 'bg-orange-100 text-orange-700 border border-orange-300';
+                        break;
+                      case 'accepted':
+                      case 'accept':
+                        statusColor = 'bg-green-100 text-green-700 border border-green-300';
                         break;
                       case 'accepted_by_delivery_partner':
-                        statusColor = 'bg-blue-100 text-blue-700';
+                        statusColor = 'bg-blue-100 text-blue-700 border border-blue-300';
                         break;
                       case 'ready_to_pickup':
-                        statusColor = 'bg-yellow-100 text-yellow-800';
-                        break;
-                      case 'out for delivery':
-                        statusColor = 'bg-indigo-100 text-indigo-700';
+                        statusColor = 'bg-yellow-100 text-yellow-800 border border-yellow-300';
                         break;
                       case 'order placed':
-                        statusColor = 'bg-green-100 text-green-700';
+                        statusColor = 'bg-cyan-100 text-cyan-700 border border-cyan-300';
                         break;
-                      case 'order collected':
-                        statusColor = 'bg-purple-100 text-purple-700';
+                      case 'out for delivery':
+                        statusColor = 'bg-purple-100 text-purple-700 border border-purple-300';
                         break;
                       case 'delivered':
-                        statusColor = 'bg-emerald-100 text-emerald-700';
+                        statusColor = 'bg-emerald-100 text-emerald-700 border border-emerald-300';
+                        break;
+                      case 'rejected':
+                        statusColor = 'bg-red-100 text-red-700 border border-red-300';
                         break;
                       case 'cancelled':
-                        statusColor = 'bg-red-100 text-red-700';
+                        statusColor = 'bg-red-100 text-red-700 border border-red-300';
                         break;
                       default:
-                        statusColor = 'bg-gray-100 text-gray-700';
+                        statusColor = 'bg-gray-100 text-gray-700 border border-gray-300';
                     }
 
                     return (
@@ -316,7 +320,7 @@ export default function Dashboard() {
                         <td className="py-3 px-4 text-blue-600">{order.invoiceNo || order._id}</td>
                         <td className="py-3 px-4">{order.shippingAddress?.name || '-'}</td>
                         <td className="py-3 px-4">
-                          <span className={`inline-flex px-2 py-1 rounded text-xs ${typeColor}`}>
+                          <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${typeColor}`}>
                             {order.deliveryType || order.orderType || '-'}
                           </span>
                         </td>
@@ -325,8 +329,8 @@ export default function Dashboard() {
                           {order.pricing?.grandTotal || '-'}
                         </td>
                         <td className="py-3 px-4">
-                          <span className={`inline-flex px-2 py-1 rounded text-xs ${statusColor}`}>
-                            {order.status || '-'}
+                          <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${statusColor}`}>
+                            {(order.status || '-').charAt(0).toUpperCase() + (order.status || '-').slice(1)}
                           </span>
                         </td>
                         <td className="py-3 px-4">
