@@ -1684,7 +1684,7 @@ const handleRemoveWeight = (weight: number) => {
             isExpressDelivery: productForm.isExpressDelivery,
             isNextDayDelivery: false,
             order: 1,
-            images: productImageLocations
+            image: productImageLocations[0] || ''
           },
           variants: variants
         };
