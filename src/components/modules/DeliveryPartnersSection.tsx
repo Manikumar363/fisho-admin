@@ -89,6 +89,19 @@ export default function DeliveryPartnersSection({
   const [deletedUsersTotalCount, setDeletedUsersTotalCount] = useState(0);
   const deletedUsersLimit = 10;
 
+  const getStatusBadgeClass = (status: string | undefined) => {
+    return status === 'Active'
+      ? 'bg-green-100 text-green-700 border border-green-300'
+      : 'bg-gray-100 text-red-700 border border-red-300';
+  };
+
+  const isAddPartnerFormValid =
+    deliveryPartnerForm.name.trim().length > 0 &&
+    /^\d{10}$/.test(deliveryPartnerForm.mobileNumber) &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(deliveryPartnerForm.email.trim()) &&
+    Boolean(deliveryPartnerForm.drivingLicense) &&
+    Boolean(deliveryPartnerForm.workPermit);
+
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -282,7 +295,7 @@ export default function DeliveryPartnersSection({
                           {partner.earnings.toLocaleString()}
                         </td>
                         <td className="py-3 px-4">
-                          <Badge variant={partner.status === 'Active' ? 'default' : 'secondary'}>
+                          <Badge className={getStatusBadgeClass(partner.status)}>
                             {partner.status}
                           </Badge>
                         </td>
@@ -346,9 +359,7 @@ export default function DeliveryPartnersSection({
 
       <Dialog
         open={showAddDeliveryPartnerModal}
-        onOpenChange={(open) => {
-          if (!open) return;
-        }}
+        onOpenChange={setShowAddDeliveryPartnerModal}
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -357,7 +368,9 @@ export default function DeliveryPartnersSection({
           <form onSubmit={handleAddDeliveryPartner}>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="partnerName">Name</Label>
+                <Label htmlFor="partnerName">
+                  Name<span className="text-red-600">*</span>
+                </Label>
                 <Input
                   id="partnerName"
                   value={deliveryPartnerForm.name}
@@ -368,7 +381,9 @@ export default function DeliveryPartnersSection({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="partnerMobile">Mobile Number</Label>
+                <Label htmlFor="partnerMobile">
+                  Mobile Number<span className="text-red-600">*</span>
+                </Label>
                 <Input
                   id="partnerMobile"
                   type="tel"
@@ -384,7 +399,9 @@ export default function DeliveryPartnersSection({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="drivingLicense">Driving License</Label>
+                <Label htmlFor="drivingLicense">
+                  Driving License<span className="text-red-600">*</span>
+                </Label>
                 <Input
                   id="drivingLicense"
                   type="file"
@@ -401,7 +418,9 @@ export default function DeliveryPartnersSection({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="workPermit">Work Permit</Label>
+                <Label htmlFor="workPermit">
+                  Work Permit<span className="text-red-600">*</span>
+                </Label>
                 <Input
                   id="workPermit"
                   type="file"
@@ -418,7 +437,9 @@ export default function DeliveryPartnersSection({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="partnerEmail">Email ID</Label>
+                <Label htmlFor="partnerEmail">
+                  Email ID<span className="text-red-600">*</span>
+                </Label>
                 <Input
                   id="partnerEmail"
                   type="email"
@@ -434,7 +455,11 @@ export default function DeliveryPartnersSection({
               <Button type="button" variant="outline" onClick={() => setShowAddDeliveryPartnerModal(false)}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
+              <Button
+                type="submit"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={!isAddPartnerFormValid}
+              >
                 Add Partner
               </Button>
             </DialogFooter>
@@ -445,7 +470,9 @@ export default function DeliveryPartnersSection({
       <Dialog open={showDeletedUsersModal} onOpenChange={setShowDeletedUsersModal}>
         <DialogContent className="max-w-4xl sm:max-w-5xl w-[80vw] sm:w-[70vw] max-h-[70vh] flex flex-col p-0 overflow-hidden">
           <DialogHeader className="px-6 py-4 border-b bg-white">
-            <DialogTitle>Deleted Delivery Partners</DialogTitle>
+            <div className="flex items-center gap-3">
+              <DialogTitle>Deleted Delivery Partners</DialogTitle>
+            </div>
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto px-6 py-4">
@@ -458,11 +485,18 @@ export default function DeliveryPartnersSection({
             ) : deletedUsers.length === 0 ? (
               <div className="py-8 text-center text-gray-500">No deleted users found</div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-4">DP ID</th>
+              <>
+                <div className="mb-4 flex items-center gap-2">
+                  <h3 className="font-semibold text-gray-700">Total Deleted Partners:</h3>
+                  <Badge className="bg-red-100 text-red-700 border border-red-300">
+                    {deletedUsersTotalCount}
+                  </Badge>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-3 px-4">DP ID</th>
                       <th className="text-left py-3 px-4">Name</th>
                       <th className="text-left py-3 px-4">Email</th>
                       <th className="text-left py-3 px-4">Phone</th>
@@ -494,6 +528,7 @@ export default function DeliveryPartnersSection({
                   </tbody>
                 </table>
               </div>
+              </>
             )}
           </div>
 

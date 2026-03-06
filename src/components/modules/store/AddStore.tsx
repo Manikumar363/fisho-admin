@@ -8,7 +8,7 @@ import { Textarea } from '../../ui/textarea';
 import { Button } from '../../ui/button';
 import { Switch } from '../../ui/switch';
 import { apiFetch } from '../../../lib/api';
-import { toast, ToastContainer } from 'react-toastify';
+import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import MapSection from './MapSection';
 
@@ -182,7 +182,7 @@ export default function AddStore({ onBack, onStoreCreated }: AddStoreProps) {
   };
 
   return (
-    <div className="space-y-6 max-h-[calc(100vh-6rem)] overflow-auto">
+    <div className="space-y-6 pb-6">
       <div className="flex items-center gap-4">
         <button 
           onClick={handleBack}
@@ -355,19 +355,6 @@ export default function AddStore({ onBack, onStoreCreated }: AddStoreProps) {
         </CardContent>
       </Card>
 
-      {/* Toast Notifications */}
-      <ToastContainer
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="light"
-      />
     </div>
   );
 }

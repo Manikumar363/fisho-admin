@@ -827,6 +827,22 @@ export default function UserManagement() {
   setShowEditVendorModal(true);
   };
 
+  const openAddVendorModal = () => {
+    setVendorForm({
+      vendorName: '',
+      companyName: '',
+      vatNumber: '',
+      email: '',
+      contactNumber: ''
+    });
+    setShowAddVendorModal(true);
+  };
+
+  const openAddSubadminModal = () => {
+    setSubadminForm({ name: '', email: '', phone: '' });
+    setShowAddSubadminModal(true);
+  };
+
   const clearFilters = () => {
     setFilters({
       status: '',
@@ -836,6 +852,16 @@ export default function UserManagement() {
 
   const hasActiveFilters = () => {
     return filters.status !== '';
+  };
+
+  const getStatusBadgeClass = (status: string | boolean | undefined | null) => {
+    const isActive = typeof status === 'string'
+      ? status.toLowerCase() === 'active'
+      : Boolean(status);
+
+    return isActive
+      ? 'bg-green-100 text-green-700 border border-green-300'
+      : 'bg-gray-100 text-red-700 border border-red-300';
   };
 
   const storeManagerSortOptions = [
@@ -1136,7 +1162,7 @@ export default function UserManagement() {
                           </td>
                           <td className="py-3 px-4">{user.email || 'N/A'}</td>
                           <td className="py-3 px-4">
-                            <Badge variant={user.isActive ? 'default' : 'secondary'}>
+                            <Badge className={getStatusBadgeClass(user.isActive)}>
                               {user.isActive ? 'Active' : 'Inactive'}
                             </Badge>
                           </td>
@@ -1217,7 +1243,7 @@ export default function UserManagement() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Store Managers</CardTitle>
               <Button 
-                onClick={() => setShowAddSubadminModal(true)}
+                onClick={openAddSubadminModal}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -1256,7 +1282,7 @@ export default function UserManagement() {
                           <td className="py-3 px-4">{manager.email}</td>
                           <td className="py-3 px-4 capitalize">{manager.role ? manager.role.charAt(0).toUpperCase() + manager.role.slice(1): ''}</td>
                           <td className="py-3 px-4">
-                            <Badge variant={manager.isActive ? 'default' : 'secondary'}>
+                            <Badge className={getStatusBadgeClass(manager.isActive)}>
                               {manager.isActive ? 'Active' : 'Inactive'}
                             </Badge>
                           </td>
@@ -1330,7 +1356,7 @@ export default function UserManagement() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Vendors</CardTitle>
               <Button 
-                onClick={() => setShowAddVendorModal(true)}
+                onClick={openAddVendorModal}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -1371,7 +1397,7 @@ export default function UserManagement() {
                           <td className="py-3 px-4">{vendor.email}</td>
                           <td className="py-3 px-4">{vendor.phone}</td>
                           <td className="py-3 px-4">
-                            <Badge variant="default">Active</Badge>
+                            <Badge className={getStatusBadgeClass('Active')}>Active</Badge>
                           </td>
                           <td className="py-3 px-4">
                             <div className="flex gap-2">
@@ -1515,6 +1541,7 @@ export default function UserManagement() {
                   }}
                   placeholder="Enter 10-digit phone number"
                   maxLength={10}
+                  pattern="[0-9]{10}"
                   required
                 />
               </div>
@@ -1532,7 +1559,18 @@ export default function UserManagement() {
            } }>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
+              <Button
+                type="submit"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={
+                  !vendorForm.vendorName.trim() ||
+                  !vendorForm.companyName.trim() ||
+                  !vendorForm.vatNumber.trim() ||
+                  !vendorForm.email.trim() ||
+                  !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(vendorForm.email) ||
+                  !/^\d{10}$/.test(vendorForm.contactNumber)
+                }
+              >
                 Add Vendor
               </Button>
             </DialogFooter>
@@ -1544,6 +1582,21 @@ export default function UserManagement() {
       <Dialog open={showEditVendorModal} onOpenChange={(open) => {
         if (!open) {
           setShowEditVendorModal(false);
+          setEditingVendorId(null);
+          setVendorForm({
+            vendorName: '',
+            companyName: '',
+            vatNumber: '',
+            email: '',
+            contactNumber: ''
+          });
+          setOriginalVendorForm({
+            vendorName: '',
+            companyName: '',
+            vatNumber: '',
+            email: '',
+            contactNumber: ''
+          });
         }
       }}>
         <DialogContent className="max-w-md">
@@ -1610,6 +1663,7 @@ export default function UserManagement() {
                     setVendorForm({ ...vendorForm, contactNumber: value });
                   }}
                   maxLength={10}
+                  pattern="[0-9]{10}"
                   placeholder="Enter 10 digit contact number"
                   required
                 />
@@ -1628,7 +1682,8 @@ export default function UserManagement() {
                 !vendorForm.companyName.trim() ||
                 !vendorForm.vatNumber.trim() ||
                 !vendorForm.email.trim() ||
-                !vendorForm.contactNumber.trim() ||
+                !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(vendorForm.email) ||
+                !/^\d{10}$/.test(vendorForm.contactNumber) ||
                 (vendorForm.vendorName === originalVendorForm.vendorName &&
                  vendorForm.companyName === originalVendorForm.companyName &&
                  vendorForm.vatNumber === originalVendorForm.vatNumber &&
@@ -1801,12 +1856,14 @@ export default function UserManagement() {
                   type="tel"
                   value={subadminForm.phone}
                   onChange={(e) =>{
-                    const value = e.target.value.replace(/[^0-9]/g, '');
+                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
                    setSubadminForm({ ...subadminForm, phone: value })}                    
 
                   } 
 
                   placeholder="Enter 10-digit phone number"
+                  maxLength={10}
+                  pattern="[0-9]{10}"
                   required
                 />
               </div>
@@ -1825,7 +1882,7 @@ export default function UserManagement() {
                 disabled={isAddingSubadmin  ||
                   !subadminForm.name.trim() ||
                   !subadminForm.email.trim() ||
-                  !subadminForm.phone.trim() ||
+                  !/^\d{10}$/.test(subadminForm.phone) ||
                   !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(subadminForm.email)
                 }
               >
@@ -1840,6 +1897,9 @@ export default function UserManagement() {
       <Dialog open={showEditSubadminModal} onOpenChange={(open) => {
         if (!open) {
           setShowEditSubadminModal(false);
+          setEditingSubadminId(null);
+          setSubadminForm({ name: '', email: '', phone: '' });
+          setOriginalSubadminForm({ name: '', email: '', phone: '' });
         }
       }}>
         <DialogContent className="max-w-md">
@@ -1883,6 +1943,7 @@ export default function UserManagement() {
                   }}
                   placeholder="Enter 10-digit phone number"
                   maxLength={10}
+                  pattern="[0-9]{10}"
                   required
                 />
               </div>
@@ -1898,7 +1959,7 @@ export default function UserManagement() {
                 disabled={
                   !subadminForm.name.trim() ||
                   !subadminForm.email.trim() ||
-                  !subadminForm.phone.trim() ||
+                  !/^\d{10}$/.test(subadminForm.phone) ||
                   !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(subadminForm.email) ||
                   (subadminForm.name === originalSubadminForm.name &&
                    subadminForm.email === originalSubadminForm.email &&
@@ -1957,7 +2018,7 @@ export default function UserManagement() {
           
                       <div>
                         <Label className="text-gray-600">Status</Label>
-                        <p><Badge variant={selectedItem.status === 'Active' ? 'default' : 'secondary'}>{selectedItem.status}</Badge></p>
+                        <p><Badge className={getStatusBadgeClass(selectedItem.status)}>{selectedItem.status}</Badge></p>
                       </div>
                       <div>
                         <Label className="text-gray-600">Created</Label>
@@ -2012,7 +2073,7 @@ export default function UserManagement() {
                       </div>
                       <div>
                         <Label className="text-gray-600">Status</Label>
-                        <p><Badge variant={selectedItem.status === 'Active' ? 'default' : 'secondary'}>{selectedItem.status}</Badge></p>
+                        <p><Badge className={getStatusBadgeClass(selectedItem.status)}>{selectedItem.status}</Badge></p>
                       </div>
                     </>
                   )}
@@ -2040,7 +2101,7 @@ export default function UserManagement() {
                       </div>
                       <div>
                         <Label className="text-gray-600">Status</Label>
-                        <p><Badge variant={selectedItem.isActive ? 'default' : 'secondary'}>{selectedItem.isActive ? 'Active' : 'Inactive'}</Badge></p>
+                        <p><Badge className={getStatusBadgeClass(selectedItem.isActive)}>{selectedItem.isActive ? 'Active' : 'Inactive'}</Badge></p>
                       </div>
                       <div>
                         <Label className="text-gray-600">Created At</Label>
@@ -2076,7 +2137,7 @@ export default function UserManagement() {
                       </div>
                       <div>
                         <Label className="text-gray-600">Status</Label>
-                        <p><Badge variant={selectedItem.status === 'Active' ? 'default' : 'secondary'}>{selectedItem.status}</Badge></p>
+                        <p><Badge className={getStatusBadgeClass(selectedItem.status)}>{selectedItem.status}</Badge></p>
                       </div>
                       <div>
                         <Label className="text-gray-600">Created</Label>
@@ -2121,6 +2182,7 @@ export default function UserManagement() {
         <DialogContent className="max-w-4xl sm:max-w-5xl w-[80vw] sm:w-[70vw] max-h-[70vh] flex flex-col p-0 overflow-hidden">
           <DialogHeader className="px-6 py-4 border-b bg-white">
             <DialogTitle>Deleted Users</DialogTitle>
+
           </DialogHeader>
           
           <div className="px-6 py-3 border-b bg-gray-50">
@@ -2148,6 +2210,12 @@ export default function UserManagement() {
                 <div className="py-8 text-center text-gray-500">No results found for "{deletedUsersSearchTerm}"</div>
               ) : (
                 <div className="overflow-x-auto">
+                  <div className="mb-4 flex items-center gap-2">
+                                    <h3 className="font-semibold text-gray-700">Total Deleted Users:</h3>
+                                    <Badge className="bg-red-100 text-red-700 border border-red-300">
+                                      {deletedUsersTotalCount}
+                                    </Badge>
+                                  </div>
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-gray-200">

@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Skeleton } from '../ui/skeleton';
 import { toast } from 'react-toastify';
 import { getAdminData, getUserRole, apiFetch } from '../../lib/api';
 
@@ -54,6 +55,7 @@ export default function Dashboard() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [selectedDeliveryPartner, setSelectedDeliveryPartner] = useState<string>('');
   const [isAssigning, setIsAssigning] = useState(false);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [dashboardStats, setDashboardStats] = useState<any>({
     activeUsers: 0,
     totalOrders: 0,
@@ -62,6 +64,7 @@ export default function Dashboard() {
     totalRevenue: 0,
     expressOrders: 0,
     nextDayOrders: 0,
+    todaysRevenue:0,
     bulkOrders: 0
   });
 
@@ -74,6 +77,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const fetchDashboardStats = async () => {
+      setStatsLoading(true);
       try {
         const response = await apiFetch('/api/admin/dashboard-stats');
         if (response.success && response.data) {
@@ -82,6 +86,8 @@ export default function Dashboard() {
       } catch (error) {
         console.error('Failed to fetch dashboard stats:', error);
         // Keep static values on error
+      } finally {
+        setStatsLoading(false);
       }
     };
     fetchDashboardStats();
@@ -180,7 +186,7 @@ export default function Dashboard() {
     { label: 'Next-Day Orders', value: (dashboardStats?.nextDayOrders ?? 0).toLocaleString(), icon: Calendar, color: 'text-green-600', bgColor: 'bg-green-100', onClick: () => navigate('/orders?type=next-day'), roles: ['admin', 'subadmin'] },
     { label: 'Bulk Orders', value: (dashboardStats?.bulkOrders ?? 0).toLocaleString(), icon: PackageIcon, color: 'text-purple-600', bgColor: 'bg-purple-100', onClick: () => navigate('/orders?type=bulk'), roles: ['admin', 'subadmin'] },
     { label: 'Waste Management', value: '3.2%', icon: AlertTriangle, color: 'text-red-600', bgColor: 'bg-red-100', onClick: () => navigate('/waste-management'), roles: ['admin', 'subadmin'] },
-    { label: "Today's Revenue", value: '₹1.8L', icon: Receipt, color: 'text-teal-600', bgColor: 'bg-teal-100', onClick: () => navigate('/transactions'), roles: ['admin', 'subadmin'] }
+    { label: "Today's Revenue", value: (dashboardStats?.todaysRevenue ?? 0).toLocaleString(), icon: Receipt, color: 'text-teal-600', bgColor: 'bg-teal-100', onClick: () => navigate('/transactions'), roles: ['admin', 'subadmin'] }
   ];
 
   // Filter KPI data based on user role
@@ -230,7 +236,9 @@ export default function Dashboard() {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <p className="text-gray-600 text-sm mb-2">{kpi.label}</p>
-                  {kpi.value && kpi.value.symbol ? (
+                  {statsLoading ? (
+                    <Skeleton className="h-7 w-24" />
+                  ) : kpi.value && kpi.value.symbol ? (
                     <p className="mb-1">
                       <span className="dirham-symbol mr-2">&#xea;</span>
                       {kpi.value.amount}
@@ -256,7 +264,7 @@ export default function Dashboard() {
         <CardContent>
           <div className="overflow-x-auto">
             {ordersLoading ? (
-              <div className="p-4 text-center text-gray-600">Loading active orders...</div>
+              <div className="p-4 text-center text-gray-600">Loading orders...</div>
             ) : ordersError ? (
               <div className="p-4 text-center text-red-600">{ordersError}</div>
             ) : (

@@ -3305,13 +3305,13 @@ const handleRemoveWeight = (weight: number) => {
               Add Product Variant
             </Button> */}
           {/* )} */}
-          {!['variants', 'cuttypes', 'inventoryAlerts'].includes(activeTab) && (
+          {!['variants', 'inventoryAlerts'].includes(activeTab) && (
             <Button
               className="bg-blue-600 hover:bg-blue-700"
               onClick={handleOpenAddModal}
             >
               <Plus className="w-4 h-4 mr-2" />
-              Add
+              {activeTab === 'cuttypes' ? 'Add Cut Type' : 'Add'}
             </Button>
           )}
         </div>
