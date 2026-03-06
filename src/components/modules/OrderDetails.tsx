@@ -672,17 +672,37 @@ export default function OrderDetails() {
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                   <p className="text-sm text-blue-800 mb-3">Select a new status:</p>
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {(getStatusFlow(order) || []).map((status) => (
-                      <Button
-                        key={status}
-                        size="sm"
-                        onClick={() => setSelectedStatus(status)}
-                        disabled={updatingStatus !== null}
-                        className={`${selectedStatus === status ? 'bg-blue-600 text-white' : order.status === status ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-                      >
-                        {getStatusLabel(status)}
-                      </Button>
-                    ))}
+                    {(getStatusFlow(order) || []).map((status) => {
+                      const timelineFlow = getTimelineFlow(order);
+                      const currentStatusIndex = timelineFlow.indexOf(order?.status || '');
+                      const statusIndex = timelineFlow.indexOf(status);
+                      
+                      // Allow cancelled at any time (terminal status)
+                      const isTerminalStatus = status === 'cancelled';
+                      // Disable if trying to go backwards (lower index than current)
+                      const isBackwards = !isTerminalStatus && statusIndex !== -1 && statusIndex < currentStatusIndex;
+                      const isCurrent = order?.status === status;
+                      
+                      return (
+                        <Button
+                          key={status}
+                          size="sm"
+                          onClick={() => setSelectedStatus(status)}
+                          disabled={updatingStatus !== null || isBackwards}
+                          className={`${
+                            selectedStatus === status 
+                              ? 'bg-blue-600 text-white' 
+                              : isCurrent 
+                                ? 'bg-green-600 text-white' 
+                                : isBackwards 
+                                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          }`}
+                        >
+                          {getStatusLabel(status)}
+                        </Button>
+                      );
+                    })}
                   </div>
                   {selectedStatus && (
                     <div className="flex gap-2">

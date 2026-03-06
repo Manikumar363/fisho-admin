@@ -2159,6 +2159,9 @@ const handleRemoveWeight = (weight: number) => {
   const hasProductFormChanged = () => {
     if (!editingProductId) return true; // Allow submit for new products (add mode)
     
+    // Check if any cut type images have been added
+    const hasCutTypeImages = Object.values(productCutTypeImages).some(img => img !== null);
+    
     return !(
       productForm.category === originalProductForm.category &&
       productForm.productName === originalProductForm.productName &&
@@ -2174,7 +2177,8 @@ const handleRemoveWeight = (weight: number) => {
       productForm.featured === originalProductForm.featured &&
       productForm.bestseller === originalProductForm.bestseller &&
       productForm.isExpressDelivery === originalProductForm.isExpressDelivery &&
-      productForm.productImages.length === 0 && // No new images added
+      productForm.productImages.length === 0 && // No new main product images added
+      !hasCutTypeImages && // No new cut type images added
       JSON.stringify(productVariantRows) === JSON.stringify(originalProductVariantRows) // Check if variant rows changed
     );
   };

@@ -98,6 +98,7 @@ export default function BulkOrderDetails() {
     tax: '',
     shipping: '',
   });
+  const [itemPrices, setItemPrices] = useState<{ [itemId: string]: string }>({});
 
   // Fetch order details
   useEffect(() => {
@@ -331,6 +332,16 @@ export default function BulkOrderDetails() {
       return (numeric / subtotalValue) * 100;
     };
 
+    // Initialize item prices - distribute subtotal evenly across items or use equal amounts
+    const prices: { [itemId: string]: string } = {};
+    if (order?.items && order.items.length > 0) {
+      const pricePerItem = subtotalValue / order.items.length;
+      order.items.forEach((item) => {
+        prices[item._id] = pricePerItem.toFixed(2);
+      });
+    }
+
+    setItemPrices(prices);
     setEditingPricing({
       subtotal: String(subtotalValue),
       discount: String(toPercent(order?.pricing?.discount)),
@@ -363,11 +374,24 @@ export default function BulkOrderDetails() {
     }));
   };
 
+  const handleItemPriceChange = (itemId: string, value: string) => {
+    setItemPrices((prev) => ({
+      ...prev,
+      [itemId]: value,
+    }));
+  };
+
+  const calculateItemsSubtotal = () => {
+    return Object.values(itemPrices).reduce((sum, price) => {
+      return sum + (parseFloat(price) || 0);
+    }, 0);
+  };
+
   const savePricingChanges = async () => {
     if (!order) return;
     setIsSavingPricing(true);
     try {
-      const subtotal = parseFloat(editingPricing.subtotal) || 0;
+      const subtotal = calculateItemsSubtotal(); // Use calculated subtotal from item prices
       const discount = parseFloat(editingPricing.discount) || 0;
       const tax = parseFloat(editingPricing.tax) || 0;
       const shipping = parseFloat(editingPricing.shipping) || 0;
@@ -375,17 +399,25 @@ export default function BulkOrderDetails() {
       const discountAmount = calculatePercentAmount(subtotal, discount);
       const taxAmount = calculatePercentAmount(subtotal, tax);
       const shippingAmount = calculatePercentAmount(subtotal, shipping);
+      
+      // Build item pricing breakdown
+      const itemPricing = order.items.map((item) => ({
+        itemId: item._id,
+        basePrice: parseFloat(itemPrices[item._id] || '0'),
+      }));
+      
       const pricingSummary = {
         subTotal: subtotal,
+        itemPricing,
+        tax: taxAmount,
+        discount: discountAmount,
+        shipping: shippingAmount,
         grandTotal: calculateGrandTotal(
           subtotal,
           discount,
           tax,
           shipping
         ),
-        discount: discountAmount,
-        shipping: shippingAmount,
-        tax: taxAmount,
       };
 
       const res = await apiFetch<{ success: boolean; message?: string; data?: BulkOrder }>(
@@ -629,27 +661,45 @@ export default function BulkOrderDetails() {
             ) : (
               <>
                 <div className="space-y-4">
-                  {/* Subtotal Input */}
-                  <div>
-                    <label className="text-sm text-gray-600 block mb-2">Subtotal</label>
-                    <div className="flex items-center gap-2">
-                      <span className="dirham-symbol">&#xea;</span>
-                      <input
-                        type="number"
-                        value={editingPricing.subtotal}
-                        onChange={(e) => handlePricingChange('subtotal', e.target.value)}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        step="0.01"
-                        min="0"
-                      />
+                  {/* Per-Product Pricing */}
+                  <div className="border-b pb-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">Product Base Prices</h4>
+                    <div className="space-y-3">
+                      {order.items?.map((item) => (
+                        <div key={item._id} className="flex items-center justify-between gap-3 bg-gray-50 p-3 rounded-lg">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{item.product?.name || 'Product'}</p>
+                            <p className="text-xs text-gray-500">Weight: {item.weight}kg</p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="dirham-symbol text-sm">&#xea;</span>
+                            <input
+                              type="number"
+                              value={itemPrices[item._id] || '0'}
+                              onChange={(e) => handleItemPriceChange(item._id, e.target.value)}
+                              className="w-24 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                              step="0.01"
+                              min="0"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* Calculated Subtotal */}
+                    <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between items-center bg-blue-50 p-2 rounded">
+                      <span className="text-sm font-semibold text-gray-700">Calculated Subtotal:</span>
+                      <span className="font-semibold text-blue-600">
+                        <span className="dirham-symbol mr-1">&#xea;</span>
+                        {calculateItemsSubtotal().toFixed(2)}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Tax Input */}
+                  {/* Tax Input - Applied to whole order */}
                   <div>
-                    <label className="text-sm text-gray-600 block mb-2">Tax % (Added)</label>
+                    <label className="text-sm text-gray-600 block mb-2">Tax % (Applied to whole order)</label>
                     <div className="flex items-center gap-2">
-                      <span className="dirham-symbol">&#xea;</span>
                       <input
                         type="number"
                         value={editingPricing.tax}
@@ -657,15 +707,19 @@ export default function BulkOrderDetails() {
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         step="0.01"
                         min="0"
+                        max="100"
                       />
+                      <span className="text-gray-500">%</span>
                     </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Amount: <span className="dirham-symbol">&#xea;</span>{calculatePercentAmount(calculateItemsSubtotal(), parseFloat(editingPricing.tax) || 0).toFixed(2)}
+                    </p>
                   </div>
 
-                  {/* Discount Input */}
+                  {/* Discount Input - Applied to whole order */}
                   <div>
-                    <label className="text-sm text-gray-600 block mb-2">Discount % (Subtracted)</label>
+                    <label className="text-sm text-gray-600 block mb-2">Discount % (Applied to whole order)</label>
                     <div className="flex items-center gap-2">
-                      <span className="dirham-symbol">&#xea;</span>
                       <input
                         type="number"
                         value={editingPricing.discount}
@@ -673,15 +727,19 @@ export default function BulkOrderDetails() {
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         step="0.01"
                         min="0"
+                        max="100"
                       />
+                      <span className="text-gray-500">%</span>
                     </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Amount: <span className="dirham-symbol">&#xea;</span>{calculatePercentAmount(calculateItemsSubtotal(), parseFloat(editingPricing.discount) || 0).toFixed(2)}
+                    </p>
                   </div>
 
-                  {/* Shipping Input */}
+                  {/* Shipping Input - Applied to whole order */}
                   <div>
-                    <label className="text-sm text-gray-600 block mb-2">Shipping % (Added)</label>
+                    <label className="text-sm text-gray-600 block mb-2">Shipping % (Applied to whole order)</label>
                     <div className="flex items-center gap-2">
-                      <span className="dirham-symbol">&#xea;</span>
                       <input
                         type="number"
                         value={editingPricing.shipping}
@@ -689,23 +747,46 @@ export default function BulkOrderDetails() {
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         step="0.01"
                         min="0"
+                        max="100"
                       />
+                      <span className="text-gray-500">%</span>
                     </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Amount: <span className="dirham-symbol">&#xea;</span>{calculatePercentAmount(calculateItemsSubtotal(), parseFloat(editingPricing.shipping) || 0).toFixed(2)}
+                    </p>
                   </div>
 
                   {/* Grand Total Display */}
                   <div className="border-t pt-4 bg-blue-50 p-3 rounded-lg">
-                    <div className="flex justify-between items-center">
-                      <span className="font-semibold text-gray-700">Calculated Grand Total</span>
-                      <span className="font-bold text-lg text-blue-600">
-                        <span className="dirham-symbol mr-2">&#xea;</span>
-                        {calculateGrandTotal(
-                          parseFloat(editingPricing.subtotal) || 0,
-                          parseFloat(editingPricing.discount) || 0,
-                          parseFloat(editingPricing.tax) || 0,
-                          parseFloat(editingPricing.shipping) || 0
-                        ).toFixed(2)}
-                      </span>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Subtotal (All Products):</span>
+                        <span><span className="dirham-symbol mr-1">&#xea;</span>{calculateItemsSubtotal().toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-green-600">
+                        <span>Tax ({editingPricing.tax}%):</span>
+                        <span>+<span className="dirham-symbol mr-1">&#xea;</span>{calculatePercentAmount(calculateItemsSubtotal(), parseFloat(editingPricing.tax) || 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-red-600">
+                        <span>Discount ({editingPricing.discount}%):</span>
+                        <span>-<span className="dirham-symbol mr-1">&#xea;</span>{calculatePercentAmount(calculateItemsSubtotal(), parseFloat(editingPricing.discount) || 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-green-600">
+                        <span>Shipping ({editingPricing.shipping}%):</span>
+                        <span>+<span className="dirham-symbol mr-1">&#xea;</span>{calculatePercentAmount(calculateItemsSubtotal(), parseFloat(editingPricing.shipping) || 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between items-center pt-2 border-t border-blue-200">
+                        <span className="font-semibold text-gray-700">Grand Total:</span>
+                        <span className="font-bold text-lg text-blue-600">
+                          <span className="dirham-symbol mr-2">&#xea;</span>
+                          {calculateGrandTotal(
+                            calculateItemsSubtotal(),
+                            parseFloat(editingPricing.discount) || 0,
+                            parseFloat(editingPricing.tax) || 0,
+                            parseFloat(editingPricing.shipping) || 0
+                          ).toFixed(2)}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -769,20 +850,38 @@ export default function BulkOrderDetails() {
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                 <p className="text-sm text-blue-800 mb-3">Select a new status:</p>
                 <div className="flex flex-wrap gap-2">
-                  {getStatusFlow().map((status) => (
-                    <Button
-                      key={status}
-                      size="sm"
-                      onClick={() => {
-                        handleStatusUpdate(status);
-                        setIsEditingTimeline(false);
-                      }}
-                      disabled={updatingStatus !== null}
-                      className={`${order?.status === status ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-                    >
-                      {updatingStatus === status ? 'Updating...' : getStatusLabel(status)}
-                    </Button>
-                  ))}
+                  {getStatusFlow().map((status) => {
+                    const timelineFlow = getTimelineFlow();
+                    const currentStatusIndex = timelineFlow.indexOf(order?.status || '');
+                    const statusIndex = timelineFlow.indexOf(status);
+                    
+                    // Allow cancelled and rejected at any time
+                    const isTerminalStatus = status === 'cancelled' || status === 'rejected';
+                    // Disable if trying to go backwards (lower index than current)
+                    const isBackwards = !isTerminalStatus && statusIndex !== -1 && statusIndex < currentStatusIndex;
+                    const isCurrent = order?.status === status;
+                    
+                    return (
+                      <Button
+                        key={status}
+                        size="sm"
+                        onClick={() => {
+                          handleStatusUpdate(status);
+                          setIsEditingTimeline(false);
+                        }}
+                        disabled={updatingStatus !== null || isBackwards}
+                        className={`${
+                          isCurrent 
+                            ? 'bg-green-600 text-white' 
+                            : isBackwards 
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {updatingStatus === status ? 'Updating...' : getStatusLabel(status)}
+                      </Button>
+                    );
+                  })}
                 </div>
               </div>
             )}

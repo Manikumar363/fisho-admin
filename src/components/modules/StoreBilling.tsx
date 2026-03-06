@@ -590,7 +590,7 @@ export default function StoreBilling() {
                         )}
                         <div className="flex-1">
                           <h3 className="font-semibold text-lg">{inventoryItem.productId.name}</h3>
-                          <p className="text-sm text-gray-500">Stock: {inventoryItem.totalStock} {inventoryItem.productId.weightUnit}</p>
+                          <p className="text-sm text-gray-500">Stock: {inventoryItem.totalStock} kg</p>
                         </div>
                       </div>
 
