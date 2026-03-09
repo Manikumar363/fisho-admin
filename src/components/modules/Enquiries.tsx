@@ -44,6 +44,8 @@ export default function Enquiries() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [sortOption, setSortOption] = useState<'aToZ' | 'zToA' | ''>('');
+  const [platformFilter, setPlatformFilter] = useState<'All' | 'Web' | 'Mobile'>('All');
 
   const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
 
@@ -135,11 +137,28 @@ export default function Enquiries() {
     }
   };
 
-  const filteredEnquiries = enquiries.filter(enquiry =>
-    enquiry.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    enquiry.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    enquiry.mobile.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredEnquiries = enquiries
+    .filter(enquiry => {
+      // Search filter
+      const matchesSearch = 
+        enquiry.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        enquiry.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        enquiry.mobile.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      // Platform filter
+      const matchesPlatform = platformFilter === 'All' || enquiry.platform === platformFilter;
+      
+      return matchesSearch && matchesPlatform;
+    })
+    .sort((a, b) => {
+      // Sort by name
+      if (sortOption === 'aToZ') {
+        return a.name.localeCompare(b.name);
+      } else if (sortOption === 'zToA') {
+        return b.name.localeCompare(a.name);
+      }
+      return 0; // No sorting
+    });
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -172,6 +191,26 @@ export default function Enquiries() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
               />
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={sortOption}
+                onChange={(e) => setSortOption(e.target.value as 'aToZ' | 'zToA' | '')}
+                className="border rounded-md px-3 py-2 text-sm min-w-[200px] bg-white"
+              >
+                <option value="">Sort by Name</option>
+                <option value="aToZ">A to Z (Customer Name)</option>
+                <option value="zToA">Z to A (Customer Name)</option>
+              </select>
+              <select
+                value={platformFilter}
+                onChange={(e) => setPlatformFilter(e.target.value as 'All' | 'Web' | 'Mobile')}
+                className="border rounded-md px-3 py-2 text-sm min-w-[150px] bg-white"
+              >
+                <option value="All">All Platforms</option>
+                <option value="Web">Web</option>
+                <option value="Mobile">Mobile</option>
+              </select>
             </div>
           </div>
         </CardContent>
@@ -272,7 +311,7 @@ export default function Enquiries() {
 
       {/* View Enquiry Dialog */}
       <Dialog open={viewingEnquiry !== null} onOpenChange={() => setViewingEnquiry(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Enquiry Details</DialogTitle>
             <DialogDescription>
@@ -312,15 +351,14 @@ export default function Enquiries() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-gray-600">Email</label>
-                  <p className="text-gray-900">{viewingEnquiry.email}</p>
-                </div>
-                <div>
-                  <label className="text-gray-600">Mobile Number</label>
-                  <p className="text-gray-900">{viewingEnquiry.mobile}</p>
-                </div>
+              <div>
+                <label className="text-gray-600">Email</label>
+                <p className="text-gray-900 break-all">{viewingEnquiry.email}</p>
+              </div>
+
+              <div>
+                <label className="text-gray-600">Mobile Number</label>
+                <p className="text-gray-900">{viewingEnquiry.mobile}</p>
               </div>
 
               {/* Image Preview and Download */}

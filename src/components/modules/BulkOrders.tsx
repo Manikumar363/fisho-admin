@@ -81,6 +81,16 @@ export default function BulkOrders() {
     params.append('page', String(currentPage));
     params.append('limit', '20');
 
+    // Add search parameter if search input is provided
+    if (searchInput.trim()) {
+      params.append('search', searchInput.trim());
+    }
+
+    // Add status filter if selected
+    if (selectedStatus !== 'all') {
+      params.append('status', selectedStatus);
+    }
+
     apiFetch<{
       success: boolean;
       data: BulkOrder[];
@@ -105,10 +115,11 @@ export default function BulkOrders() {
     return () => {
       active = false;
     };
-  }, [currentPage]);
+  }, [currentPage, searchInput, selectedStatus])
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchInput(e.target.value);
+    setCurrentPage(1); // Reset to first page when searching
   };
 
   const handleStatusFilterSelect = (status: string) => {
@@ -144,21 +155,10 @@ export default function BulkOrders() {
   };
 
   const filteredAndSortedOrders = React.useMemo(() => {
-    const query = searchInput.trim().toLowerCase();
+    // Since API handles search and status filtering now, just sort the results
+    let sorted = [...orders];
 
-    let filtered = orders.filter((order) => {
-      const orderStatus = (order.status || '').toLowerCase();
-      const matchesStatus = selectedStatus === 'all' || orderStatus === selectedStatus;
-      if (!matchesStatus) return false;
-
-      if (!query) return true;
-
-      const orderId = (order._id || '').toLowerCase();
-      const customerName = (order.shippingAddress?.name || '').toLowerCase();
-      return orderId.includes(query) || customerName.includes(query);
-    });
-
-    filtered.sort((a, b) => {
+    sorted.sort((a, b) => {
       if (sortType === 'date-desc' || sortType === 'date-asc') {
         const dateA = new Date(a.createdAt).getTime();
         const dateB = new Date(b.createdAt).getTime();
@@ -173,8 +173,8 @@ export default function BulkOrders() {
       return 0;
     });
 
-    return filtered;
-  }, [orders, searchInput, selectedStatus, sortType]);
+    return sorted;
+  }, [orders, sortType])
 
   // Format helpers
   const formatDate = (dateString: string) => {
@@ -444,7 +444,7 @@ export default function BulkOrders() {
       <Card>
         <CardHeader>
           <CardTitle>
-            Bulk Orders ({searchInput.trim() ? filteredAndSortedOrders.length : totalOrders})
+            Bulk Orders ({filteredAndSortedOrders.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -479,7 +479,7 @@ export default function BulkOrders() {
                 ) : filteredAndSortedOrders.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="py-4 px-4 text-center text-gray-500">
-                      {searchInput.trim() ? 'No matching orders found' : 'No orders found'}
+                      No orders found
                     </td>
                   </tr>
                 ) : (

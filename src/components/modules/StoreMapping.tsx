@@ -51,18 +51,30 @@ export default function StoreMapping() {
   const filteredStores = useMemo(() => {
     if (!searchTerm.trim()) return stores;
     const term = searchTerm.toLowerCase().trim();
+    const normalizedTerm = term.replace(/\D/g, '');
     return stores.filter(store => {
       const name = store.name?.toLowerCase() || '';
       const address = store.address?.toLowerCase() || '';
       const managerName = store.manager?.name?.toLowerCase() || '';
       const managerEmail = store.manager?.email?.toLowerCase() || '';
       const contactNumber = store.contactNumber?.toLowerCase() || '';
+      const phone = String(store.phone || '').toLowerCase();
+      const mobileNumber = String(store.mobileNumber || '').toLowerCase();
+      const managerPhone = String(store.manager?.phone || '').toLowerCase();
+
+      const normalizedNumbers = [contactNumber, phone, mobileNumber, managerPhone]
+        .map(value => value.replace(/\D/g, ''));
+
       return (
         name.includes(term) ||
         address.includes(term) ||
         managerName.includes(term) ||
         managerEmail.includes(term) ||
-        contactNumber.includes(term)
+        contactNumber.includes(term) ||
+        phone.includes(term) ||
+        mobileNumber.includes(term) ||
+        managerPhone.includes(term) ||
+        (normalizedTerm.length > 0 && normalizedNumbers.some(num => num.includes(normalizedTerm)))
       );
     });
   }, [stores, searchTerm]);

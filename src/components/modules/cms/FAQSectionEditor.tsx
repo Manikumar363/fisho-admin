@@ -33,7 +33,7 @@ interface FAQItem {
 
 interface FAQSectionData {
   _id?: string;
-  mainHeading: string;
+  title: string;
   faqs: FAQItem[];
   isActive?: boolean;
 }
@@ -46,7 +46,7 @@ interface FAQSectionEditorProps {
 export default function FAQSectionEditor({ sectionItem, onCancel }: FAQSectionEditorProps) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [mainHeading, setMainHeading] = useState('Frequently Asked Questions');
+  const [title, setTitle] = useState('Frequently Asked Questions');
   const [faqs, setFaqs] = useState<FAQItem[]>([]);
   const [editingFAQ, setEditingFAQ] = useState<FAQItem | null>(null);
   const [isFAQDialogOpen, setIsFAQDialogOpen] = useState(false);
@@ -67,64 +67,40 @@ export default function FAQSectionEditor({ sectionItem, onCancel }: FAQSectionEd
   const loadSectionData = async () => {
     setLoading(true);
     try {
-      // TODO: Replace with actual API endpoint when available
-      // For now, using static data
-      const staticData: FAQSectionData = {
-        mainHeading: 'Frequently Asked Questions',
-        faqs: [
-          {
-            id: '1',
-            question: 'How can I buy fish online in Dubai from Fisho.ae?',
-            answer: 'You can easily browse our wide selection of fresh fish and seafood on our website, add items to your cart, and proceed to checkout. We offer multiple payment options and fast delivery across Dubai.',
-            order: 1
-          },
-          {
-            id: '2',
-            question: 'Is the fish really fresh?',
-            answer: 'Yes, we guarantee the freshness of all our products. Each fish and seafood product is carefully stored and shipped under high hygiene standards to ensure maximum freshness when it reaches your doorstep.',
-            order: 2
-          },
-          {
-            id: '3',
-            question: 'Do you provide same-day delivery in Dubai?',
-            answer: 'We offer express delivery service for orders placed before a certain time. Check our delivery options at checkout to see if same-day delivery is available for your location.',
-            order: 3
-          },
-          {
-            id: '4',
-            question: 'Can I schedule my delivery of seafood?',
-            answer: 'Yes, you can schedule your delivery at a convenient time during checkout. We provide flexible delivery time slots to accommodate your schedule.',
-            order: 4
-          },
-          {
-            id: '5',
-            question: 'What kinds of marine products do you offer in Dubai?',
-            answer: 'We offer a wide variety of marine products including local fish like Hamour and Kingfish, imported fish like Salmon and Tuna, shellfish like prawns and crabs, and specialty seafood products.',
-            order: 5
-          },
-          {
-            id: '6',
-            question: 'Is there a minimum order requirement?',
-            answer: 'We have a minimum order value to ensure efficient delivery. The exact amount may vary based on your location. Please check our website for current minimum order requirements.',
-            order: 6
-          },
-          {
-            id: '7',
-            question: 'How do you maintain hygiene and quality?',
-            answer: 'We follow strict hygiene standards in handling, storage, and delivery of all products. Our team is trained in food safety and our facilities are regularly inspected.',
-            order: 7
-          },
-          {
-            id: '8',
-            question: 'If I don\'t like certain seafood, can I return or exchange it?',
-            answer: 'Yes, we have a return and exchange policy. If you receive any product that doesn\'t meet our quality standards, please contact us within 24 hours for a replacement or refund.',
-            order: 8
-          }
-        ]
-      };
+      const res = await apiFetch<{
+        success: boolean;
+        section?: {
+          _id: string;
+          title: string;
+          faqs: Array<{
+            _id?: string;
+            question: string;
+            answer: string;
+          }>;
+          isDeleted?: boolean;
+          isActive?: boolean;
+          createdAt: string;
+          updatedAt: string;
+        };
+        message?: string;
+      }>('/api/landing/faq-section');
 
-      setMainHeading(staticData.mainHeading);
-      setFaqs(staticData.faqs);
+      if (!res?.success || !res.section) {
+        throw new Error(res?.message || 'Failed to load FAQ section');
+      }
+
+      const section = res.section;
+      setTitle(section.title || 'Frequently Asked Questions');
+      
+      // Map faqs with temporary IDs for new items
+      const mappedFaqs: FAQItem[] = section.faqs.map((faq, index) => ({
+        id: faq._id || `faq-${Date.now()}-${index}`,
+        question: faq.question,
+        answer: faq.answer,
+        order: index + 1
+      }));
+      
+      setFaqs(mappedFaqs);
     } catch (error: any) {
       console.error('Failed to load section data:', error);
       toast.error('Failed to load section data');
@@ -134,7 +110,7 @@ export default function FAQSectionEditor({ sectionItem, onCancel }: FAQSectionEd
   };
 
   const handleSaveSection = async () => {
-    if (!mainHeading.trim()) {
+    if (!title.trim()) {
       toast.error('Main heading is required');
       return;
     }
@@ -145,22 +121,37 @@ export default function FAQSectionEditor({ sectionItem, onCancel }: FAQSectionEd
 
     setSaving(true);
     try {
-      const sectionData: FAQSectionData = {
-        mainHeading,
-        faqs,
-        isActive: true
+      // Sanitize FAQs: remove temporary IDs (those starting with 'faq-')
+      const sanitizedFaqs = faqs.map(faq => {
+        const { id, order, ...faqData } = faq;
+        // Only include _id if it's a real MongoDB ObjectId (not starting with 'faq-')
+        if (id && !id.startsWith('faq-')) {
+          return { _id: id, ...faqData };
+        }
+        return faqData;
+      });
+
+      const sectionData = {
+        title,
+        faqs: sanitizedFaqs
       };
 
-      // TODO: Replace with actual API endpoint when available
-      // const res = await apiFetch('/api/faq-section', {
-      //   method: 'POST',
-      //   body: JSON.stringify(sectionData)
-      // });
+      const res = await apiFetch<{
+        success: boolean;
+        section?: any;
+        message?: string;
+      }>('/api/landing/faq-section', {
+        method: 'POST',
+        body: JSON.stringify(sectionData)
+      });
 
-      toast.success('FAQ section saved successfully');
-      console.log('FAQ section data to save:', sectionData);
+      if (!res?.success) {
+        throw new Error(res?.message || 'Failed to save FAQ section');
+      }
+
+      toast.success(res.message || 'FAQ section saved successfully');
+      console.log('FAQ section saved:', res.section);
       
-      // For now, just show success
       setTimeout(() => {
         onCancel();
       }, 1000);
@@ -308,11 +299,11 @@ export default function FAQSectionEditor({ sectionItem, onCancel }: FAQSectionEd
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label htmlFor="mainHeading">Main Heading *</Label>
+            <Label htmlFor="title">Main Heading *</Label>
             <Input
-              id="mainHeading"
-              value={mainHeading}
-              onChange={(e) => setMainHeading(e.target.value)}
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g., Frequently Asked Questions"
               className="mt-1"
             />

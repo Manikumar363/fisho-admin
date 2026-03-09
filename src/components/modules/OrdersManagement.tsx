@@ -103,6 +103,11 @@ export default function OrdersManagement() {
       params.append('storeId', storeId);
     }
     
+    // Add search parameter if search input is provided
+    if (searchInput.trim()) {
+      params.append('search', searchInput.trim());
+    }
+    
     if (selectedType !== 'all') {
       const apiDeliveryType = selectedType === 'next-day' ? 'nextDay' : selectedType;
       params.append('deliveryType', apiDeliveryType);
@@ -145,7 +150,7 @@ export default function OrdersManagement() {
       });
 
     return () => { active = false; };
-  }, [selectedType, selectedStatus, currentPage, userRole, storeId]);
+  }, [selectedType, selectedStatus, currentPage, userRole, storeId, searchInput]);
 
   const normalizeDeliveryType = (type?: string) => {
     const normalized = (type || '').toLowerCase().replace(/[_\s]/g, '-');
@@ -155,24 +160,10 @@ export default function OrdersManagement() {
   };
 
   const filteredOrders = React.useMemo(() => {
-    const query = searchInput.trim().toLowerCase();
-
-    return orders.filter((order) => {
-      const normalizedType = normalizeDeliveryType(order.deliveryType);
-      const matchesType = selectedType === 'all' || normalizedType === selectedType;
-      if (!matchesType) return false;
-
-      const orderStatus = (order.status || '').toLowerCase();
-      const matchesStatus = selectedStatus === 'all' || orderStatus === selectedStatus;
-      if (!matchesStatus) return false;
-
-      const orderId = (order.invoiceNo || order._id || '').toLowerCase();
-      const customerName = (order.shippingAddress?.name || '').toLowerCase();
-      if (!query) return true;
-
-      return orderId.includes(query) || customerName.includes(query);
-    });
-  }, [orders, searchInput, selectedType, selectedStatus]);
+    // Since API handles search filtering now, just return all orders
+    // The API response already contains filtered results
+    return orders;
+  }, [orders]);
 
   // Delivery type stats (for filter counts)
   const deliveryTypeStats = React.useMemo(() => {
@@ -205,6 +196,7 @@ export default function OrdersManagement() {
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchInput(e.target.value);
+    setCurrentPage(1); // Reset to first page when searching
   };
 
   // Format helpers
@@ -319,6 +311,21 @@ export default function OrdersManagement() {
   };
 
   const downloadFileFromUrl = async (fileUrl: string, filename: string) => {
+    const isAbsoluteUrl = /^https?:\/\//i.test(fileUrl);
+
+    // External links (like S3) should be opened directly to avoid CORS/auth header issues.
+    if (isAbsoluteUrl) {
+      const link = document.createElement('a');
+      link.href = fileUrl;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+
     const token = localStorage.getItem('token');
     const response = await fetch(fileUrl, {
       method: 'GET',
@@ -343,15 +350,7 @@ export default function OrdersManagement() {
   const handleDownloadInvoice = async (order: Order) => {
     setDownloadingInvoiceId(order._id);
     try {
-      let invoiceUrl = order.invoiceUrl || order.receiptUrl;
-
-      if (!invoiceUrl) {
-        const detailRes = await apiFetch<{ success: boolean; data?: Order; message?: string }>(
-          `/api/order/order-by-id/${order._id}`
-        );
-        if (!detailRes.success) throw new Error(detailRes.message || 'Failed to fetch invoice details');
-        invoiceUrl = detailRes.data?.invoiceUrl || detailRes.data?.receiptUrl;
-      }
+      const invoiceUrl = order.invoiceUrl || order.receiptUrl;
 
       if (!invoiceUrl) {
         toast.info('Invoice not available for this order');
@@ -670,7 +669,7 @@ export default function OrdersManagement() {
       <Card>
         <CardHeader>
           <CardTitle>
-            Online Orders ({searchInput.trim() ? filteredOrders.length : totalOrders})
+            Online Orders ({filteredOrders.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -701,7 +700,7 @@ export default function OrdersManagement() {
                 ) : filteredOrders.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="py-4 px-4 text-center text-gray-500">
-                      {searchInput.trim() ? 'No matching orders found' : 'No orders found'}
+                      No orders found
                     </td>
                   </tr>
                 ) : (

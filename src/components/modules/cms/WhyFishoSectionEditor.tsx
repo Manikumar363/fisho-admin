@@ -21,19 +21,20 @@ import { toast } from 'react-toastify';
 import { apiFetch } from '../../../lib/api';
 
 interface WhyFishoCard {
-  id: string;
-  heading: string;
+  _id?: string;
+  title: string;
   description: string;
   image: string;
-  order?: number;
 }
 
 interface WhyFishoSectionData {
   _id?: string;
-  mainHeading: string;
-  mainDescription: string;
-  cards: WhyFishoCard[];
+  title: string;
+  description1: string;
+  featuredCards: WhyFishoCard[];
   isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface WhyFishoSectionEditorProps {
@@ -44,8 +45,8 @@ interface WhyFishoSectionEditorProps {
 export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFishoSectionEditorProps) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [mainHeading, setMainHeading] = useState('Why Fisho.ae?');
-  const [mainDescription, setMainDescription] = useState('');
+  const [title, setTitle] = useState('Why Choose Fisho?');
+  const [description1, setDescription1] = useState('');
   const [cards, setCards] = useState<WhyFishoCard[]>([]);
   const [editingCard, setEditingCard] = useState<WhyFishoCard | null>(null);
   const [isCardDialogOpen, setIsCardDialogOpen] = useState(false);
@@ -53,13 +54,26 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
   const [cardToDelete, setCardToDelete] = useState<WhyFishoCard | null>(null);
 
   // Card form states
-  const [cardHeading, setCardHeading] = useState('');
+  const [cardTitle, setCardTitle] = useState('');
   const [cardDescription, setCardDescription] = useState('');
   const [cardImage, setCardImage] = useState<File | null>(null);
+  const [cardImagePath, setCardImagePath] = useState('');
   const [cardImagePreview, setCardImagePreview] = useState<string>('');
   const [uploadingCard, setUploadingCard] = useState(false);
 
   const IMAGE_BASE = ((import.meta as any).env?.VITE_IMAGE_BASE_URL || (import.meta as any).env?.VITE_BASE_URL) as string | undefined;
+
+  // Resolve image URL by prepending base URL
+  const resolveImageUrl = (path?: string) => {
+    if (!path) return '';
+    if (/^https?:\/\//i.test(path) || path.startsWith('data:')) return path;
+    
+    const base = IMAGE_BASE?.replace(/\/$/, '') || '';
+    if (!base) return path;
+    
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    return `${base}${normalizedPath}`;
+  };
 
   // Load existing section data
   useEffect(() => {
@@ -69,39 +83,20 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
   const loadSectionData = async () => {
     setLoading(true);
     try {
-      // TODO: Replace with actual API endpoint when available
-      // For now, using static data
-      const staticData: WhyFishoSectionData = {
-        mainHeading: 'Why Fisho.ae?',
-        mainDescription: 'Marine products in Dubai are excusingly fresh, convenient, and of high quality. This is why fisho.ae continues to earn the trust of its customers.',
-        cards: [
-          {
-            id: '1',
-            heading: 'Freshness with a promise',
-            description: 'Each fish and seafood product will be stored carefully and shipped under high hygiene standards.',
-            image: '/placeholder-fish1.jpg',
-            order: 1
-          },
-          {
-            id: '2',
-            heading: 'Wide selection',
-            description: 'From local fish to international favorites, you have a collection that caters to anyone\'s palate.',
-            image: '/placeholder-fish2.jpg',
-            order: 2
-          },
-          {
-            id: '3',
-            heading: 'Home sweet home',
-            description: 'You can never worry about fresh seafood getting out of your reach as our fish delivery is trustable in Dubai.',
-            image: '/placeholder-fish3.jpg',
-            order: 3
-          }
-        ]
-      };
+      const res = await apiFetch<{
+        success: boolean;
+        section?: WhyFishoSectionData;
+        message?: string;
+      }>('/api/landing/why-fisho-section');
 
-      setMainHeading(staticData.mainHeading);
-      setMainDescription(staticData.mainDescription);
-      setCards(staticData.cards);
+      if (!res?.success || !res.section) {
+        throw new Error(res?.message || 'Failed to load section data');
+      }
+
+      const section = res.section;
+      setTitle(section.title);
+      setDescription1(section.description1);
+      setCards(section.featuredCards || []);
     } catch (error: any) {
       console.error('Failed to load section data:', error);
       toast.error('Failed to load section data');
@@ -111,34 +106,49 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
   };
 
   const handleSaveSection = async () => {
-    if (!mainHeading.trim()) {
-      toast.error('Main heading is required');
+    if (!title.trim()) {
+      toast.error('Title is required');
       return;
     }
-    if (!mainDescription.trim()) {
-      toast.error('Main description is required');
+    if (!description1.trim()) {
+      toast.error('Description is required');
       return;
     }
 
     setSaving(true);
     try {
-      const sectionData: WhyFishoSectionData = {
-        mainHeading,
-        mainDescription,
-        cards,
+      // Remove temporary _id fields from new cards before sending to backend
+      const cleanedCards = cards.map(card => {
+        const { _id, ...rest } = card;
+        // Only include _id if it's a real MongoDB ObjectId (not our temporary "card-" prefix)
+        if (_id && !_id.startsWith('card-')) {
+          return card;
+        }
+        return rest;
+      });
+
+      const sectionData = {
+        title,
+        description1,
+        featuredCards: cleanedCards,
         isActive: true
       };
 
-      // TODO: Replace with actual API endpoint when available
-      // const res = await apiFetch('/api/why-fisho-section', {
-      //   method: 'POST',
-      //   body: JSON.stringify(sectionData)
-      // });
+      const res = await apiFetch<{
+        success: boolean;
+        section?: WhyFishoSectionData;
+        message?: string;
+      }>('/api/landing/why-fisho-section', {
+        method: 'POST',
+        body: JSON.stringify(sectionData)
+      });
+
+      if (!res?.success) {
+        throw new Error(res?.message || 'Failed to save section');
+      }
 
       toast.success('Section saved successfully');
-      console.log('Section data to save:', sectionData);
       
-      // For now, just show success
       setTimeout(() => {
         onCancel();
       }, 1000);
@@ -152,19 +162,21 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
 
   const handleAddCard = () => {
     setEditingCard(null);
-    setCardHeading('');
+    setCardTitle('');
     setCardDescription('');
     setCardImage(null);
+    setCardImagePath('');
     setCardImagePreview('');
     setIsCardDialogOpen(true);
   };
 
   const handleEditCard = (card: WhyFishoCard) => {
     setEditingCard(card);
-    setCardHeading(card.heading);
+    setCardTitle(card.title);
     setCardDescription(card.description);
     setCardImage(null);
-    setCardImagePreview(card.image.startsWith('/') && IMAGE_BASE ? `${IMAGE_BASE}${card.image}` : card.image);
+    setCardImagePath(card.image);
+    setCardImagePreview(resolveImageUrl(card.image));
     setIsCardDialogOpen(true);
   };
 
@@ -175,7 +187,8 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
 
   const confirmDeleteCard = () => {
     if (!cardToDelete) return;
-    setCards(cards.filter(c => c.id !== cardToDelete.id));
+    const cardId = cardToDelete._id || cardToDelete.title;
+    setCards(cards.filter(c => (c._id || c.title) !== cardId));
     toast.success('Card deleted successfully');
     setDeleteDialogOpen(false);
     setCardToDelete(null);
@@ -199,8 +212,8 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
   };
 
   const handleSaveCard = async () => {
-    if (!cardHeading.trim()) {
-      toast.error('Card heading is required');
+    if (!cardTitle.trim()) {
+      toast.error('Card title is required');
       return;
     }
     if (!cardDescription.trim()) {
@@ -214,43 +227,58 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
 
     setUploadingCard(true);
     try {
-      let imageUrl = editingCard?.image || '';
+      let imagePath = cardImagePath;
 
       // Upload image if new file selected
       if (cardImage) {
         const formData = new FormData();
         formData.append('image', cardImage);
 
-        // TODO: Replace with actual image upload endpoint
-        // const uploadRes = await apiFetch('/api/upload/image', {
-        //   method: 'POST',
-        //   body: formData
-        // });
-        // imageUrl = uploadRes.imageUrl;
+        const uploadRes = await apiFetch<{
+          location?: string;
+          message?: string;
+        }>('/api/upload-image', {
+          method: 'POST',
+          body: formData
+        });
 
-        // For now, use preview URL
-        imageUrl = cardImagePreview;
+        if (!uploadRes?.location) {
+          throw new Error(uploadRes?.message || 'Failed to upload image');
+        }
+
+        imagePath = uploadRes.location;
+      }
+
+      // For new cards, ensure we have an image path
+      if (!editingCard && !imagePath) {
+        toast.error('Image upload failed. Please try again.');
+        setUploadingCard(false);
+        return;
       }
 
       if (editingCard) {
         // Update existing card
-        setCards(cards.map(c => 
-          c.id === editingCard.id 
-            ? { ...c, heading: cardHeading, description: cardDescription, image: imageUrl }
+        const updatedCards = cards.map(c => 
+          (c._id === editingCard._id || c.title === editingCard.title)
+            ? { ...c, title: cardTitle, description: cardDescription, image: imagePath }
             : c
-        ));
+        );
+        setCards(updatedCards);
         toast.success('Card updated successfully');
+        console.log('Card updated:', { title: cardTitle, image: imagePath });
       } else {
-        // Add new card
+        // Add new card to local array
         const newCard: WhyFishoCard = {
-          id: `card-${Date.now()}`,
-          heading: cardHeading,
+          _id: `card-${Date.now()}`,
+          title: cardTitle,
           description: cardDescription,
-          image: imageUrl,
-          order: cards.length + 1
+          image: imagePath,
         };
-        setCards([...cards, newCard]);
+        const updatedCards = [...cards, newCard];
+        setCards(updatedCards);
         toast.success('Card added successfully');
+        console.log('New card added:', newCard);
+        console.log('Updated cards array:', updatedCards);
       }
 
       setIsCardDialogOpen(false);
@@ -265,9 +293,10 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
 
   const resetCardForm = () => {
     setEditingCard(null);
-    setCardHeading('');
+    setCardTitle('');
     setCardDescription('');
     setCardImage(null);
+    setCardImagePath('');
     setCardImagePreview('');
   };
 
@@ -292,7 +321,7 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
             <h1 className="text-2xl font-semibold">Why Fisho Section Editor</h1>
           </div>
           <p className="text-gray-600 mt-1">
-            Manage the main heading, description, and feature cards
+            Manage the title, description, and featured cards
           </p>
         </div>
         <Button 
@@ -312,22 +341,22 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label htmlFor="mainHeading">Main Heading *</Label>
+            <Label htmlFor="title">Title *</Label>
             <Input
-              id="mainHeading"
-              value={mainHeading}
-              onChange={(e) => setMainHeading(e.target.value)}
-              placeholder="e.g., Why Fisho.ae?"
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g., Why Choose Fisho?"
               className="mt-1"
             />
           </div>
           <div>
-            <Label htmlFor="mainDescription">Main Description *</Label>
+            <Label htmlFor="description1">Description *</Label>
             <Textarea
-              id="mainDescription"
-              value={mainDescription}
-              onChange={(e) => setMainDescription(e.target.value)}
-              placeholder="Enter the main description for this section"
+              id="description1"
+              value={description1}
+              onChange={(e) => setDescription1(e.target.value)}
+              placeholder="Enter the description for this section"
               rows={3}
               className="mt-1"
             />
@@ -338,7 +367,7 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
       {/* Cards Management */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Feature Cards ({cards.length})</CardTitle>
+          <CardTitle>Featured Cards ({cards.length})</CardTitle>
           <Button onClick={handleAddCard} size="sm">
             <Plus className="w-4 h-4 mr-1" />
             Add Card
@@ -348,11 +377,11 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
           {cards.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {cards.map((card, index) => (
-                <Card key={card.id} className="overflow-hidden">
+                <Card key={card._id || index} className="overflow-hidden">
                   <div className="relative h-40">
                     <ImageWithFallback
-                      src={card.image.startsWith('/') && IMAGE_BASE ? `${IMAGE_BASE}${card.image}` : card.image}
-                      alt={card.heading}
+                      src={resolveImageUrl(card.image)}
+                      alt={card.title}
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute top-2 left-2">
@@ -380,7 +409,7 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
                     </div>
                   </div>
                   <CardContent className="p-4">
-                    <h4 className="font-semibold text-sm mb-1">{card.heading}</h4>
+                    <h4 className="font-semibold text-sm mb-1">{card.title}</h4>
                     <p className="text-xs text-gray-600 line-clamp-2">{card.description}</p>
                   </CardContent>
                 </Card>
@@ -407,18 +436,18 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
               {editingCard ? 'Edit Card' : 'Add New Card'}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Fill in the details for this feature card
+              Fill in the details for this featured card
             </AlertDialogDescription>
           </AlertDialogHeader>
           
           <div className="space-y-4 py-4">
             <div>
-              <Label htmlFor="cardHeading">Card Heading *</Label>
+              <Label htmlFor="cardTitle">Card Title *</Label>
               <Input
-                id="cardHeading"
-                value={cardHeading}
-                onChange={(e) => setCardHeading(e.target.value)}
-                placeholder="e.g., Freshness with a promise"
+                id="cardTitle"
+                value={cardTitle}
+                onChange={(e) => setCardTitle(e.target.value)}
+                placeholder="e.g., Fresh Catch Everyday"
                 className="mt-1"
               />
             </div>
@@ -451,6 +480,7 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
                       onClick={() => {
                         setCardImage(null);
                         setCardImagePreview('');
+                        setCardImagePath('');
                       }}
                       className="absolute top-2 right-2"
                     >
@@ -498,7 +528,7 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Card</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{cardToDelete?.heading}"? This action cannot be undone.
+              Are you sure you want to delete "{cardToDelete?.title}"? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

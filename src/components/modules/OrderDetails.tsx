@@ -559,14 +559,14 @@ export default function OrderDetails() {
             </CardContent>
           </Card>
 
-          {/* Notes */}
-          {order.notes && (
+          {/* Special Instructions */}
+          {order.notes !== undefined && order.notes !== null && (
             <Card>
               <CardHeader>
-                <CardTitle>Customer Notes</CardTitle>
+                <CardTitle>Special Instructions</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-600">{order.notes}</p>
+                <p className="text-gray-600">{order.notes || 'No special instructions provided'}</p>
               </CardContent>
             </Card>
           )}

@@ -47,8 +47,13 @@ export default function EditStore({ storeId, onBack, onStoreUpdated }: EditStore
     isActive: true,
     operatingHours: defaultHours,
   });
+  const [initialFormData, setInitialFormData] = useState(formData);
 
   const dayEntries = useMemo(() => Object.entries(formData.operatingHours) as [DayKey, { open: string; close: string; isClosed: boolean }][], [formData.operatingHours]);
+
+  const hasChanges = useMemo(() => {
+    return JSON.stringify(formData) !== JSON.stringify(initialFormData);
+  }, [formData, initialFormData]);
 
   // Fetch managers list
   useEffect(() => {
@@ -85,17 +90,19 @@ export default function EditStore({ storeId, onBack, onStoreUpdated }: EditStore
       .then((res) => {
         if (!res.success) throw new Error(res.message || 'Failed to fetch store');
         const store = res.store;
-        setFormData({
+        const loadedData = {
           name: store.name || '',
           address: store.address || '',
           lat: store.lat?.toString() || store.location?.lat?.toString() || '',
           lng: store.lng?.toString() || store.location?.lng?.toString() || '',
           description: store.description || '',
-          contactNumber: store.contactNumber || '',
+          contactNumber: store.phone || store.contactNumber || '',
           managerId: store.manager?._id || store.manager?.id || store.manager || '',
           isActive: store.isActive !== false,
           operatingHours: store.operatingHours || defaultHours,
-        });
+        };
+        setFormData(loadedData);
+        setInitialFormData(loadedData);
       })
       .catch((err) => {
         const msg = err?.message || 'Failed to load store';
@@ -166,7 +173,7 @@ export default function EditStore({ storeId, onBack, onStoreUpdated }: EditStore
             lat: latNum,
             lng: lngNum,
             description: formData.description,
-            contactNumber: formData.contactNumber,
+            phone: formData.contactNumber,
             manager: formData.managerId,
             isActive: formData.isActive,
             operatingHours: formData.operatingHours,
@@ -405,7 +412,7 @@ export default function EditStore({ storeId, onBack, onStoreUpdated }: EditStore
               <Button
                 type="submit"
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                disabled={submitting}
+                disabled={submitting || !hasChanges}
               >
                 <Save className="w-4 h-4 mr-2" />
                 {submitting ? 'Saving...' : 'Save Changes'}

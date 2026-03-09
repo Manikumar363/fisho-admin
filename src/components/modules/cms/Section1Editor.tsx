@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Loader, Upload, X, Image as ImageIcon } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ArrowLeft, Loader, X, Image as ImageIcon } from 'lucide-react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
@@ -7,6 +7,7 @@ import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { toast } from 'react-toastify';
+import { apiFetch } from '../../../lib/api';
 
 interface Section1EditorProps {
   sectionItem?: any;
@@ -39,19 +40,68 @@ const formats = [
   'align',
 ];
 
-export default function Section1Editor({ onCancel }: Section1EditorProps) {
+export default function Section1Editor({ sectionItem, onCancel }: Section1EditorProps) {
   // Static content - now editable
   const [mainTitle, setMainTitle] = useState('Fresh Fish for Online Purchase in Dubai Seafood Delivery Direct to Your Doorstep');
   const [image1File, setImage1File] = useState<File | null>(null);
   const [image1Preview, setImage1Preview] = useState<string>('');
+  const [image1Path, setImage1Path] = useState<string>('');
   const [image2File, setImage2File] = useState<File | null>(null);
   const [image2Preview, setImage2Preview] = useState<string>('');
+  const [image2Path, setImage2Path] = useState<string>('');
   const [description1, setDescription1] = useState('Fisho.ae offers an easy and fast online service where you can buy fish in Dubai. With various hand-picked seafood choices and a smart, simple Fisho.ae online fish delivery in Dubai, you can enjoy the best catches from the ocean delivered right to your door. From filling very homesick checks to paying homage to the luxuries offered to us by the blue ocean, we present an endless range of marine products in Dubai with the best quality.');
   const [title2, setTitle2] = useState('The Fisho.ae Way');
   const [image3File, setImage3File] = useState<File | null>(null);
   const [image3Preview, setImage3Preview] = useState<string>('');
+  const [image3Path, setImage3Path] = useState<string>('');
   const [description2, setDescription2] = useState('Fisho.ae reigns supreme in providing fresh fish in Dubai. We effectively source fish from only the biggest suppliers to guarantee fast deliveries that center around the freshness and taste of our products. Our pride lies in our main goal, ensuring customer satisfaction. We bring the seafood market to your home so that you may save time and effort among other market struggles. So spare some time and see the benefits offered by our online seafood in Dubai for your good life as seafood lovers.');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const IMAGE_BASE = ((import.meta as any).env?.VITE_IMAGE_BASE_URL || (import.meta as any).env?.VITE_BASE_URL || '') as string;
+
+  const resolveImageUrl = (path?: string) => {
+    if (!path) return '';
+    if (/^https?:\/\//i.test(path) || path.startsWith('data:')) return path;
+
+    const base = IMAGE_BASE.replace(/\/$/, '');
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    return `${base}${normalizedPath}`;
+  };
+
+  useEffect(() => {
+    if (!sectionItem) return;
+
+    setMainTitle(sectionItem.title1 || sectionItem.title || '');
+    setDescription1(sectionItem.description1 || '');
+    setTitle2(sectionItem.title2 || '');
+    setDescription2(sectionItem.description2 || '');
+
+    setImage1Path(sectionItem.image1Left || '');
+    setImage2Path(sectionItem.image1Right || '');
+    setImage3Path(sectionItem.image2 || '');
+
+    setImage1Preview(resolveImageUrl(sectionItem.image1Left));
+    setImage2Preview(resolveImageUrl(sectionItem.image1Right));
+    setImage3Preview(resolveImageUrl(sectionItem.image2));
+  }, [sectionItem]);
+
+  const uploadImage = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const res = await apiFetch<{
+      message?: string;
+      location?: string;
+    }>('/api/upload-image', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!res.location) {
+      throw new Error(res.message || 'Failed to upload image');
+    }
+
+    return res.location;
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, imageNumber: 1 | 2 | 3) => {
     const file = e.target.files?.[0];
@@ -72,12 +122,15 @@ export default function Section1Editor({ onCancel }: Section1EditorProps) {
       reader.onloadend = () => {
         if (imageNumber === 1) {
           setImage1File(file);
+          setImage1Path('');
           setImage1Preview(reader.result as string);
         } else if (imageNumber === 2) {
           setImage2File(file);
+          setImage2Path('');
           setImage2Preview(reader.result as string);
         } else {
           setImage3File(file);
+          setImage3Path('');
           setImage3Preview(reader.result as string);
         }
       };
@@ -89,31 +142,83 @@ export default function Section1Editor({ onCancel }: Section1EditorProps) {
     if (imageNumber === 1) {
       setImage1File(null);
       setImage1Preview('');
+      setImage1Path('');
     } else if (imageNumber === 2) {
       setImage2File(null);
       setImage2Preview('');
+      setImage2Path('');
     } else {
       setImage3File(null);
       setImage3Preview('');
+      setImage3Path('');
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!mainTitle.trim()) {
+      toast.error('Main title is required');
+      return;
+    }
+    if (!description1.trim()) {
+      toast.error('Description 1 is required');
+      return;
+    }
+    if (!title2.trim()) {
+      toast.error('Section 2 title is required');
+      return;
+    }
+    if (!description2.trim()) {
+      toast.error('Description 2 is required');
+      return;
+    }
+    if (!image1File && !image1Path) {
+      toast.error('Image 1 is required');
+      return;
+    }
+    if (!image2File && !image2Path) {
+      toast.error('Image 2 is required');
+      return;
+    }
+    if (!image3File && !image3Path) {
+      toast.error('Image 3 is required');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      // For now, just show success message - API integration pending
-      toast.success('Section content updated successfully');
-      console.log({
-        mainTitle,
-        image1: image1File?.name,
-        image2: image2File?.name,
+      const image1Left = image1File
+        ? await uploadImage(image1File)
+        : image1Path;
+      const image1Right = image2File
+        ? await uploadImage(image2File)
+        : image2Path;
+      const image2 = image3File
+        ? await uploadImage(image3File)
+        : image3Path;
+
+      const payload = {
+        title1: mainTitle.trim(),
+        image1Left,
+        image1Right,
         description1,
-        title2,
-        image3: image3File?.name,
+        title2: title2.trim(),
+        image2,
         description2,
+      };
+
+      const res = await apiFetch<{
+        success?: boolean;
+        message?: string;
+        data?: any;
+      }>('/api/landing/section', {
+        method: 'POST',
+        body: JSON.stringify(payload),
       });
+
+      toast.success(res?.message || 'Section content updated successfully');
       setIsSubmitting(false);
       onCancel();
     } catch (e: any) {

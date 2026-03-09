@@ -21,18 +21,19 @@ import { toast } from 'react-toastify';
 import { apiFetch } from '../../../lib/api';
 
 interface MarineProductCard {
-  id: string;
+  _id?: string;
   description: string;
   image: string;
-  order?: number;
 }
 
 interface MarineProductsSectionData {
   _id?: string;
-  mainHeading: string;
-  mainDescription: string;
-  cards: MarineProductCard[];
+  title: string;
+  description: string;
+  featuredCards: MarineProductCard[];
   isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface MarineProductsSectionEditorProps {
@@ -43,8 +44,8 @@ interface MarineProductsSectionEditorProps {
 export default function MarineProductsSectionEditor({ sectionItem, onCancel }: MarineProductsSectionEditorProps) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [mainHeading, setMainHeading] = useState('Check Out Our Marine Products in Dubai');
-  const [mainDescription, setMainDescription] = useState('');
+  const [title, setTitle] = useState('Marine Product section?');
+  const [description, setDescription] = useState('');
   const [cards, setCards] = useState<MarineProductCard[]>([]);
   const [editingCard, setEditingCard] = useState<MarineProductCard | null>(null);
   const [isCardDialogOpen, setIsCardDialogOpen] = useState(false);
@@ -54,10 +55,22 @@ export default function MarineProductsSectionEditor({ sectionItem, onCancel }: M
   // Card form states
   const [cardDescription, setCardDescription] = useState('');
   const [cardImage, setCardImage] = useState<File | null>(null);
+  const [cardImagePath, setCardImagePath] = useState('');
   const [cardImagePreview, setCardImagePreview] = useState<string>('');
   const [uploadingCard, setUploadingCard] = useState(false);
 
   const IMAGE_BASE = ((import.meta as any).env?.VITE_IMAGE_BASE_URL || (import.meta as any).env?.VITE_BASE_URL) as string | undefined;
+
+  const resolveImageUrl = (path?: string) => {
+    if (!path) return '';
+    if (/^https?:\/\//i.test(path) || path.startsWith('data:')) return path;
+
+    const base = IMAGE_BASE?.replace(/\/$/, '') || '';
+    if (!base) return path;
+
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    return `${base}${normalizedPath}`;
+  };
 
   // Load existing section data
   useEffect(() => {
@@ -67,42 +80,20 @@ export default function MarineProductsSectionEditor({ sectionItem, onCancel }: M
   const loadSectionData = async () => {
     setLoading(true);
     try {
-      // TODO: Replace with actual API endpoint when available
-      // For now, using static data
-      const staticData: MarineProductsSectionData = {
-        mainHeading: 'Check Out Our Marine Products in Dubai',
-        mainDescription: 'Fisho.ae has stocked a whole tide of seafood and marine products, especially in Dubai, such as',
-        cards: [
-          {
-            id: '1',
-            description: 'Some fresh local fish types like Hamour, Kingfish, and Sheri.',
-            image: '/placeholder-marine1.jpg',
-            order: 1
-          },
-          {
-            id: '2',
-            description: 'Imported fish like Salmon, Tuna, and Mackerel.',
-            image: '/placeholder-marine2.jpg',
-            order: 2
-          },
-          {
-            id: '3',
-            description: 'Shellfish like prawns, crabs, lobsters.',
-            image: '/placeholder-marine3.jpg',
-            order: 3
-          },
-          {
-            id: '4',
-            description: 'Specifically for seafood lovers, specialty products.',
-            image: '/placeholder-marine4.jpg',
-            order: 4
-          }
-        ]
-      };
+      const res = await apiFetch<{
+        success: boolean;
+        section?: MarineProductsSectionData;
+        message?: string;
+      }>('/api/landing/marine-section');
 
-      setMainHeading(staticData.mainHeading);
-      setMainDescription(staticData.mainDescription);
-      setCards(staticData.cards);
+      if (!res?.success || !res.section) {
+        throw new Error(res?.message || 'Failed to load section data');
+      }
+
+      const section = res.section;
+      setTitle(section.title);
+      setDescription(section.description);
+      setCards(section.featuredCards || []);
     } catch (error: any) {
       console.error('Failed to load section data:', error);
       toast.error('Failed to load section data');
@@ -112,34 +103,47 @@ export default function MarineProductsSectionEditor({ sectionItem, onCancel }: M
   };
 
   const handleSaveSection = async () => {
-    if (!mainHeading.trim()) {
-      toast.error('Main heading is required');
+    if (!title.trim()) {
+      toast.error('Title is required');
       return;
     }
-    if (!mainDescription.trim()) {
-      toast.error('Main description is required');
+    if (!description.trim()) {
+      toast.error('Description is required');
       return;
     }
 
     setSaving(true);
     try {
-      const sectionData: MarineProductsSectionData = {
-        mainHeading,
-        mainDescription,
-        cards,
+      const cleanedCards = cards.map((card) => {
+        const { _id, ...rest } = card;
+        if (_id && !_id.startsWith('card-')) {
+          return card;
+        }
+        return rest;
+      });
+
+      const sectionData = {
+        title,
+        description,
+        featuredCards: cleanedCards,
         isActive: true
       };
 
-      // TODO: Replace with actual API endpoint when available
-      // const res = await apiFetch('/api/marine-products-section', {
-      //   method: 'POST',
-      //   body: JSON.stringify(sectionData)
-      // });
+      const res = await apiFetch<{
+        success: boolean;
+        section?: MarineProductsSectionData;
+        message?: string;
+      }>('/api/landing/marine-section', {
+        method: 'POST',
+        body: JSON.stringify(sectionData)
+      });
+
+      if (!res?.success) {
+        throw new Error(res?.message || 'Failed to save section');
+      }
 
       toast.success('Section saved successfully');
-      console.log('Section data to save:', sectionData);
-      
-      // For now, just show success
+
       setTimeout(() => {
         onCancel();
       }, 1000);
@@ -155,6 +159,7 @@ export default function MarineProductsSectionEditor({ sectionItem, onCancel }: M
     setEditingCard(null);
     setCardDescription('');
     setCardImage(null);
+    setCardImagePath('');
     setCardImagePreview('');
     setIsCardDialogOpen(true);
   };
@@ -163,7 +168,8 @@ export default function MarineProductsSectionEditor({ sectionItem, onCancel }: M
     setEditingCard(card);
     setCardDescription(card.description);
     setCardImage(null);
-    setCardImagePreview(card.image.startsWith('/') && IMAGE_BASE ? `${IMAGE_BASE}${card.image}` : card.image);
+    setCardImagePath(card.image);
+    setCardImagePreview(resolveImageUrl(card.image));
     setIsCardDialogOpen(true);
   };
 
@@ -174,7 +180,8 @@ export default function MarineProductsSectionEditor({ sectionItem, onCancel }: M
 
   const confirmDeleteCard = () => {
     if (!cardToDelete) return;
-    setCards(cards.filter(c => c.id !== cardToDelete.id));
+    const cardId = cardToDelete._id || cardToDelete.description;
+    setCards(cards.filter((c) => (c._id || c.description) !== cardId));
     toast.success('Card deleted successfully');
     setDeleteDialogOpen(false);
     setCardToDelete(null);
@@ -209,39 +216,48 @@ export default function MarineProductsSectionEditor({ sectionItem, onCancel }: M
 
     setUploadingCard(true);
     try {
-      let imageUrl = editingCard?.image || '';
+      let imagePath = cardImagePath;
 
       // Upload image if new file selected
       if (cardImage) {
         const formData = new FormData();
         formData.append('image', cardImage);
 
-        // TODO: Replace with actual image upload endpoint
-        // const uploadRes = await apiFetch('/api/upload/image', {
-        //   method: 'POST',
-        //   body: formData
-        // });
-        // imageUrl = uploadRes.imageUrl;
+        const uploadRes = await apiFetch<{
+          location?: string;
+          message?: string;
+        }>('/api/upload-image', {
+          method: 'POST',
+          body: formData
+        });
 
-        // For now, use preview URL
-        imageUrl = cardImagePreview;
+        if (!uploadRes?.location) {
+          throw new Error(uploadRes?.message || 'Failed to upload image');
+        }
+
+        imagePath = uploadRes.location;
+      }
+
+      if (!editingCard && !imagePath) {
+        toast.error('Image upload failed. Please try again.');
+        setUploadingCard(false);
+        return;
       }
 
       if (editingCard) {
         // Update existing card
         setCards(cards.map(c => 
-          c.id === editingCard.id 
-            ? { ...c, description: cardDescription, image: imageUrl }
+          (c._id === editingCard._id || c.description === editingCard.description)
+            ? { ...c, description: cardDescription, image: imagePath }
             : c
         ));
         toast.success('Card updated successfully');
       } else {
         // Add new card
         const newCard: MarineProductCard = {
-          id: `card-${Date.now()}`,
+          _id: `card-${Date.now()}`,
           description: cardDescription,
-          image: imageUrl,
-          order: cards.length + 1
+          image: imagePath,
         };
         setCards([...cards, newCard]);
         toast.success('Card added successfully');
@@ -261,6 +277,7 @@ export default function MarineProductsSectionEditor({ sectionItem, onCancel }: M
     setEditingCard(null);
     setCardDescription('');
     setCardImage(null);
+    setCardImagePath('');
     setCardImagePreview('');
   };
 
@@ -285,7 +302,7 @@ export default function MarineProductsSectionEditor({ sectionItem, onCancel }: M
             <h1 className="text-2xl font-semibold">Marine Products Section Editor</h1>
           </div>
           <p className="text-gray-600 mt-1">
-            Manage the main heading, description, and product image cards
+            Manage the title, description, and product image cards
           </p>
         </div>
         <Button 
@@ -305,22 +322,22 @@ export default function MarineProductsSectionEditor({ sectionItem, onCancel }: M
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label htmlFor="mainHeading">Main Heading *</Label>
+            <Label htmlFor="title">Title *</Label>
             <Input
-              id="mainHeading"
-              value={mainHeading}
-              onChange={(e) => setMainHeading(e.target.value)}
-              placeholder="e.g., Check Out Our Marine Products in Dubai"
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g., Marine Product section?"
               className="mt-1"
             />
           </div>
           <div>
-            <Label htmlFor="mainDescription">Main Description *</Label>
+            <Label htmlFor="description">Description *</Label>
             <Textarea
-              id="mainDescription"
-              value={mainDescription}
-              onChange={(e) => setMainDescription(e.target.value)}
-              placeholder="Enter the main description for this section"
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Enter the description for this section"
               rows={3}
               className="mt-1"
             />
@@ -341,10 +358,10 @@ export default function MarineProductsSectionEditor({ sectionItem, onCancel }: M
           {cards.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {cards.map((card, index) => (
-                <Card key={card.id} className="overflow-hidden">
+                <Card key={card._id || index} className="overflow-hidden">
                   <div className="relative h-48">
                     <ImageWithFallback
-                      src={card.image.startsWith('/') && IMAGE_BASE ? `${IMAGE_BASE}${card.image}` : card.image}
+                      src={resolveImageUrl(card.image)}
                       alt={card.description}
                       className="w-full h-full object-cover"
                     />
@@ -432,6 +449,7 @@ export default function MarineProductsSectionEditor({ sectionItem, onCancel }: M
                       onClick={() => {
                         setCardImage(null);
                         setCardImagePreview('');
+                        setCardImagePath('');
                       }}
                       className="absolute top-2 right-2"
                     >

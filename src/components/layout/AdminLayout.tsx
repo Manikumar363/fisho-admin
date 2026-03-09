@@ -271,6 +271,8 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
               className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <Bell className="w-5 h-5 text-gray-600" />
+              {/* Red dot indicator - always show */}
+              <div className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full z-10 animate-pulse"></div>
               {unreadCount > 0 && (
                 <Badge 
                   className="absolute -top-1 -right-1 h-5 min-w-5 flex items-center justify-center p-0 px-1 text-xs bg-red-500 hover:bg-red-600"

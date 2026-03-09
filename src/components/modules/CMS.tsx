@@ -33,6 +33,13 @@ interface ContentItem {
   type: ContentType;
   sequence?: number;
   image?: string;
+  title1?: string;
+  image1Left?: string;
+  image1Right?: string;
+  description1?: string;
+  title2?: string;
+  image2?: string;
+  description2?: string;
 }
 
 export default function CMS() {
@@ -386,17 +393,48 @@ export default function CMS() {
     setSectionsLoading(true);
     setSectionsError(null);
     try {
-      // Load static content for now - API endpoint not yet developed
-      const staticSections: ContentItem[] = [
+      const res = await apiFetch<{
+        success: boolean;
+        section?: {
+          _id: string;
+          title1: string;
+          image1Left: string;
+          image1Right: string;
+          description1: string;
+          title2: string;
+          image2: string;
+          description2: string;
+          isDeleted?: boolean;
+          isActive?: boolean;
+          createdAt: string;
+          updatedAt: string;
+        };
+        message?: string;
+      }>('/api/landing/section');
+
+      if (!res?.success || !res.section) {
+        throw new Error(res?.message || 'Failed to load section content');
+      }
+
+      const section = res.section;
+      const mappedSections: ContentItem[] = [
         {
-          id: 'section1-static',
-          title: 'Fresh Fish for Online Purchase in Dubai',
-          lastUpdated: new Date().toISOString().split('T')[0],
-          status: 'Active',
+          id: section._id,
+          title: section.title1 || 'Section Content',
+          lastUpdated: new Date(section.updatedAt).toISOString().split('T')[0],
+          status: section.isActive ? 'Active' : 'Inactive',
           type: 'section1',
+          title1: section.title1,
+          image1Left: section.image1Left,
+          image1Right: section.image1Right,
+          description1: section.description1,
+          title2: section.title2,
+          image2: section.image2,
+          description2: section.description2,
         }
       ];
-      setSections(staticSections);
+
+      setSections(mappedSections);
     } catch (e: any) {
       const msg = e?.message || 'Failed to load sections';
       console.error('Load sections error:', e);
@@ -412,17 +450,48 @@ export default function CMS() {
     setWhyFishoLoading(true);
     setWhyFishoError(null);
     try {
-      // Load static content for now - API endpoint not yet developed
-      const staticWhyFisho: ContentItem[] = [
+      const res = await apiFetch<{
+        success: boolean;
+        section?: {
+          _id: string;
+          title: string;
+          description1: string;
+          featuredCards: Array<{
+            _id?: string;
+            image: string;
+            title: string;
+            description: string;
+          }>;
+          isDeleted?: boolean;
+          isActive?: boolean;
+          createdAt: string;
+          updatedAt: string;
+        };
+        message?: string;
+      }>('/api/landing/why-fisho-section');
+
+      if (!res?.success || !res.section) {
+        throw new Error(res?.message || 'Failed to load Why Fisho section');
+      }
+
+      const section = res.section;
+      const mappedWhyFisho: ContentItem[] = [
         {
-          id: 'why-fisho-section',
-          title: 'Why Fisho.ae?',
-          lastUpdated: new Date().toISOString().split('T')[0],
-          status: 'Active',
+          id: section._id,
+          title: section.title || 'Why Choose Fisho?',
+          lastUpdated: new Date(section.updatedAt).toISOString().split('T')[0],
+          status: section.isActive ? 'Active' : 'Inactive',
           type: 'whyFisho',
+          title1: section.title,
+          description1: section.description1,
+          // Store full section data for editing
+          image1Left: section.featuredCards?.[0]?.image,
+          image1Right: section.featuredCards?.[1]?.image,
+          image2: section.featuredCards?.[2]?.image,
         }
       ];
-      setWhyFishoSection(staticWhyFisho);
+
+      setWhyFishoSection(mappedWhyFisho);
     } catch (e: any) {
       const msg = e?.message || 'Failed to load Why Fisho section';
       console.error('Load Why Fisho section error:', e);
@@ -438,17 +507,46 @@ export default function CMS() {
     setMarineProductsLoading(true);
     setMarineProductsError(null);
     try {
-      // Load static content for now - API endpoint not yet developed
-      const staticMarineProducts: ContentItem[] = [
+      const res = await apiFetch<{
+        success: boolean;
+        section?: {
+          _id: string;
+          title: string;
+          description: string;
+          featuredCards: Array<{
+            _id?: string;
+            image: string;
+            description: string;
+          }>;
+          isDeleted?: boolean;
+          isActive?: boolean;
+          createdAt: string;
+          updatedAt: string;
+        };
+        message?: string;
+      }>('/api/landing/marine-section');
+
+      if (!res?.success || !res.section) {
+        throw new Error(res?.message || 'Failed to load Marine Products section');
+      }
+
+      const section = res.section;
+      const mappedMarineProducts: ContentItem[] = [
         {
-          id: 'marine-products-section',
-          title: 'Check Out Our Marine Products in Dubai',
-          lastUpdated: new Date().toISOString().split('T')[0],
-          status: 'Active',
+          id: section._id,
+          title: section.title || 'Marine Product section?',
+          lastUpdated: new Date(section.updatedAt).toISOString().split('T')[0],
+          status: section.isActive ? 'Active' : 'Inactive',
           type: 'marineProducts',
+          title1: section.title,
+          description1: section.description,
+          image1Left: section.featuredCards?.[0]?.image,
+          image1Right: section.featuredCards?.[1]?.image,
+          image2: section.featuredCards?.[2]?.image,
         }
       ];
-      setMarineProductsSection(staticMarineProducts);
+
+      setMarineProductsSection(mappedMarineProducts);
     } catch (e: any) {
       const msg = e?.message || 'Failed to load Marine Products section';
       console.error('Load Marine Products section error:', e);
@@ -464,17 +562,39 @@ export default function CMS() {
     setFaqLoading(true);
     setFaqError(null);
     try {
-      // Load static content for now - API endpoint not yet developed
-      const staticFaq: ContentItem[] = [
+      const res = await apiFetch<{
+        success: boolean;
+        section?: {
+          _id: string;
+          title: string;
+          faqs: Array<{
+            _id?: string;
+            question: string;
+            answer: string;
+          }>;
+          isDeleted?: boolean;
+          isActive?: boolean;
+          createdAt: string;
+          updatedAt: string;
+        };
+        message?: string;
+      }>('/api/landing/faq-section');
+
+      if (!res?.success || !res.section) {
+        throw new Error(res?.message || 'Failed to load FAQ section');
+      }
+
+      const section = res.section;
+      const mappedFaq: ContentItem[] = [
         {
-          id: 'faq-section',
-          title: 'Frequently Asked Questions',
-          lastUpdated: new Date().toISOString().split('T')[0],
-          status: 'Active',
+          id: section._id,
+          title: section.title || 'Frequently Asked Questions',
+          lastUpdated: new Date(section.updatedAt).toISOString().split('T')[0],
+          status: section.isActive ? 'Active' : 'Inactive',
           type: 'faq',
         }
       ];
-      setFaqSection(staticFaq);
+      setFaqSection(mappedFaq);
     } catch (e: any) {
       const msg = e?.message || 'Failed to load FAQ section';
       console.error('Load FAQ section error:', e);
@@ -869,7 +989,7 @@ export default function CMS() {
                             >
                               <Edit className="w-4 h-4" />
                             </Button>
-                            {(item.type === 'banners' || item.type === 'section1' || item.type === 'whyFisho' || item.type === 'marineProducts' || item.type === 'faq') && (
+                            {item.type === 'banners' && (
                               <Button
                                 variant="ghost"
                                 size="sm"
