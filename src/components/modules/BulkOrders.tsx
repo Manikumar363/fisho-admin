@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Download, Eye, Filter, X, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, Download, Eye, Filter, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -65,9 +65,7 @@ export default function BulkOrders() {
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
-  const [sortType, setSortType] = useState<'date-desc' | 'date-asc' | 'name-asc' | 'name-desc'>('date-desc');
   const [showFilterMenu, setShowFilterMenu] = useState(false);
-  const [showSortMenu, setShowSortMenu] = useState(false);
 
   // Fetch bulk orders from API
   useEffect(() => {
@@ -134,47 +132,9 @@ export default function BulkOrders() {
     setCurrentPage(1);
   };
 
-  const handleSortSelect = (sortOption: 'date-desc' | 'date-asc' | 'name-asc' | 'name-desc') => {
-    setSortType(sortOption);
-    setShowSortMenu(false);
-  };
-
-  const getSortLabel = () => {
-    switch (sortType) {
-      case 'date-desc':
-        return 'Date (Newest First)';
-      case 'date-asc':
-        return 'Date (Oldest First)';
-      case 'name-asc':
-        return 'Name (A-Z)';
-      case 'name-desc':
-        return 'Name (Z-A)';
-      default:
-        return 'Sort';
-    }
-  };
-
   const filteredAndSortedOrders = React.useMemo(() => {
-    // Since API handles search and status filtering now, just sort the results
-    let sorted = [...orders];
-
-    sorted.sort((a, b) => {
-      if (sortType === 'date-desc' || sortType === 'date-asc') {
-        const dateA = new Date(a.createdAt).getTime();
-        const dateB = new Date(b.createdAt).getTime();
-        return sortType === 'date-desc' ? dateB - dateA : dateA - dateB;
-      } else if (sortType === 'name-asc' || sortType === 'name-desc') {
-        const nameA = (a.shippingAddress?.name || '').toLowerCase();
-        const nameB = (b.shippingAddress?.name || '').toLowerCase();
-        if (nameA < nameB) return sortType === 'name-asc' ? -1 : 1;
-        if (nameA > nameB) return sortType === 'name-asc' ? 1 : -1;
-        return 0;
-      }
-      return 0;
-    });
-
-    return sorted;
-  }, [orders, sortType])
+    return orders;
+  }, [orders])
 
   // Format helpers
   const formatDate = (dateString: string) => {
@@ -286,64 +246,6 @@ export default function BulkOrders() {
             <div className="relative">
               <Button
                 variant="outline"
-                onClick={() => setShowSortMenu(!showSortMenu)}
-              >
-                {sortType.startsWith('date') ? (
-                  sortType === 'date-desc' ? (
-                    <ArrowDown className="w-4 h-4 mr-2" />
-                  ) : (
-                    <ArrowUp className="w-4 h-4 mr-2" />
-                  )
-                ) : null}
-                {getSortLabel()}
-              </Button>
-              {showSortMenu && (
-                <div className="absolute left-0 top-full mt-2 w-56 bg-white border rounded-lg shadow-lg z-10">
-                  <div className="p-3 border-b">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-semibold">Sort By</span>
-                      <button
-                        onClick={() => setShowSortMenu(false)}
-                        className="text-gray-400 hover:text-gray-600"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="p-2">
-                    <button
-                      onClick={() => handleSortSelect('date-desc')}
-                      className={sortType === 'date-desc' ? 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 bg-blue-50 text-blue-600 flex items-center gap-2' : 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 flex items-center gap-2'}
-                    >
-                      <ArrowDown className="w-4 h-4" />
-                      Date (Newest First)
-                    </button>
-                    <button
-                      onClick={() => handleSortSelect('date-asc')}
-                      className={sortType === 'date-asc' ? 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 bg-blue-50 text-blue-600 flex items-center gap-2' : 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 flex items-center gap-2'}
-                    >
-                      <ArrowUp className="w-4 h-4" />
-                      Date (Oldest First)
-                    </button>
-                    <button
-                      onClick={() => handleSortSelect('name-asc')}
-                      className={sortType === 'name-asc' ? 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 bg-blue-50 text-blue-600' : 'w-full text-left px-3 py-2 rounded hover:bg-gray-50'}
-                    >
-                      Name (A-Z)
-                    </button>
-                    <button
-                      onClick={() => handleSortSelect('name-desc')}
-                      className={sortType === 'name-desc' ? 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 bg-blue-50 text-blue-600' : 'w-full text-left px-3 py-2 rounded hover:bg-gray-50'}
-                    >
-                      Name (Z-A)
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="relative">
-              <Button
-                variant="outline"
                 onClick={() => setShowFilterMenu(!showFilterMenu)}
                 className={selectedStatus !== 'all' ? 'border-blue-600 text-blue-600' : ''}
               >
@@ -444,7 +346,7 @@ export default function BulkOrders() {
       <Card>
         <CardHeader>
           <CardTitle>
-            Bulk Orders ({filteredAndSortedOrders.length})
+            Bulk Orders ({filteredAndSortedOrders.length} of {totalOrders})
           </CardTitle>
         </CardHeader>
         <CardContent>

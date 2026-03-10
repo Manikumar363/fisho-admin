@@ -28,6 +28,26 @@ const Transactions: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState('');
   const [txnType, setTxnType] = useState('');
 
+  const filteredTransactions = React.useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return transactions;
+
+    return transactions.filter((txn) => {
+      const orderId = typeof txn.order === 'object' ? (txn.order?._id || txn.order?.id || '') : (txn.order || '');
+      const storeName = txn.store?.name || '';
+      const txnId = txn._id || '';
+      const userName = txn.user ? `${txn.user.firstName || ''} ${txn.user.lastName || ''}`.trim() : '';
+      const payment = txn.paymentMethod || '';
+      const status = txn.status || '';
+      const amount = String(txn.amount ?? '');
+
+      return [txnId, orderId, userName, payment, status, storeName, amount]
+        .join(' ')
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [transactions, search]);
+
   useEffect(() => {
     const fetchTransactions = async () => {
       setLoading(true);
@@ -36,7 +56,6 @@ const Transactions: React.FC = () => {
         let url = '/api/transactions/get-all?status=completed';
         if (paymentMethod) url += `&paymentMethod=${encodeURIComponent(paymentMethod)}`;
         if (txnType) url += `&type=${encodeURIComponent(txnType)}`;
-        if (search) url += `&search=${encodeURIComponent(search)}`;
         if (fromDate) url += `&fromDate=${encodeURIComponent(fromDate)}`;
         if (toDate) url += `&toDate=${encodeURIComponent(toDate)}`;
         const res = await apiFetch(url);
@@ -50,7 +69,7 @@ const Transactions: React.FC = () => {
       }
     };
     fetchTransactions();
-  }, [paymentMethod, txnType, search, fromDate, toDate]);
+  }, [paymentMethod, txnType, fromDate, toDate]);
 
   if (loading) {
     return (
@@ -183,7 +202,7 @@ const Transactions: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {transactions.length === 0 ? (
+                {filteredTransactions.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="py-8 text-center text-gray-500">
                       {paymentMethod === 'online' ? 'No online transactions.' :
@@ -195,13 +214,28 @@ const Transactions: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  transactions.map((txn) => (
+                  filteredTransactions.map((txn) => {
+                    const orderId = typeof txn.order === 'object' ? (txn.order?._id || txn.order?.id || '') : (txn.order || '');
+                    const storeId = txn.store?._id || txn.store?.id || txn.storeId || '';
+                    const isBulkOrder = !orderId && !storeId;
+
+                    return (
                     <tr key={txn._id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-3 px-4 text-blue-600 cursor-pointer hover:underline" title={txn._id} onClick={() => handleCopy(txn._id, 'Transaction ID')}>
                         {shortId(txn._id)}
                       </td>
-                      <td className="py-3 px-4 text-blue-600 cursor-pointer hover:underline" title={txn.order} onClick={() => txn.order && handleCopy(txn.order, 'Order ID')}>
-                        {txn.order ? shortId(txn.order) : '-'}
+                      <td
+                        className={isBulkOrder ? 'py-3 px-4 text-gray-500' : 'py-3 px-4 text-blue-600 cursor-pointer hover:underline'}
+                        title={orderId || (isBulkOrder ? 'Bulk Order' : '-')}
+                        onClick={() => {
+                          if (!isBulkOrder && orderId) handleCopy(orderId, 'Order ID');
+                        }}
+                      >
+                        {isBulkOrder ? (
+                          <Badge className="bg-orange-100 text-orange-700 border border-orange-300 hover:bg-orange-100">
+                            Bulk Order
+                          </Badge>
+                        ) : (orderId ? shortId(orderId) : '-')}
                       </td>
                       <td className="py-3 px-4">{txn.user ? `${txn.user.firstName} ${txn.user.lastName}` : '-'}</td>
                       <td className="py-3 px-4 text-green-600">{txn.type === 'in' ? (<><span className="dirham-symbol mr-2">&#xea;</span>{txn.amount}</>) : '-'}</td>
@@ -213,9 +247,16 @@ const Transactions: React.FC = () => {
                         </Badge>
                       </td>
                       <td className="py-3 px-4">{new Date(txn.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })}</td>
-                      <td className="py-3 px-4">{txn.store?.name || '-'}</td>
+                      <td className="py-3 px-4">
+                        {isBulkOrder ? (
+                          <Badge className="bg-orange-100 text-orange-700 border border-orange-300 hover:bg-orange-100">
+                            Bulk Order
+                          </Badge>
+                        ) : (txn.store?.name || '-')}
+                      </td>
                     </tr>
-                  ))
+                  );
+                  })
                 )}
               </tbody>
             </table>

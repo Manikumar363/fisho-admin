@@ -22,6 +22,25 @@ interface Particular {
   rfv?: string;
 }
 
+interface ProductVariant {
+  _id: string;
+  product: string | { _id: string; name?: string };
+  cutType: string | { _id: string; name?: string };
+  weight?: number;
+  costPrice?: number;
+  profit?: number;
+  discount?: number;
+  displayPrice?: number;
+  sellingPrice?: number;
+  featured?: boolean;
+  bestSeller?: boolean;
+  isExpressDelivery?: boolean;
+  isNextDayDelivery?: boolean;
+  notes?: string;
+  image?: string;
+  isActive?: boolean;
+}
+
 export default function PrePurchaseOrders() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -46,6 +65,8 @@ export default function PrePurchaseOrders() {
   const [vendorsLoading, setVendorsLoading] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [variantsLoading, setVariantsLoading] = useState(false);
   const [particulars, setParticulars] = useState<Particular[]>([
     {
       id: '1',
@@ -61,8 +82,23 @@ export default function PrePurchaseOrders() {
   useEffect(() => {
     fetchPpos();
     fetchVendors();
-    fetchProducts();
   }, []);
+
+  useEffect(() => {
+    if (!showAddForm) return;
+
+    const fetchProductsAndVariants = async () => {
+      // Fetch products for both add and edit modes (needed to display product names)
+      // Fetch variants only in add mode (needed for price recalculation)
+      if (isEditMode) {
+        await fetchProducts();
+      } else {
+        await Promise.all([fetchProducts(), fetchVariants()]);
+      }
+    };
+
+    fetchProductsAndVariants();
+  }, [showAddForm, isEditMode]);
 
   // Auto-update global RFV when particulars change
   useEffect(() => {
@@ -110,6 +146,83 @@ export default function PrePurchaseOrders() {
     } finally {
       setProductsLoading(false);
     }
+  };
+
+  const fetchVariants = async () => {
+    setVariantsLoading(true);
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        variants?: ProductVariant[];
+        message?: string;
+      }>('/api/variants');
+
+      if (!res.success) throw new Error(res.message || 'Failed to fetch variants');
+      setVariants(res.variants || []);
+    } catch (e: any) {
+      console.error('Fetch variants error:', e);
+      setVariants([]);
+    } finally {
+      setVariantsLoading(false);
+    }
+  };
+
+  const getProductIdFromVariant = (variant: ProductVariant) => {
+    if (!variant.product) return '';
+    return typeof variant.product === 'string' ? variant.product : variant.product._id;
+  };
+
+  const getCutTypeIdFromVariant = (variant: ProductVariant) => {
+    if (!variant.cutType) return '';
+    return typeof variant.cutType === 'string' ? variant.cutType : variant.cutType._id;
+  };
+
+  const roundTo2 = (value: number) => Number(value.toFixed(2));
+
+  const calculateVariantPriceFromCost = (baseCostPrice: number, weight: number, profit: number, discount: number) => {
+    // Match InventoryManagement logic: cost-per-kg scaled by weight in grams.
+    const variantCostPrice = (baseCostPrice * weight) / 1000;
+    const displayPrice = variantCostPrice + (variantCostPrice * profit) / 100;
+    const sellingPrice = displayPrice - (displayPrice * discount) / 100;
+
+    return {
+      costPrice: roundTo2(variantCostPrice),
+      displayPrice: roundTo2(displayPrice),
+      sellingPrice: roundTo2(sellingPrice),
+    };
+  };
+
+  const buildVariantUpdatesForProduct = (productId: string, baseCostPrice: number) => {
+    const productVariants = variants.filter((variant) => getProductIdFromVariant(variant) === productId);
+
+    const computedVariants = productVariants.map((variant) => {
+      const weight = Number(variant.weight) || 0;
+      const profit = Number(variant.profit) || 0;
+      const discount = Number(variant.discount) || 0;
+      const recalculated = calculateVariantPriceFromCost(baseCostPrice, weight, profit, discount);
+
+      return {
+        _id: variant._id,
+        id: variant._id,
+        product: productId,
+        cutType: getCutTypeIdFromVariant(variant),
+        weight,
+        costPrice: recalculated.costPrice,
+        profit,
+        discount,
+        displayPrice: recalculated.displayPrice,
+        sellingPrice: recalculated.sellingPrice,
+        featured: !!variant.featured,
+        bestSeller: !!variant.bestSeller,
+        isExpressDelivery: !!variant.isExpressDelivery,
+        isNextDayDelivery: !!variant.isNextDayDelivery,
+        notes: variant.notes || '',
+        isActive: variant.isActive !== false,
+        image: variant.image || '',
+      };
+    });
+
+    return computedVariants;
   };
 
   const fetchPpos = async () => {
@@ -299,7 +412,7 @@ export default function PrePurchaseOrders() {
   };
 
   const handleParticularChange = (id: string, field: keyof Particular, value: string) => {
-    setParticulars(particulars.map(p => {
+    const nextParticulars = particulars.map(p => {
       if (p.id === id) {
         const updated = { ...p, [field]: value };
         
@@ -318,7 +431,26 @@ export default function PrePurchaseOrders() {
         return updated;
       }
       return p;
-    }));
+    });
+
+    setParticulars(nextParticulars);
+
+    if (field === 'costPrice' || field === 'product') {
+      const changedParticular = nextParticulars.find((p) => p.id === id);
+      const parsedCost = parseFloat(changedParticular?.costPrice || '0');
+      const productId = changedParticular?.product || '';
+
+      if (productId && parsedCost > 0) {
+        const computedVariants = buildVariantUpdatesForProduct(productId, parsedCost);
+        const productName = products.find((product) => product._id === productId)?.name || productId;
+        console.log('[PPO] Recalculated variant values (not shown in UI):', {
+          productId,
+          productName,
+          costPricePerUnit: parsedCost,
+          variants: computedVariants,
+        });
+      }
+    }
   };
 
   const calculatePPOTotal = () => {
@@ -354,29 +486,148 @@ export default function PrePurchaseOrders() {
 
       const ppoValue = calculatePPOTotal();
 
-      const url = isEditMode ? `/api/ppos/${editingPpoId}` : '/api/ppos';
-      const method = isEditMode ? 'PATCH' : 'POST';
+      if (isEditMode) {
+        const res = await apiFetch<{
+          success: boolean;
+          ppo?: any;
+          message?: string;
+        }>(`/api/ppos/${editingPpoId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            billNo,
+            date,
+            vendor,
+            particulars: mappedParticulars,
+            notes,
+            rfv: rfv ? parseFloat(rfv) : 0,
+            ppoValue,
+          }),
+        });
 
-      const res = await apiFetch<{
-        success: boolean;
-        ppo?: any;
-        message?: string;
-      }>(url, {
-        method,
-        body: JSON.stringify({
-          billNo,
-          date,
-          vendor,
-          particulars: mappedParticulars,
-          notes,
-          rfv: rfv ? parseFloat(rfv) : 0,
-          ppoValue
-        }),
-      });
+        if (!res.success) throw new Error(res.message || 'Failed to update PPO');
+        toast.success(res.message || 'PPO updated successfully');
+      } else {
+        const latestCostByProduct = new Map<string, number>();
+        const quantityIncreaseByProduct = new Map<string, number>();
+        validParticulars.forEach((particular) => {
+          const parsedCost = parseFloat(particular.costPrice);
+          const parsedQuantity = parseFloat(particular.quantity);
 
-      if (!res.success) throw new Error(res.message || `Failed to ${isEditMode ? 'update' : 'create'} PPO`);
+          if (particular.product && !Number.isNaN(parsedCost) && parsedCost > 0) {
+            latestCostByProduct.set(particular.product, parsedCost);
+          }
 
-      toast.success(res.message || `PPO ${isEditMode ? 'updated' : 'created'} successfully`);
+          if (particular.product && !Number.isNaN(parsedQuantity) && parsedQuantity > 0) {
+            const existingQuantity = quantityIncreaseByProduct.get(particular.product) || 0;
+            quantityIncreaseByProduct.set(particular.product, existingQuantity + parsedQuantity);
+          }
+        });
+
+        const variantUpdatePayloads: Array<{ productId: string; payload: any }> = [];
+        latestCostByProduct.forEach((baseCostPrice, productId) => {
+          const product = products.find((item) => item._id === productId);
+          if (!product) return;
+
+          const currentStock = Number(product.stock) || 0;
+          const stockIncrease = quantityIncreaseByProduct.get(productId) || 0;
+          const updatedStock = currentStock + stockIncrease;
+
+          const computedVariants = buildVariantUpdatesForProduct(productId, baseCostPrice);
+          console.log('[PPO] Variant payload for update-product-with-variant:', {
+            productId,
+            baseCostPrice,
+            variants: computedVariants,
+          });
+
+          const payload = {
+            product: {
+              name: product.name,
+              description: product.description || '',
+              nutritionFacts: product.nutritionFacts || '',
+              category: typeof product.category === 'object' ? product.category?._id : product.category || '',
+              availableCutTypes: (product.availableCutTypes || []).map((cutType: any) =>
+                typeof cutType === 'object' ? cutType._id : cutType
+              ),
+              cost: baseCostPrice,
+              defaultProfit: Number(product.defaultProfit) || 0,
+              defaultDiscount: Number(product.defaultDiscount) || 0,
+              availableWeights: product.availableWeights || [],
+              stock: updatedStock,
+              isActive: product.isActive !== false,
+              featured: !!product.featured,
+              bestSeller: !!product.bestSeller,
+              special: !!product.special,
+              isExpressDelivery: !!product.isExpressDelivery,
+              isNextDayDelivery: !!product.isNextDayDelivery,
+              order: Number(product.order) || 1,
+              image: product.image || '',
+            },
+            variants: computedVariants,
+          };
+
+          variantUpdatePayloads.push({ productId, payload });
+        });
+
+        const createPpoRes = await apiFetch<{
+          success: boolean;
+          ppo?: any;
+          message?: string;
+        }>('/api/ppos', {
+          method: 'POST',
+          body: JSON.stringify({
+            billNo,
+            date,
+            vendor,
+            particulars: mappedParticulars,
+            notes,
+            rfv: rfv ? parseFloat(rfv) : 0,
+            ppoValue,
+          }),
+        });
+
+        if (!createPpoRes.success) {
+          throw new Error(createPpoRes.message || 'Failed to create PPO');
+        }
+
+        for (const { productId, payload } of variantUpdatePayloads) {
+          let lastError: any = null;
+
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              const updateRes = await apiFetch<{
+                success: boolean;
+                message?: string;
+              }>(`/api/products/update-product-with-variant/${productId}`, {
+                method: 'PUT',
+                body: JSON.stringify(payload),
+              });
+
+              if (!updateRes.success) {
+                throw new Error(updateRes.message || `Failed to update variants for product ${productId}`);
+              }
+
+              lastError = null;
+              break;
+            } catch (err: any) {
+              lastError = err;
+              const message = (err?.message || '').toLowerCase();
+              const isWriteConflict = message.includes('write conflict') || message.includes('please retry');
+
+              if (!isWriteConflict || attempt === 2) {
+                break;
+              }
+
+              await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+            }
+          }
+
+          if (lastError) {
+            throw lastError;
+          }
+        }
+
+        toast.success('PPO created and product variants updated successfully');
+      }
       
       // Reset form
       setBillNo('');
@@ -487,6 +738,7 @@ export default function PrePurchaseOrders() {
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="Enter notes (optional)"
+                    
                   />
                 </div>
               </div>
@@ -512,6 +764,7 @@ export default function PrePurchaseOrders() {
                     variant="outline"
                     size="sm"
                     onClick={handleAddParticular}
+                    disabled={isEditMode}
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Add Particular
@@ -539,6 +792,7 @@ export default function PrePurchaseOrders() {
                             <Select
                               value={particular.product}
                               onValueChange={(value: string) => handleParticularChange(particular.id, 'product', value)}
+                              disabled={isEditMode}
                             >
                               <SelectTrigger className="w-full">
                                 <SelectValue placeholder="Select product" />
@@ -561,6 +815,8 @@ export default function PrePurchaseOrders() {
                               min="0"
                               step="0.01"
                               required
+                              disabled={isEditMode}
+                              className={isEditMode ? "bg-gray-50" : ""}
                             />
                           </td>
                           <td className="py-3 px-4">
@@ -572,6 +828,8 @@ export default function PrePurchaseOrders() {
                               min="0"
                               step="0.01"
                               required
+                              disabled={isEditMode}
+                              className={isEditMode ? "bg-gray-50" : ""}
                             />
                           </td>
                           <td className="py-3 px-4">
@@ -591,6 +849,8 @@ export default function PrePurchaseOrders() {
                               max="100"
                               step="0.01"
                               required
+                              disabled={isEditMode}
+                              className={isEditMode ? "bg-gray-50" : ""}
                             />
                           </td>
                           <td className="py-3 px-4">
@@ -614,9 +874,9 @@ export default function PrePurchaseOrders() {
                               type="button"
                               onClick={() => handleRemoveParticular(particular.id)}
                               className="p-1 hover:bg-gray-100 rounded"
-                              disabled={particulars.length === 1}
+                              disabled={particulars.length === 1 || isEditMode}
                             >
-                              <Trash2 className={`w-4 h-4 ${particulars.length === 1 ? 'text-gray-300' : 'text-red-600'}`} />
+                              <Trash2 className={`w-4 h-4 ${particulars.length === 1 || isEditMode ? 'text-gray-300' : 'text-red-600'}`} />
                             </button>
                           </td>
                         </tr>

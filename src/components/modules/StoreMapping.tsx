@@ -57,24 +57,33 @@ export default function StoreMapping() {
       const address = store.address?.toLowerCase() || '';
       const managerName = store.manager?.name?.toLowerCase() || '';
       const managerEmail = store.manager?.email?.toLowerCase() || '';
-      const contactNumber = store.contactNumber?.toLowerCase() || '';
-      const phone = String(store.phone || '').toLowerCase();
-      const mobileNumber = String(store.mobileNumber || '').toLowerCase();
-      const managerPhone = String(store.manager?.phone || '').toLowerCase();
+      const phoneCandidates = [
+        store.contactNumber,
+        store.phone,
+        store.mobileNumber,
+        store?.contact?.phone,
+        store?.contact?.mobile,
+        store.manager?.phone,
+        store.manager?.mobile,
+        store.manager?.mobileNumber,
+      ]
+        .map((value) => String(value ?? '').toLowerCase())
+        .filter(Boolean);
 
-      const normalizedNumbers = [contactNumber, phone, mobileNumber, managerPhone]
-        .map(value => value.replace(/\D/g, ''));
+      const normalizedNumbers = phoneCandidates
+        .map(value => value.replace(/\D/g, ''))
+        .filter(Boolean);
+
+      const matchesPhoneText = phoneCandidates.some(value => value.includes(term));
+      const matchesPhoneDigits = normalizedTerm.length > 0 && normalizedNumbers.some(num => num.includes(normalizedTerm));
 
       return (
         name.includes(term) ||
         address.includes(term) ||
         managerName.includes(term) ||
         managerEmail.includes(term) ||
-        contactNumber.includes(term) ||
-        phone.includes(term) ||
-        mobileNumber.includes(term) ||
-        managerPhone.includes(term) ||
-        (normalizedTerm.length > 0 && normalizedNumbers.some(num => num.includes(normalizedTerm)))
+        matchesPhoneText ||
+        matchesPhoneDigits
       );
     });
   }, [stores, searchTerm]);

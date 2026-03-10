@@ -762,6 +762,7 @@ const moveVariant = (index: number, direction: 'up' | 'down') => {
 };
 
 const handleAddCutType = (cutTypeId: string) => {
+  if (editingProductId) return;
   if (!cutTypeId) return;
   setProductForm((prev) => {
     if (prev.cutTypes.includes(cutTypeId)) return { ...prev, currentCutType: '' };
@@ -807,6 +808,7 @@ const handleAddCutType = (cutTypeId: string) => {
 };
 
 const handleRemoveCutType = (cutTypeId: string) => {
+  if (editingProductId) return;
   setProductForm((prev) => ({
     ...prev,
     cutTypes: prev.cutTypes.filter((id) => id !== cutTypeId),
@@ -824,6 +826,7 @@ const handleRemoveCutType = (cutTypeId: string) => {
 };
 
 const handleAddWeight = () => {
+  if (editingProductId) return;
   const weight = parseFloat(productForm.currentWeight);
   if (!isNaN(weight) && weight > 0 && !productForm.availableWeights.includes(weight)) {
     setProductForm(prev => ({
@@ -867,6 +870,7 @@ const handleAddWeight = () => {
 };
 
 const handleRemoveWeight = (weight: number) => {
+  if (editingProductId) return;
   setProductForm(prev => ({
     ...prev,
     availableWeights: prev.availableWeights.filter(w => w !== weight)
@@ -2208,7 +2212,10 @@ const handleRemoveWeight = (weight: number) => {
     );
   };
 
-  const renderProductModal = () => (
+  const renderProductModal = () => {
+    const isProductEditMode = editingProductId !== null;
+
+    return (
     <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
@@ -2463,7 +2470,7 @@ const handleRemoveWeight = (weight: number) => {
             className="w-48 px-3 py-2 border border-gray-300 rounded-md"
             value={productForm.currentCutType}
             onChange={e => setProductForm({ ...productForm, currentCutType: e.target.value })}
-            disabled={isSubmitting || loadingCutTypes}
+            disabled={isSubmitting || loadingCutTypes || isProductEditMode}
           >
             <option value="">Select cut type</option>
             {cutTypesData.map((c) => (
@@ -2475,12 +2482,8 @@ const handleRemoveWeight = (weight: number) => {
           <Button
             type="button"
             variant="outline"
-            onClick={() => {
-              if (productForm.currentCutType && !productForm.cutTypes.includes(productForm.currentCutType)) {
-                setProductForm({ ...productForm, cutTypes: [...productForm.cutTypes, productForm.currentCutType], currentCutType: '' });
-              }
-            }}
-            disabled={!productForm.currentCutType || isSubmitting}
+            onClick={() => handleAddCutType(productForm.currentCutType)}
+            disabled={!productForm.currentCutType || isSubmitting || isProductEditMode}
           >
             <Plus className="w-4 h-4" />
           </Button>
@@ -2495,7 +2498,7 @@ const handleRemoveWeight = (weight: number) => {
                   type="button"
                   className="ml-1 text-gray-500 hover:text-red-500"
                   onClick={() => handleRemoveCutType(cutTypeId)}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isProductEditMode}
                 >×</button>
               </span>
             );
@@ -2509,7 +2512,7 @@ const handleRemoveWeight = (weight: number) => {
           {productForm.availableWeights.map(w => (
             <span key={w} className="inline-flex items-center bg-gray-200 rounded px-2 py-1 text-sm">
               {w}
-              <button type="button" className="ml-1 text-gray-500 hover:text-red-500" onClick={() => handleRemoveWeight(w)} disabled={isSubmitting}>×</button>
+              <button type="button" className="ml-1 text-gray-500 hover:text-red-500" onClick={() => handleRemoveWeight(w)} disabled={isSubmitting || isProductEditMode}>×</button>
             </span>
           ))}
           <Input
@@ -2526,18 +2529,21 @@ const handleRemoveWeight = (weight: number) => {
                 }
               }
             }}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isProductEditMode}
           />
           <Button
             type="button"
             variant="outline"
             size="icon"
             onClick={handleAddWeight}
-            disabled={!productForm.currentWeight || isSubmitting}
+            disabled={!productForm.currentWeight || isSubmitting || isProductEditMode}
           >
             <Plus className="w-4 h-4" />
           </Button>
         </div>
+        {isProductEditMode && (
+          <p className="text-xs text-gray-500 mt-2">Cut types and weights cannot be changed while editing a product.</p>
+        )}
       </div>
 
       <div className="space-y-3">
@@ -2791,7 +2797,8 @@ const handleRemoveWeight = (weight: number) => {
         </Button>
       </DialogFooter>
     </form>
-  );
+    );
+  };
 
   const renderVariantModal = () => {
     // Get product from selection to auto-fill defaults

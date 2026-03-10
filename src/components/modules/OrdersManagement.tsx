@@ -234,6 +234,16 @@ export default function OrdersManagement() {
   const getStoreId = (order: Order) =>
     (order as any).store?._id || (order as any).store?.id || (order as any).storeId;
 
+  const getStoreName = (order: Order) => {
+    const store = (order as any).store;
+    if (store && typeof store === 'object') {
+      return store.name || store._id || store.id || '—';
+    }
+    if (typeof store === 'string') return store;
+    if ((order as any).storeId) return (order as any).storeId;
+    return '—';
+  };
+
   const handleAcceptOrder = async (order: Order) => {
     const storeId = getStoreId(order);
     if (!storeId) {
@@ -576,91 +586,89 @@ export default function OrdersManagement() {
                 onChange={handleSearchChange}
               />
             </div>
-            {userRole !== 'subadmin' && (
-              <div className="relative">
-                <Button 
-                  variant="outline"
-                  onClick={() => setShowFilterMenu(!showFilterMenu)}
-                  className={selectedType !== 'all' || selectedStatus !== 'all' ? 'border-blue-600 text-blue-600' : ''}
-                >
-                  <Filter className="w-4 h-4 mr-2" />
-                  Filters
-                  {(selectedType !== 'all' || selectedStatus !== 'all') && (
-                    <Badge variant="default" className="ml-2 bg-blue-600">
-                      {(selectedType !== 'all' ? 1 : 0) + (selectedStatus !== 'all' ? 1 : 0)}
-                    </Badge>
-                  )}
-                </Button>
-                
-                {showFilterMenu && (
-                  <div className="absolute right-0 top-full mt-2 w-56 bg-white border rounded-lg shadow-lg z-10">
-                    <div className="p-3 border-b">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-semibold">Filter by Delivery Type</span>
-                        <button 
-                          onClick={() => setShowFilterMenu(false)}
-                          className="text-gray-400 hover:text-gray-600"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                      {(selectedType !== 'all' || selectedStatus !== 'all') && (
-                        <button
-                          onClick={clearFilters}
-                          className="text-sm text-blue-600 hover:underline"
-                        >
-                          Clear filters
-                        </button>
-                      )}
+            <div className="relative">
+              <Button 
+                variant="outline"
+                onClick={() => setShowFilterMenu(!showFilterMenu)}
+                className={selectedType !== 'all' || selectedStatus !== 'all' ? 'border-blue-600 text-blue-600' : ''}
+              >
+                <Filter className="w-4 h-4 mr-2" />
+                Filters
+                {(selectedType !== 'all' || selectedStatus !== 'all') && (
+                  <Badge variant="default" className="ml-2 bg-blue-600">
+                    {(selectedType !== 'all' ? 1 : 0) + (selectedStatus !== 'all' ? 1 : 0)}
+                  </Badge>
+                )}
+              </Button>
+              
+              {showFilterMenu && (
+                <div className="absolute right-0 top-full mt-2 w-56 bg-white border rounded-lg shadow-lg z-10">
+                  <div className="p-3 border-b">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-semibold">Filter by Delivery Type</span>
+                      <button 
+                        onClick={() => setShowFilterMenu(false)}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
-                    <div className="p-2">
+                    {(selectedType !== 'all' || selectedStatus !== 'all') && (
                       <button
                         onClick={clearFilters}
-                        className={`w-full text-left px-3 py-2 rounded hover:bg-gray-50 ${
-                          selectedType === 'all' && selectedStatus === 'all' ? 'bg-blue-50 text-blue-600' : ''
-                        }`}
+                        className="text-sm text-blue-600 hover:underline"
                       >
-                        All Orders ({totalOrders})
+                        Clear filters
                       </button>
-                      <div className="px-3 pt-3 pb-1 text-xs font-semibold text-gray-500">Status</div>
-                      <button
-                        onClick={() => handleStatusFilterSelect('pending')}
-                        className={`w-full text-left px-3 py-2 rounded hover:bg-gray-50 ${
-                          selectedStatus === 'pending' ? 'bg-blue-50 text-blue-600' : ''
-                        }`}
-                      >
-                        Pending
-                      </button>
-                      <button
-                        onClick={() => handleStatusFilterSelect('delivered')}
-                        className={`w-full text-left px-3 py-2 rounded hover:bg-gray-50 ${
-                          selectedStatus === 'delivered' ? 'bg-blue-50 text-blue-600' : ''
-                        }`}
-                      >
-                        Delivered
-                      </button>
-                      <div className="px-3 pt-3 pb-1 text-xs font-semibold text-gray-500">Delivery Type</div>
-                      <button
-                        onClick={() => handleFilterSelect('express')}
-                        className={`w-full text-left px-3 py-2 rounded hover:bg-gray-50 ${
-                          selectedType === 'express' ? 'bg-blue-50 text-blue-600' : ''
-                        }`}
-                      >
-                        Express Orders ({deliveryTypeStats['express'] || 0})
-                      </button>
-                      <button
-                        onClick={() => handleFilterSelect('next-day')}
-                        className={`w-full text-left px-3 py-2 rounded hover:bg-gray-50 ${
-                          selectedType === 'next-day' ? 'bg-blue-50 text-blue-600' : ''
-                        }`}
-                      >
-                        Next-Day Orders ({deliveryTypeStats['next-day'] || 0})
-                      </button>
-                    </div>
+                    )}
                   </div>
-                )}
-              </div>
-            )}
+                  <div className="p-2">
+                    <button
+                      onClick={clearFilters}
+                      className={`w-full text-left px-3 py-2 rounded hover:bg-gray-50 ${
+                        selectedType === 'all' && selectedStatus === 'all' ? 'bg-blue-50 text-blue-600' : ''
+                      }`}
+                    >
+                      All Orders ({totalOrders})
+                    </button>
+                    <div className="px-3 pt-3 pb-1 text-xs font-semibold text-gray-500">Status</div>
+                    <button
+                      onClick={() => handleStatusFilterSelect('pending')}
+                      className={`w-full text-left px-3 py-2 rounded hover:bg-gray-50 ${
+                        selectedStatus === 'pending' ? 'bg-blue-50 text-blue-600' : ''
+                      }`}
+                    >
+                      Pending
+                    </button>
+                    <button
+                      onClick={() => handleStatusFilterSelect('delivered')}
+                      className={`w-full text-left px-3 py-2 rounded hover:bg-gray-50 ${
+                        selectedStatus === 'delivered' ? 'bg-blue-50 text-blue-600' : ''
+                      }`}
+                    >
+                      Delivered
+                    </button>
+                    <div className="px-3 pt-3 pb-1 text-xs font-semibold text-gray-500">Delivery Type</div>
+                    <button
+                      onClick={() => handleFilterSelect('express')}
+                      className={`w-full text-left px-3 py-2 rounded hover:bg-gray-50 ${
+                        selectedType === 'express' ? 'bg-blue-50 text-blue-600' : ''
+                      }`}
+                    >
+                      Express Orders ({deliveryTypeStats['express'] || 0})
+                    </button>
+                    <button
+                      onClick={() => handleFilterSelect('next-day')}
+                      className={`w-full text-left px-3 py-2 rounded hover:bg-gray-50 ${
+                        selectedType === 'next-day' ? 'bg-blue-50 text-blue-600' : ''
+                      }`}
+                    >
+                      Next-Day Orders ({deliveryTypeStats['next-day'] || 0})
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -678,6 +686,7 @@ export default function OrdersManagement() {
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-4">Order ID</th>
+                  {userRole === 'subadmin' && <th className="text-left py-3 px-4">Store</th>}
                   <th className="text-left py-3 px-4">Customer</th>
                   <th className="text-left py-3 px-4">Items</th>
                   <th className="text-left py-3 px-4">Amount</th>
@@ -691,15 +700,15 @@ export default function OrdersManagement() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="py-4 px-4 text-center text-gray-600">Loading orders...</td>
+                    <td colSpan={userRole === 'subadmin' ? 10 : 9} className="py-4 px-4 text-center text-gray-600">Loading orders...</td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan={9} className="py-4 px-4 text-center text-red-600">{error}</td>
+                    <td colSpan={userRole === 'subadmin' ? 10 : 9} className="py-4 px-4 text-center text-red-600">{error}</td>
                   </tr>
                 ) : filteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-4 px-4 text-center text-gray-500">
+                    <td colSpan={userRole === 'subadmin' ? 10 : 9} className="py-4 px-4 text-center text-gray-500">
                       No orders found
                     </td>
                   </tr>
@@ -715,6 +724,7 @@ export default function OrdersManagement() {
                     return (
                       <tr key={order._id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-3 px-4 text-blue-600">{order.invoiceNo || order._id}</td>
+                        {userRole === 'subadmin' && <td className="py-3 px-4">{getStoreName(order)}</td>}
                         <td className="py-3 px-4">{order.shippingAddress?.name || '—'}</td>
                         <td className="py-3 px-4">{order.items?.length || 0}</td>
                         <td className="py-3 px-4"><span className="dirham-symbol mr-2">&#xea;</span>{parseFloat(order.pricing?.grandTotal || '0').toFixed(2)}</td>
