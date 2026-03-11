@@ -800,14 +800,15 @@ export default function OrderDetails() {
 
               {/* Refund Options for Cancelled Orders */}
               {(() => {
-                const isCancelled = order?.status?.toLowerCase() === 'cancelled';
+                const normalizedOrderStatus = order?.status?.toLowerCase() || '';
+                const isReturned = normalizedOrderStatus === 'return_requested' || normalizedOrderStatus === 'return' || normalizedOrderStatus === 'returned';
                 const paymentMethod = order?.payment?.method?.toLowerCase() || '';
                 const paymentStatus = order?.payment?.status?.toLowerCase() || '';
                 const isOnlinePayment = paymentMethod !== 'cod' && paymentMethod !== 'cash' && paymentMethod !== 'offline';
                 const isPaymentSuccessful = paymentStatus === 'paid' || paymentStatus === 'successful' || paymentStatus === 'success';
                 
-                // Show refund buttons only if order is cancelled AND payment is online AND payment is successful
-                const canShowRefundButtons = isCancelled && isOnlinePayment && isPaymentSuccessful;
+                // Show refund buttons only if order is returned AND payment is online AND payment is successful
+                const canShowRefundButtons = isReturned && isOnlinePayment && isPaymentSuccessful;
                 
                 return canShowRefundButtons ? (
                   <div className="mt-4 pt-4 border-t border-gray-200">
