@@ -11,10 +11,14 @@ import { toast } from 'react-toastify';
 // Utility function to get full image URL
 const getImageUrl = (imagePath?: string): string | undefined => {
   if (!imagePath) return undefined;
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath;
+  }
   const baseUrl = import.meta.env.VITE_IMAGE_BASE_URL;
   if (!baseUrl) return imagePath;
+  const cleanBaseUrl = baseUrl.replace(/\/$/, '');
   const cleanPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
-  return `${baseUrl}${cleanPath}`;
+  return `${cleanBaseUrl}${cleanPath}`;
 };
 
 const formatPrice = (value: number): string => {
@@ -29,6 +33,7 @@ interface Variant {
     image: string;
     notes: string;
     cutType: string;
+    weight?: number;
     displayPrice: number;
     sellingPrice: number;
     profit: number;
@@ -80,14 +85,6 @@ interface CartItem {
   variantImage?: string;
 }
 
-interface WeightSelectionModal {
-  isOpen: boolean;
-  inventoryItem: StoreInventoryItem | null;
-  variant: Variant | null;
-  availableWeights: number[];
-  weightUnit: string;
-}
-
 export default function StoreBilling() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState(0);
@@ -115,15 +112,7 @@ export default function StoreBilling() {
   const [storeInventory, setStoreInventory] = useState<StoreInventoryItem[]>([]);
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [inventoryError, setInventoryError] = useState<string | null>(null);
-
-  // Weight selection modal state
-  const [weightModal, setWeightModal] = useState<WeightSelectionModal>({
-    isOpen: false,
-    inventoryItem: null,
-    variant: null,
-    availableWeights: [],
-    weightUnit: '',
-  });
+  const [cutTypeNames, setCutTypeNames] = useState<Record<string, string>>({});
 
   // Fetch stores only for super-admin
   useEffect(() => {
@@ -217,90 +206,60 @@ export default function StoreBilling() {
     return () => { active = false; };
   }, [selectedStoreId]);
 
+  useEffect(() => {
+    let active = true;
+    apiFetch<{
+      success: boolean;
+      cutTypes?: Array<{ _id: string; name: string }>;
+      cuttypes?: Array<{ _id: string; name: string }>;
+      message?: string;
+    }>('/api/cuttype')
+      .then((res) => {
+        if (!active || !res.success) return;
+        const list = res.cutTypes || res.cuttypes || [];
+        const nextMap = list.reduce<Record<string, string>>((acc, item) => {
+          acc[item._id] = item.name;
+          return acc;
+        }, {});
+        setCutTypeNames(nextMap);
+      })
+      .catch((err) => {
+        console.error('Fetch cut types error:', err);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const getCutTypeName = (cutTypeId?: string) => {
+    if (!cutTypeId) return 'Variant';
+    return cutTypeNames[cutTypeId] || cutTypeId;
+  };
+
   // Filter inventory by category and search term
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase();
   const filteredInventory = storeInventory.filter((item) => {
     const matchesCategory = !selectedCategoryId || item.productId.category === selectedCategoryId;
-    const matchesSearch = !searchTerm || 
-      item.productId.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.variants.some(v => v.variantId.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesSearch =
+      !normalizedSearchTerm ||
+      item.productId.name.toLowerCase().includes(normalizedSearchTerm) ||
+      item.variants.some((variant) => {
+        const variantName = variant.variantId.name?.toLowerCase() || '';
+        const notes = variant.variantId.notes?.toLowerCase() || '';
+        const cutTypeName = getCutTypeName(variant.variantId.cutType).toLowerCase();
+        const weight = String(variant.variantId.weight || '');
+
+        return (
+          variantName.includes(normalizedSearchTerm) ||
+          notes.includes(normalizedSearchTerm) ||
+          cutTypeName.includes(normalizedSearchTerm) ||
+          weight.includes(normalizedSearchTerm)
+        );
+      });
+
     return matchesCategory && matchesSearch && item.isActive && !item.isDeleted;
   });
-
-  const openWeightModal = (inventoryItem: StoreInventoryItem, variant: Variant) => {
-    const availableWeights = inventoryItem.productId.availableWeights || [];
-    setWeightModal({
-      isOpen: true,
-      inventoryItem,
-      variant,
-      availableWeights,
-      weightUnit: inventoryItem.productId.weightUnit,
-    });
-  };
-
-  const closeWeightModal = () => {
-    setWeightModal({
-      isOpen: false,
-      inventoryItem: null,
-      variant: null,
-      availableWeights: [],
-      weightUnit: '',
-    });
-  };
-
-  const addToCartWithWeight = (weight: number) => {
-    if (!weightModal.inventoryItem || !weightModal.variant) return;
-
-    const inventoryItem = weightModal.inventoryItem;
-    const variant = weightModal.variant;
-
-    if (inventoryItem.totalStock <= 0) {
-      toast.error('Product out of stock');
-      return;
-    }
-
-    const cartItemId = `${inventoryItem.productId._id}-${variant.variantId._id}-${weight}`;
-
-    const productName = inventoryItem.productId.name;
-    const variantName = variant.variantId.name;
-    const price = variant.variantId.sellingPrice;
-    const productImage = getImageUrl(inventoryItem.productId.image);
-    const variantImage = getImageUrl(variant.variantId.image);
-
-    const existing = cart.find((item) => item.id === cartItemId);
-    
-    if (existing) {
-      if (existing.quantity >= inventoryItem.totalStock) {
-        toast.error('Cannot add more than available stock');
-        return;
-      }
-      setCart(
-        cart.map((item) =>
-          item.id === cartItemId ? { ...item, quantity: item.quantity + 1 } : item
-        )
-      );
-    } else {
-      const newItem: CartItem = {
-        id: cartItemId,
-        productId: inventoryItem.productId._id,
-        variantId: variant.variantId._id,
-        productName,
-        variantName,
-        price,
-        quantity: 1,
-        weight,
-        weightUnit: inventoryItem.productId.weightUnit,
-        notes: variant.variantId.notes,
-        cutType: variant.variantId.cutType,
-        availableStock: inventoryItem.totalStock,
-        productImage,
-        variantImage,
-      };
-      setCart([...cart, newItem]);
-      toast.success(`Added ${variantName} (${weight}${inventoryItem.productId.weightUnit})`);
-    }
-
-    closeWeightModal();
-  };
 
   const addToCart = (inventoryItem: StoreInventoryItem, variant?: Variant) => {
     if (inventoryItem.totalStock <= 0) {
@@ -308,8 +267,9 @@ export default function StoreBilling() {
       return;
     }
 
+    const variantWeight = variant?.variantId.weight;
     const cartItemId = variant 
-      ? `${inventoryItem.productId._id}-${variant.variantId._id}`
+      ? `${inventoryItem.productId._id}-${variant.variantId._id}-${variantWeight || 0}`
       : inventoryItem.productId._id;
 
     const productName = inventoryItem.productId.name;
@@ -339,13 +299,18 @@ export default function StoreBilling() {
         variantName,
         price,
         quantity: 1,
+        weight: variantWeight,
+        weightUnit: inventoryItem.productId.weightUnit,
         notes: variant?.variantId.notes,
-        cutType: variant?.variantId.cutType,
+        cutType: getCutTypeName(variant?.variantId.cutType),
         availableStock: inventoryItem.totalStock,
         productImage,
         variantImage,
       };
       setCart([...cart, newItem]);
+      if (variant) {
+        toast.success(`Added ${getCutTypeName(variant.variantId.cutType)} ${variantWeight || ''}${inventoryItem.productId.weightUnit}`);
+      }
     }
   };
 
@@ -598,18 +563,7 @@ export default function StoreBilling() {
                       {inventoryItem.variants.length === 0 ? (
                         <div className="flex justify-end">
                           <Button
-                            onClick={() => {
-                              // For base products without variants
-                              const availableWeights = inventoryItem.productId.availableWeights || [];
-                              if (availableWeights.length > 0) {
-                                openWeightModal(inventoryItem, {
-                                  variantId: { _id: '', name: inventoryItem.productId.name, image: '', notes: '', cutType: '', displayPrice: inventoryItem.productId.cost, sellingPrice: inventoryItem.productId.cost, profit: 0, discount: 0, isActive: true },
-                                  isActive: true,
-                                  isDeleted: false,
-                                  _id: '',
-                                } as Variant);
-                              }
-                            }}
+                            onClick={() => addToCart(inventoryItem)}
                             disabled={inventoryItem.totalStock <= 0}
                             className="bg-blue-600 hover:bg-blue-700 text-white"
                           >
@@ -618,55 +572,87 @@ export default function StoreBilling() {
                           </Button>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                          {inventoryItem.variants
-                            .filter(v => v.isActive && !v.isDeleted && v.variantId.isActive)
-                            .map((variant) => (
-                              <button
-                                key={variant._id}
-                                onClick={() => openWeightModal(inventoryItem, variant)}
-                                disabled={inventoryItem.totalStock <= 0}
-                                className="flex flex-col items-center justify-between gap-2 p-3 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed min-h-[200px]"
-                              >
-                                {variant.variantId.image && (
-                                  <div className="flex-shrink-0">
-                                    <ImageWithFallback
-                                      src={getImageUrl(variant.variantId.image)}
-                                      alt={variant.variantId.name}
-                                      className="w-24 h-24 rounded-lg object-cover"
-                                    />
-                                  </div>
-                                )}
-                                
-                                <div className="w-full text-center">
-                                  <p className="font-medium text-xs line-clamp-2">{variant.variantId.name}</p>
-                                  {variant.variantId.notes && (
-                                    <p className="text-xs text-gray-500 mt-1 line-clamp-1">{variant.variantId.notes}</p>
-                                  )}
-                                  
-                                  <div className="mt-2 flex flex-col items-center gap-1">
-                                    {variant.variantId.discount > 0 && (
-                                      <>
-                                        <span className="text-xs line-through text-gray-400">
-                                          <span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(variant.variantId.displayPrice)}
-                                        </span>
-                                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-semibold">
-                                          {variant.variantId.discount}% off
-                                        </span>
-                                      </>
-                                    )}
-                                    <p className="text-blue-600 font-bold text-sm mt-1">
-                                      <span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(variant.variantId.sellingPrice)}
-                                    </p>
-                                  </div>
+                        <div className="space-y-4">
+                          {Object.entries(
+                            inventoryItem.variants
+                              .filter((variant) => variant.isActive && !variant.isDeleted && variant.variantId.isActive)
+                              .reduce<Record<string, Variant[]>>((acc, variant) => {
+                                const cutTypeKey = variant.variantId.cutType || 'uncategorized';
+                                if (!acc[cutTypeKey]) {
+                                  acc[cutTypeKey] = [];
+                                }
+                                acc[cutTypeKey].push(variant);
+                                return acc;
+                              }, {})
+                          ).map(([cutTypeId, groupedVariants]) => {
+                            const sortedVariants = [...groupedVariants].sort(
+                              (left, right) => (left.variantId.weight || 0) - (right.variantId.weight || 0)
+                            );
+
+                            return (
+                              <div key={cutTypeId} className="rounded-xl border border-gray-200 p-4">
+                                <div className="mb-3">
+                                  <h4 className="text-sm font-semibold text-gray-900">{getCutTypeName(cutTypeId)}</h4>
+                                  <p className="mt-1 text-xs text-gray-500">
+                                    Available weights: {sortedVariants
+                                      .map((variant) => `${variant.variantId.weight || 0}${inventoryItem.productId.weightUnit}`)
+                                      .join(', ')}
+                                  </p>
                                 </div>
 
-                                <div className="flex items-center gap-1 text-blue-600 font-medium text-sm">
-                                  <Plus className="w-4 h-4" />
-                                  Add
+                                <div className="flex gap-3 overflow-x-auto pb-1">
+                                  {sortedVariants.map((variant) => (
+                                    <button
+                                      key={variant._id}
+                                      onClick={() => addToCart(inventoryItem, variant)}
+                                      disabled={inventoryItem.totalStock <= 0}
+                                      className="flex min-w-[220px] flex-shrink-0 items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-all hover:border-blue-500 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                      {variant.variantId.image && (
+                                        <div className="flex-shrink-0">
+                                          <ImageWithFallback
+                                            src={getImageUrl(variant.variantId.image)}
+                                            alt={variant.variantId.name}
+                                            className="h-16 w-16 rounded-lg object-cover"
+                                          />
+                                        </div>
+                                      )}
+
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-semibold text-gray-900">
+                                          {variant.variantId.weight || 0}{inventoryItem.productId.weightUnit}
+                                        </p>
+                                        {variant.variantId.notes && (
+                                          <p className="mt-1 line-clamp-2 text-xs text-gray-500">{variant.variantId.notes}</p>
+                                        )}
+
+                                        <div className="mt-2 flex flex-col gap-1">
+                                          {variant.variantId.discount > 0 && (
+                                            <>
+                                              <span className="text-xs text-gray-400 line-through">
+                                                <span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(variant.variantId.displayPrice)}
+                                              </span>
+                                              <span className="rounded bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
+                                                {variant.variantId.discount}% off
+                                              </span>
+                                            </>
+                                          )}
+                                          <p className="mt-1 text-sm font-bold text-blue-600">
+                                            <span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(variant.variantId.sellingPrice)}
+                                          </p>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex flex-shrink-0 items-center gap-1 text-sm font-medium text-blue-600">
+                                        <Plus className="h-4 w-4" />
+                                        Add
+                                      </div>
+                                    </button>
+                                  ))}
                                 </div>
-                              </button>
-                            ))}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -862,72 +848,6 @@ export default function StoreBilling() {
           </Card>
         </div>
       </div>
-
-      {/* Weight Selection Modal */}
-      {weightModal.isOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md border-2 border-gray-200 shadow-5xl bg-gray-200">
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle>Select Weight</CardTitle>
-              <button
-                onClick={closeWeightModal}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Product/Variant Info */}
-              <div className="flex gap-3 p-3 bg-gray-50 rounded-lg">
-                {weightModal.variant?.variantId.image && (
-                  <ImageWithFallback
-                    src={getImageUrl(weightModal.variant.variantId.image)}
-                    alt={weightModal.variant.variantId.name}
-                    className="w-16 h-16 rounded object-cover flex-shrink-0"
-                  />
-                )}
-                <div className="flex-1">
-                  <p className="font-semibold text-sm">{weightModal.variant?.variantId.name}</p>
-                  <p className="text-sm text-blue-600 mt-1">
-                    <span className="dirham-symbol mr-1">&#xea;</span>
-                    {formatPrice(weightModal.variant?.variantId.sellingPrice || 0)}
-                  </p>
-                </div>
-              </div>
-
-              {/* Weight Options */}
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-700">Available Weights:</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {weightModal.availableWeights.map((weight) => (
-                    <button
-                      key={weight}
-                      onClick={() => addToCartWithWeight(weight)}
-                      className="p-3 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-center group"
-                    >
-                      <div className="font-semibold text-blue-600">{weight}</div>
-                      <div className="text-xs text-gray-500">{weightModal.weightUnit}</div>
-                      <div className="text-xs text-blue-500 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Plus className="w-3 h-3 inline mr-1" />
-                        Add
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Close Button */}
-              <Button
-                variant="outline"
-                onClick={closeWeightModal}
-                className="w-full"
-              >
-                Cancel
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }
