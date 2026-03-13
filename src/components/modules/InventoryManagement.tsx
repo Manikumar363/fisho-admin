@@ -1907,6 +1907,7 @@ const handleRemoveWeight = (weight: number) => {
           sellingPrice: selling,
           featured: variantForm.featured,
           bestSeller: variantForm.bestSeller,
+          special: variantForm.isSpecial || false,
           isExpressDelivery: variantForm.isExpressDelivery,
           isNextDayDelivery: variantForm.isNextDayDelivery,
           notes: variantForm.notes.trim(),

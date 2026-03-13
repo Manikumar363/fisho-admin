@@ -22,18 +22,25 @@ const Transactions: React.FC = () => {
   const [toDate, setToDate] = useState('');
   const [transactions, setTransactions] = useState<any[]>([]);
   const [stats, setStats] = useState<{ moneyIn: number; moneyOut: number; netAmount: number }>({ moneyIn: 0, moneyOut: 0, netAmount: 0 });
+  const [page, setPage] = useState(1);
+  const [limit] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [txnType, setTxnType] = useState('');
+  const [stores, setStores] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedStoreId, setSelectedStoreId] = useState('');
+  const [orderFilter, setOrderFilter] = useState<'all' | 'orders' | 'bulk'>('all');
 
   const filteredTransactions = React.useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return transactions;
-
-    return transactions.filter((txn) => {
+    const filtered = transactions.filter((txn) => {
       const orderId = typeof txn.order === 'object' ? (txn.order?._id || txn.order?.id || '') : (txn.order || '');
+      const storeId = txn.store?._id || txn.store?.id || txn.storeId || '';
+      const isBulkOrder = !orderId && !storeId;
       const storeName = txn.store?.name || '';
       const txnId = txn._id || '';
       const userName = txn.user ? `${txn.user.firstName || ''} ${txn.user.lastName || ''}`.trim() : '';
@@ -41,27 +48,71 @@ const Transactions: React.FC = () => {
       const status = txn.status || '';
       const amount = String(txn.amount ?? '');
 
-      return [txnId, orderId, userName, payment, status, storeName, amount]
-        .join(' ')
-        .toLowerCase()
-        .includes(query);
+      const matchesStore = !selectedStoreId || String(storeId) === String(selectedStoreId);
+      const matchesPaymentMethod = !paymentMethod || String(payment).toLowerCase() === String(paymentMethod).toLowerCase();
+      const matchesTxnType = !txnType || String(txn.type || '').toLowerCase() === String(txnType).toLowerCase();
+      const matchesOrderFilter =
+        orderFilter === 'all' ||
+        (orderFilter === 'orders' && !isBulkOrder) ||
+        (orderFilter === 'bulk' && isBulkOrder);
+
+      const matchesSearch =
+        !query ||
+        [txnId, orderId, userName, payment, status, storeName, amount]
+          .join(' ')
+          .toLowerCase()
+          .includes(query);
+
+      return matchesStore && matchesPaymentMethod && matchesTxnType && matchesOrderFilter && matchesSearch;
     });
-  }, [transactions, search]);
+
+    return filtered;
+  }, [transactions, search, paymentMethod, txnType, selectedStoreId, orderFilter]);
+
+  useEffect(() => {
+    const fetchStores = async () => {
+      try {
+        const res = await apiFetch<{ success: boolean; stores?: any[]; message?: string }>('/api/stores/');
+        if (!res.success) throw new Error(res.message || 'Failed to fetch stores');
+        const mapped = (res.stores || [])
+          .map((store) => ({ id: String(store._id || store.id || ''), name: store.name || 'Unnamed Store' }))
+          .filter((store) => store.id);
+        setStores(mapped);
+      } catch (err: any) {
+        toast.error(err?.message || 'Failed to fetch stores');
+      }
+    };
+    fetchStores();
+  }, []);
 
   useEffect(() => {
     const fetchTransactions = async () => {
       setLoading(true);
       setError(null);
       try {
-        let url = '/api/transactions/get-all?status=completed';
+        let url = `/api/transactions/get-all?page=${page}&limit=${limit}`;
         if (paymentMethod) url += `&paymentMethod=${encodeURIComponent(paymentMethod)}`;
         if (txnType) url += `&type=${encodeURIComponent(txnType)}`;
+        if (selectedStoreId) url += `&storeId=${encodeURIComponent(selectedStoreId)}`;
         if (fromDate) url += `&fromDate=${encodeURIComponent(fromDate)}`;
         if (toDate) url += `&toDate=${encodeURIComponent(toDate)}`;
-        const res = await apiFetch(url);
+
+        const res = await apiFetch<{
+          success: boolean;
+          transactions?: any[];
+          stats?: { moneyIn: number; moneyOut: number; netAmount: number };
+          page?: number;
+          limit?: number;
+          total?: number;
+          totalPages?: number;
+          message?: string;
+        }>(url);
         if (!res.success) throw new Error(res.message || 'Failed to fetch transactions');
         setTransactions(res.transactions || []);
         setStats(res.stats || { moneyIn: 0, moneyOut: 0, netAmount: 0 });
+        setPage(res.page || page);
+        setTotal(res.total || 0);
+        setTotalPages(res.totalPages || 1);
       } catch (err: any) {
         setError(err?.message || 'Failed to fetch transactions');
       } finally {
@@ -69,7 +120,11 @@ const Transactions: React.FC = () => {
       }
     };
     fetchTransactions();
-  }, [paymentMethod, txnType, fromDate, toDate]);
+  }, [paymentMethod, txnType, selectedStoreId, fromDate, toDate, page, limit]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [paymentMethod, txnType, selectedStoreId, fromDate, toDate]);
 
   if (loading) {
     return (
@@ -143,8 +198,8 @@ const Transactions: React.FC = () => {
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="relative">
+          <div className="flex items-center gap-3 overflow-x-auto whitespace-nowrap">
+            <div className="relative min-w-[260px] flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <Input
                 placeholder="Search transactions..."
@@ -153,7 +208,19 @@ const Transactions: React.FC = () => {
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
-            <div>
+            <div className="min-w-[180px]">
+              <select
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                value={selectedStoreId}
+                onChange={e => setSelectedStoreId(e.target.value)}
+              >
+                <option value="">All Stores</option>
+                {stores.map((store) => (
+                  <option key={store.id} value={store.id}>{store.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="min-w-[180px]">
               <select
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 value={paymentMethod}
@@ -165,7 +232,7 @@ const Transactions: React.FC = () => {
                 <option value="online">Online</option>
               </select>
             </div>
-            <div>
+            <div className="min-w-[180px]">
               <select
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 value={txnType}
@@ -174,6 +241,17 @@ const Transactions: React.FC = () => {
                 <option value="">Transaction Type</option>
                 <option value="in">Amount In</option>
                 <option value="out">Amount Out</option>
+              </select>
+            </div>
+            <div className="min-w-[180px]">
+              <select
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                value={orderFilter}
+                onChange={e => setOrderFilter(e.target.value as 'all' | 'orders' | 'bulk')}
+              >
+                <option value="all">Order Type</option>
+                <option value="orders">Orders</option>
+                <option value="bulk">Bulk Orders</option>
               </select>
             </div>
           </div>
@@ -186,6 +264,30 @@ const Transactions: React.FC = () => {
           <CardTitle>All Transactions</CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 flex items-center justify-between border-b pb-4">
+            <p className="text-sm text-gray-600">
+              Showing page {page} of {Math.max(totalPages, 1)} • Total records: {total}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                disabled={page <= 1 || loading}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={page >= totalPages || loading}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -205,11 +307,8 @@ const Transactions: React.FC = () => {
                 {filteredTransactions.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="py-8 text-center text-gray-500">
-                      {paymentMethod === 'online' ? 'No online transactions.' :
-                        paymentMethod === 'cod' ? 'Currently no COD orders.' :
-                        paymentMethod === 'wallet' ? 'No wallet transactions.' :
-                        txnType === 'out' ? 'No amount out transactions.' :
-                        txnType === 'in' ? 'No amount in transactions.' :
+                      {orderFilter === 'bulk' ? 'No bulk order transactions found.' :
+                        orderFilter === 'orders' ? 'No order transactions found.' :
                         'No transactions found.'}
                     </td>
                   </tr>
