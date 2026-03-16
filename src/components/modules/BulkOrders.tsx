@@ -65,6 +65,7 @@ export default function BulkOrders() {
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [selectedOrderType, setSelectedOrderType] = useState<'all' | 'order' | 'bulkOrder'>('bulkOrder');
   const [showFilterMenu, setShowFilterMenu] = useState(false);
 
   // Fetch bulk orders from API
@@ -87,6 +88,11 @@ export default function BulkOrders() {
     // Add status filter if selected
     if (selectedStatus !== 'all') {
       params.append('status', selectedStatus);
+    }
+
+    // Add order type filter when selected
+    if (selectedOrderType !== 'all') {
+      params.append('orderType', selectedOrderType);
     }
 
     apiFetch<{
@@ -113,7 +119,7 @@ export default function BulkOrders() {
     return () => {
       active = false;
     };
-  }, [currentPage, searchInput, selectedStatus])
+  }, [currentPage, searchInput, selectedStatus, selectedOrderType])
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchInput(e.target.value);
@@ -128,6 +134,7 @@ export default function BulkOrders() {
 
   const clearFilters = () => {
     setSelectedStatus('all');
+    setSelectedOrderType('bulkOrder');
     setShowFilterMenu(false);
     setCurrentPage(1);
   };
@@ -274,6 +281,31 @@ export default function BulkOrders() {
                     )}
                   </div>
                   <div className="p-2 max-h-80 overflow-y-auto">
+                    <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      Order Type
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedOrderType('order');
+                        setCurrentPage(1);
+                      }}
+                      className={selectedOrderType === 'order' ? 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 bg-blue-50 text-blue-600' : 'w-full text-left px-3 py-2 rounded hover:bg-gray-50'}
+                    >
+                      Order
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedOrderType('bulkOrder');
+                        setCurrentPage(1);
+                      }}
+                      className={selectedOrderType === 'bulkOrder' ? 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 bg-blue-50 text-blue-600' : 'w-full text-left px-3 py-2 rounded hover:bg-gray-50'}
+                    >
+                      Bulk Order
+                    </button>
+                    <div className="my-2 border-t" />
+                    <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      Status
+                    </div>
                     <button
                       onClick={clearFilters}
                       className={selectedStatus === 'all' ? 'w-full text-left px-3 py-2 rounded hover:bg-gray-50 bg-blue-50 text-blue-600' : 'w-full text-left px-3 py-2 rounded hover:bg-gray-50'}

@@ -30,7 +30,7 @@ interface Enquiry {
   name: string;
   email: string;
   mobile: string;
-  platform: 'iOS' | 'Android';
+  platform: 'iOS' | 'Android' | 'Web';
   message: string;
   subject?: string;
   imageUrl?: string; // Optional image field
@@ -45,16 +45,17 @@ export default function Enquiries() {
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [sortOption, setSortOption] = useState<'aToZ' | 'zToA' | ''>('');
-  const [platformFilter, setPlatformFilter] = useState<'All' | 'iOS' | 'Android'>('All');
+  const [platformFilter, setPlatformFilter] = useState<'All' | 'iOS' | 'Android' | 'Web'>('All');
 
   const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
 
   const IMAGE_BASE = ((import.meta as any).env?.VITE_IMAGE_BASE_URL || (import.meta as any).env?.VITE_BASE_URL) as string | undefined;
 
-  const normalizePlatform = (platform?: string): 'iOS' | 'Android' => {
+  const normalizePlatform = (platform?: string): 'iOS' | 'Android' | 'Web' => {
     const value = String(platform || '').toLowerCase();
     if (value.includes('ios')) return 'iOS';
     if (value.includes('android')) return 'Android';
+    if (value.includes('web') || value.includes('browser')) return 'Web';
     if (value.includes('mobile')) return 'Android';
     return 'iOS';
   };
@@ -212,12 +213,13 @@ export default function Enquiries() {
               </select>
               <select
                 value={platformFilter}
-                onChange={(e) => setPlatformFilter(e.target.value as 'All' | 'iOS' | 'Android')}
+                onChange={(e) => setPlatformFilter(e.target.value as 'All' | 'iOS' | 'Android' | 'Web')}
                 className="border rounded-md px-3 py-2 text-sm min-w-[150px] bg-white"
               >
                 <option value="All">All Platforms</option>
                 <option value="iOS">iOS</option>
                 <option value="Android">Android</option>
+                <option value="Web">Web</option>
               </select>
             </div>
           </div>
@@ -276,7 +278,9 @@ export default function Enquiries() {
                           className={
                             enquiry.platform === 'iOS'
                               ? 'bg-blue-100 text-blue-700 hover:bg-blue-100'
-                              : 'bg-green-100 text-green-700 hover:bg-green-100'
+                              : enquiry.platform === 'Android'
+                                ? 'bg-green-100 text-green-700 hover:bg-green-100'
+                                : 'bg-orange-100 text-orange-700 hover:bg-orange-100'
                           }
                         >
                           {enquiry.platform}
@@ -319,92 +323,101 @@ export default function Enquiries() {
 
       {/* View Enquiry Dialog */}
       <Dialog open={viewingEnquiry !== null} onOpenChange={() => setViewingEnquiry(null)}>
-        <DialogContent className="max-w-2xl" onInteractOutside={(e) => e.preventDefault()}>
-          <DialogHeader>
+        <DialogContent
+          className="max-w-4xl sm:max-w-5xl w-[80vw] sm:w-[70vw] max-h-[70vh] flex flex-col p-0 overflow-hidden"
+          onInteractOutside={(e) => e.preventDefault()}
+        >
+          <DialogHeader className="border-b border-gray-200 px-6 pt-6 pb-4">
             <DialogTitle>Enquiry Details</DialogTitle>
             <DialogDescription>
               View complete enquiry information
             </DialogDescription>
           </DialogHeader>
           {viewingEnquiry && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-gray-600">Enquiry ID</label>
-                  <p className="text-gray-900">{viewingEnquiry.id}</p>
+            <div className="flex-1 overflow-y-auto px-6 py-6">
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+                <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="min-w-0">
+                    <label className="text-gray-600">Enquiry ID</label>
+                    <p className="break-all text-gray-900">{viewingEnquiry.id}</p>
+                  </div>
+                  <div className="min-w-0">
+                    <label className="text-gray-600">Date</label>
+                    <p className="text-gray-900">{formatDate(viewingEnquiry.date)}</p>
+                  </div>
+                  <div className="min-w-0">
+                    <label className="text-gray-600">Name</label>
+                    <p className="text-gray-900">{viewingEnquiry.name}</p>
+                  </div>
+                  <div className="min-w-0">
+                    <label className="text-gray-600">Platform</label>
+                    <div className="mt-1">
+                      <Badge
+                        variant={viewingEnquiry.platform === 'iOS' ? 'default' : 'secondary'}
+                        className={
+                          viewingEnquiry.platform === 'iOS'
+                            ? 'bg-blue-100 text-blue-700 hover:bg-blue-100'
+                            : viewingEnquiry.platform === 'Android'
+                              ? 'bg-green-100 text-green-700 hover:bg-green-100'
+                              : 'bg-orange-100 text-orange-700 hover:bg-orange-100'
+                        }
+                      >
+                        {viewingEnquiry.platform}
+                      </Badge>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-gray-600">Date</label>
-                  <p className="text-gray-900">{formatDate(viewingEnquiry.date)}</p>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="min-w-0">
+                    <label className="text-gray-600">Email</label>
+                    <p className="break-all text-gray-900">{viewingEnquiry.email}</p>
+                  </div>
+                  <div className="min-w-0">
+                    <label className="text-gray-600">Mobile Number</label>
+                    <p className="text-gray-900">{viewingEnquiry.mobile}</p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
+                {viewingEnquiry.subject && (
+                  <div>
+                    <label className="text-gray-600">Subject</label>
+                    <p className="text-gray-900">{viewingEnquiry.subject}</p>
+                  </div>
+                )}
+
                 <div>
-                  <label className="text-gray-600">Name</label>
-                  <p className="text-gray-900">{viewingEnquiry.name}</p>
+                  <label className="text-gray-600">Message</label>
+                  <p className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-4 text-gray-900">
+                    {viewingEnquiry.message}
+                  </p>
                 </div>
-                <div>
-                  <label className="text-gray-600">Platform</label>
-                  <Badge
-                    variant={viewingEnquiry.platform === 'iOS' ? 'default' : 'secondary'}
-                    className={
-                      viewingEnquiry.platform === 'iOS'
-                        ? 'bg-blue-100 text-blue-700 hover:bg-blue-100'
-                        : 'bg-green-100 text-green-700 hover:bg-green-100'
-                    }
-                  >
-                    {viewingEnquiry.platform}
-                  </Badge>
                 </div>
-              </div>
 
-              <div>
-                <label className="text-gray-600">Email</label>
-                <p className="text-gray-900 break-all">{viewingEnquiry.email}</p>
-              </div>
-
-              <div>
-                <label className="text-gray-600">Mobile Number</label>
-                <p className="text-gray-900">{viewingEnquiry.mobile}</p>
-              </div>
-
-              {/* Image Preview and Download */}
-              {viewingEnquiry.imageUrl && (
-                <div>
+                {viewingEnquiry.imageUrl && (
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-5 xl:sticky xl:top-0 xl:self-start">
                   <label className="text-gray-600">Image</label>
-                  <div className="flex items-center gap-4 mt-1">
-                    <img
-                      src={viewingEnquiry.imageUrl}
-                      alt="Enquiry Attachment"
-                      className="max-h-40 rounded border border-gray-200"
-                      style={{ maxWidth: '200px' }}
-                    />
+                  <div className="mt-3 space-y-4">
+                    <div className="flex min-h-[320px] items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-white p-3">
+                      <img
+                        src={viewingEnquiry.imageUrl}
+                        alt="Enquiry Attachment"
+                        className="max-h-[420px] w-full rounded object-contain"
+                      />
+                    </div>
                     <a
                       href={viewingEnquiry.imageUrl}
                       download
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline text-sm border px-3 py-1 rounded"
+                      className="inline-flex w-full items-center justify-center rounded-md border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50"
                     >
-                      Download
+                      Download Image
                     </a>
                   </div>
-                </div>
-              )}
-
-              {viewingEnquiry.subject && (
-                <div>
-                  <label className="text-gray-600">Subject</label>
-                  <p className="text-gray-900">{viewingEnquiry.subject}</p>
-                </div>
-              )}
-
-              <div>
-                <label className="text-gray-600">Message</label>
-                <p className="text-gray-900 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  {viewingEnquiry.message}
-                </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
