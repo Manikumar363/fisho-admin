@@ -30,7 +30,7 @@ interface Enquiry {
   name: string;
   email: string;
   mobile: string;
-  platform: 'Web' | 'Mobile';
+  platform: 'iOS' | 'Android';
   message: string;
   subject?: string;
   imageUrl?: string; // Optional image field
@@ -45,11 +45,19 @@ export default function Enquiries() {
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [sortOption, setSortOption] = useState<'aToZ' | 'zToA' | ''>('');
-  const [platformFilter, setPlatformFilter] = useState<'All' | 'Web' | 'Mobile'>('All');
+  const [platformFilter, setPlatformFilter] = useState<'All' | 'iOS' | 'Android'>('All');
 
   const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
 
   const IMAGE_BASE = ((import.meta as any).env?.VITE_IMAGE_BASE_URL || (import.meta as any).env?.VITE_BASE_URL) as string | undefined;
+
+  const normalizePlatform = (platform?: string): 'iOS' | 'Android' => {
+    const value = String(platform || '').toLowerCase();
+    if (value.includes('ios')) return 'iOS';
+    if (value.includes('android')) return 'Android';
+    if (value.includes('mobile')) return 'Android';
+    return 'iOS';
+  };
 
   const fetchEnquiries = async () => {
     setLoading(true);
@@ -83,7 +91,7 @@ export default function Enquiries() {
           name: `${q.firstName} ${q.lastName}`.trim(),
           email: q.email,
           mobile: q.phone,
-          platform: (q.platform || 'Web') as 'Web' | 'Mobile',
+          platform: normalizePlatform(q.platform),
           message: q.message,
           imageUrl: q.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${q.image}` : q.image) : undefined,
         }));
@@ -204,12 +212,12 @@ export default function Enquiries() {
               </select>
               <select
                 value={platformFilter}
-                onChange={(e) => setPlatformFilter(e.target.value as 'All' | 'Web' | 'Mobile')}
+                onChange={(e) => setPlatformFilter(e.target.value as 'All' | 'iOS' | 'Android')}
                 className="border rounded-md px-3 py-2 text-sm min-w-[150px] bg-white"
               >
                 <option value="All">All Platforms</option>
-                <option value="Web">Web</option>
-                <option value="Mobile">Mobile</option>
+                <option value="iOS">iOS</option>
+                <option value="Android">Android</option>
               </select>
             </div>
           </div>
@@ -264,11 +272,11 @@ export default function Enquiries() {
                       </td>
                       <td className="px-6 py-4">
                         <Badge
-                          variant={enquiry.platform === 'Web' ? 'default' : 'secondary'}
+                          variant={enquiry.platform === 'iOS' ? 'default' : 'secondary'}
                           className={
-                            enquiry.platform === 'Web'
+                            enquiry.platform === 'iOS'
                               ? 'bg-blue-100 text-blue-700 hover:bg-blue-100'
-                              : 'bg-purple-100 text-purple-700 hover:bg-purple-100'
+                              : 'bg-green-100 text-green-700 hover:bg-green-100'
                           }
                         >
                           {enquiry.platform}
@@ -339,11 +347,11 @@ export default function Enquiries() {
                 <div>
                   <label className="text-gray-600">Platform</label>
                   <Badge
-                    variant={viewingEnquiry.platform === 'Web' ? 'default' : 'secondary'}
+                    variant={viewingEnquiry.platform === 'iOS' ? 'default' : 'secondary'}
                     className={
-                      viewingEnquiry.platform === 'Web'
+                      viewingEnquiry.platform === 'iOS'
                         ? 'bg-blue-100 text-blue-700 hover:bg-blue-100'
-                        : 'bg-purple-100 text-purple-700 hover:bg-purple-100'
+                        : 'bg-green-100 text-green-700 hover:bg-green-100'
                     }
                   >
                     {viewingEnquiry.platform}

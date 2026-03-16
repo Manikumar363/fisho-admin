@@ -560,7 +560,7 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
                     <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-3 px-4">{item.productName}</td>
                       <td className="py-3 px-4 text-gray-600">{item.variant}</td>
-                      <td className="py-3 px-4">{item.stock} kg</td>
+                      <td className="py-3 px-4">{Number(item.stock ?? 0).toFixed(2)} kg</td>
                       <td className="py-3 px-4">
                         {item.alert === 'red' ? (
                           <div className="flex items-center gap-2 text-red-600">
