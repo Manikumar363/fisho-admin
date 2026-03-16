@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Eye, Edit, Trash2, Download, X, Calendar } from 'lucide-react';
-import { apiFetch } from '../../lib/api';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Eye, Edit, Trash2, Download, X, Calendar, Search, Funnel } from 'lucide-react';
+import { API_BASE_URL, apiFetch, getToken } from '../../lib/api';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -10,6 +10,15 @@ import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Textarea } from '../ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
 
 interface Particular {
   id: string;
@@ -42,6 +51,8 @@ interface ProductVariant {
 }
 
 export default function PrePurchaseOrders() {
+  type PpoDateFilter = 'all' | 'today' | 'this_week' | 'this_month';
+
   const [showAddForm, setShowAddForm] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -67,6 +78,8 @@ export default function PrePurchaseOrders() {
   const [productsLoading, setProductsLoading] = useState(false);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [variantsLoading, setVariantsLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeDateFilter, setActiveDateFilter] = useState<PpoDateFilter>('all');
   const [particulars, setParticulars] = useState<Particular[]>([
     {
       id: '1',
@@ -346,10 +359,14 @@ export default function PrePurchaseOrders() {
 
   const handleDownloadPpo = async (ppoId: string) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/ppos/${ppoId}/download`, {
+      const base = API_BASE_URL?.replace(/\/$/, '') || '';
+      const endpoint = `/api/ppos/${ppoId}/download`;
+      const token = getToken();
+
+      const response = await fetch(`${base}${endpoint}`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         }
       });
 
@@ -456,6 +473,70 @@ export default function PrePurchaseOrders() {
   const calculatePPOTotal = () => {
     return particulars.reduce((sum, p) => sum + p.totalAmount, 0);
   };
+
+  const isPpoInDateFilter = (ppoDate: string, filter: PpoDateFilter) => {
+    if (filter === 'all') return true;
+
+    const dateValue = new Date(ppoDate);
+    if (Number.isNaN(dateValue.getTime())) return false;
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfTomorrow = new Date(startOfToday);
+    startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+
+    if (filter === 'today') {
+      return dateValue >= startOfToday && dateValue < startOfTomorrow;
+    }
+
+    if (filter === 'this_week') {
+      const startOfWeek = new Date(startOfToday);
+      const dayOfWeek = startOfWeek.getDay();
+      const daysFromMonday = (dayOfWeek + 6) % 7;
+      startOfWeek.setDate(startOfWeek.getDate() - daysFromMonday);
+
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(endOfWeek.getDate() + 7);
+
+      return dateValue >= startOfWeek && dateValue < endOfWeek;
+    }
+
+    if (filter === 'this_month') {
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      return dateValue >= startOfMonth && dateValue < startOfNextMonth;
+    }
+
+    return true;
+  };
+
+  const getDateFilterCount = (filter: PpoDateFilter) => {
+    return ppos.filter((ppo) => isPpoInDateFilter(ppo.date, filter)).length;
+  };
+
+  const filteredPpos = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
+    return ppos.filter((ppo) => {
+      const matchesDate = isPpoInDateFilter(ppo.date, activeDateFilter);
+      if (!matchesDate) return false;
+
+      if (!normalizedQuery) return true;
+
+      const searchableText = [
+        ppo.billNo,
+        ppo.vendor?.name,
+        ppo.vendor?.companyName,
+        ppo.vendor?.email,
+        String(ppo.ppoValue ?? ''),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      return searchableText.includes(normalizedQuery);
+    });
+  }, [ppos, activeDateFilter, searchQuery]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -955,9 +1036,45 @@ export default function PrePurchaseOrders() {
       {/* PPO List Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Pre-Purchase Orders ({ppos.length})</CardTitle>
+          <CardTitle>Pre-Purchase Orders ({filteredPpos.length}/{ppos.length})</CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+            <div className="relative min-w-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by PPO ID, vendor, company, email, value"
+                className="pl-10"
+              />
+            </div>
+
+            <div className="shrink-0">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="outline" className="h-10 px-4">
+                    <Funnel className="w-4 h-4 mr-2" />
+                    Filter
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Date Filter</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuRadioGroup
+                    value={activeDateFilter}
+                    onValueChange={(value) => setActiveDateFilter(value as PpoDateFilter)}
+                  >
+                    <DropdownMenuRadioItem value="all">All ({getDateFilterCount('all')})</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="today">Today ({getDateFilterCount('today')})</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="this_week">This Week ({getDateFilterCount('this_week')})</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="this_month">This Month ({getDateFilterCount('this_month')})</DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -975,10 +1092,10 @@ export default function PrePurchaseOrders() {
                   <tr><td colSpan={6} className="py-8 text-center text-gray-500">Loading PPOs...</td></tr>
                 ) : pposError ? (
                   <tr><td colSpan={6} className="py-8 text-center text-red-600">{pposError}</td></tr>
-                ) : ppos.length === 0 ? (
-                  <tr><td colSpan={6} className="py-8 text-center text-gray-500">No PPOs found</td></tr>
+                ) : filteredPpos.length === 0 ? (
+                  <tr><td colSpan={6} className="py-8 text-center text-gray-500">No PPOs match your search/filter</td></tr>
                 ) : (
-                  ppos.map((ppo) => (
+                  filteredPpos.map((ppo) => (
                     <tr key={ppo._id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-3 px-4 font-semibold text-blue-600">{ppo.billNo}</td>
                       <td className="py-3 px-4">{ppo.vendor?.name || '—'}</td>

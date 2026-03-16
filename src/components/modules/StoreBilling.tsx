@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Plus, Minus, Trash2, Printer, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
@@ -85,12 +85,30 @@ interface CartItem {
   variantImage?: string;
 }
 
+const getCategoryMeta = (category: any): { id: string; name?: string } | null => {
+  if (!category) return null;
+
+  if (typeof category === 'string' || typeof category === 'number' || typeof category === 'bigint') {
+    const id = String(category);
+    return id ? { id } : null;
+  }
+
+  if (typeof category === 'object') {
+    const id = String(category._id || category.id || '').trim();
+    const name = typeof category.name === 'string' ? category.name : undefined;
+    return id ? { id, name } : null;
+  }
+
+  return null;
+};
+
 export default function StoreBilling() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState(0);
   const [tax, setTax] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [invoiceSuccessMessage, setInvoiceSuccessMessage] = useState('');
   
   const [customerName, setCustomerName] = useState('');
   const [customerNumber, setCustomerNumber] = useState('');
@@ -237,10 +255,41 @@ export default function StoreBilling() {
     return cutTypeNames[cutTypeId] || cutTypeId;
   };
 
+  const availableCategories = useMemo(() => {
+    if (!selectedStoreId) return [] as Array<{ id: string; name: string }>;
+
+    const namesFromMaster = new Map(categories.map((c) => [c.id, c.name]));
+    const result = new Map<string, string>();
+
+    storeInventory.forEach((item) => {
+      const meta = getCategoryMeta(item.productId?.category);
+      if (!meta?.id) return;
+
+      const resolvedName = namesFromMaster.get(meta.id) || meta.name || 'Unnamed';
+      if (!result.has(meta.id)) {
+        result.set(meta.id, resolvedName);
+      }
+    });
+
+    return Array.from(result.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [selectedStoreId, storeInventory, categories]);
+
+  useEffect(() => {
+    if (selectedCategoryId === 'all') return;
+    const existsInStore = availableCategories.some((c) => c.id === selectedCategoryId);
+    if (!existsInStore) {
+      setSelectedCategoryId('all');
+    }
+  }, [availableCategories, selectedCategoryId]);
+
   // Filter inventory by category and search term
   const normalizedSearchTerm = searchTerm.trim().toLowerCase();
   const filteredInventory = storeInventory.filter((item) => {
-    const matchesCategory = !selectedCategoryId || item.productId.category === selectedCategoryId;
+    const selectedIsAll = selectedCategoryId === 'all' || !selectedCategoryId;
+    const categoryMeta = getCategoryMeta(item.productId.category);
+    const matchesCategory = selectedIsAll || categoryMeta?.id === selectedCategoryId;
     const matchesSearch =
       !normalizedSearchTerm ||
       item.productId.name.toLowerCase().includes(normalizedSearchTerm) ||
@@ -340,8 +389,11 @@ export default function StoreBilling() {
   const discountAmount = (subtotal * discount) / 100;
   const taxAmount = ((subtotal - discountAmount) * tax) / 100;
   const total = subtotal - discountAmount + taxAmount;
+  const hasCustomerDetails = customerName.trim().length > 0 && customerNumber.trim().length > 0;
 
   const handleCreateOrder = async () => {
+    setInvoiceSuccessMessage('');
+
     // Validation
     if (!selectedStoreId) {
       toast.error('Please select a store');
@@ -353,13 +405,26 @@ export default function StoreBilling() {
       return;
     }
 
-    if (!customerName.trim()) {
+    const normalizedCustomerName = customerName.trim();
+    const normalizedCustomerNumber = customerNumber.replace(/\D/g, '');
+
+    if (!normalizedCustomerName) {
       toast.error('Please enter customer name');
       return;
     }
 
-    if (!customerNumber.trim()) {
+    if (!/^[A-Za-z ]+$/.test(normalizedCustomerName)) {
+      toast.error('Customer name should contain only alphabets');
+      return;
+    }
+
+    if (!normalizedCustomerNumber) {
       toast.error('Please enter customer number');
+      return;
+    }
+
+    if (normalizedCustomerNumber.length !== 9) {
+      toast.error('Customer number should be exactly 9 digits');
       return;
     }
 
@@ -376,8 +441,8 @@ export default function StoreBilling() {
 
     const orderPayload = {
       storeId: selectedStoreId,
-      customerName: customerName.trim(),
-      customerNumber: customerNumber.trim(),
+      customerName: normalizedCustomerName,
+      customerNumber: normalizedCustomerNumber,
       selectedProducts,
       subTotal: subtotal,
       discount,
@@ -410,7 +475,11 @@ export default function StoreBilling() {
       setCustomerNumber('');
       setPaymentMethod('instore');
 
-      toast.success(`Order created successfully! Invoice: ${invoiceNo}`);
+      const successMessage = invoiceNo
+        ? `Invoice generated successfully! Invoice: ${invoiceNo}`
+        : 'Invoice generated successfully!';
+      setInvoiceSuccessMessage(successMessage);
+      toast.success(successMessage);
 
       // Download receipt if available
       if (invoiceUrl) {
@@ -419,6 +488,7 @@ export default function StoreBilling() {
     } catch (err: any) {
       const msg = err?.message || 'Failed to create order';
       console.error('Create order error:', err);
+      setInvoiceSuccessMessage('');
       toast.error(msg);
     } finally {
       setIsSubmitting(false);
@@ -476,9 +546,7 @@ export default function StoreBilling() {
                   <label className="text-sm text-gray-600">Category</label>
                   <Select
                     value={selectedCategoryId}
-                    onValueChange={(val) => {
-                      setSelectedCategoryId(val === 'all' ? '' : val);
-                    }}
+                    onValueChange={setSelectedCategoryId}
                     disabled={(!isSubAdmin && !selectedStoreId) || categoriesLoading || !!categoriesError}
                   >
                     <SelectTrigger className="w-full">
@@ -488,7 +556,10 @@ export default function StoreBilling() {
                       <SelectItem value="all">All Categories</SelectItem>
                       {categoriesLoading && <SelectItem value="__loading" disabled>Loading...</SelectItem>}
                       {categoriesError && <SelectItem value="__error" disabled>{categoriesError}</SelectItem>}
-                      {categories.map((c) => (
+                      {!categoriesLoading && !categoriesError && selectedStoreId && availableCategories.length === 0 && (
+                        <SelectItem value="__none" disabled>No categories in this store</SelectItem>
+                      )}
+                      {availableCategories.map((c) => (
                         <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                       ))}
                     </SelectContent>
@@ -555,7 +626,7 @@ export default function StoreBilling() {
                         )}
                         <div className="flex-1">
                           <h3 className="font-semibold text-lg">{inventoryItem.productId.name}</h3>
-                          <p className="text-sm text-gray-500">Stock: {inventoryItem.totalStock} kg</p>
+                          <p className="text-sm text-gray-500">Stock: {Number(inventoryItem.totalStock ?? 0).toFixed(2)} kg</p>
                         </div>
                       </div>
 
@@ -671,22 +742,30 @@ export default function StoreBilling() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
+                {invoiceSuccessMessage && (
+                  <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                    {invoiceSuccessMessage}
+                  </div>
+                )}
+
                 {/* Customer Details */}
                 <div className="space-y-2 pb-4 border-b border-gray-200">
                   <label className="text-sm text-gray-600">Customer Name</label>
                   <Input
                     placeholder="Enter customer name"
                     value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
+                    onChange={(e) => setCustomerName(e.target.value.replace(/[^A-Za-z ]/g, ''))}
                     disabled={cart.length === 0}
                   />
                   
-                  <label className="text-sm text-gray-600 block mt-2">Customer Phone</label>
+                  <label className="text-sm text-gray-600 block mt-2">Customer Phone Number</label>
                   <Input
-                    placeholder="Enter customer phone"
+                    placeholder="Enter customer phone number"
                     type="tel"
+                    inputMode="numeric"
+                    maxLength={9}
                     value={customerNumber}
-                    onChange={(e) => setCustomerNumber(e.target.value)}
+                    onChange={(e) => setCustomerNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
                     disabled={cart.length === 0}
                   />
                 </div>
@@ -717,8 +796,11 @@ export default function StoreBilling() {
                           {item.variantName && (
                             <p className="text-xs text-gray-500 truncate">{item.variantName}</p>
                           )}
-                          {item.weight && (
-                            <p className="text-xs text-gray-500">{item.weight} {item.weightUnit}</p>
+                          {(item.cutType || item.weight) && (
+                            <p className="text-xs text-gray-500 truncate">
+                              {item.cutType || 'Variant'}
+                              {item.weight ? ` • ${item.weight}${item.weightUnit || ''}` : ''}
+                            </p>
                           )}
                           <p className="text-xs text-blue-600 mt-1"><span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(item.price)} × {item.quantity}</p>
                         </div>
@@ -823,7 +905,7 @@ export default function StoreBilling() {
                   <Button
                     className="w-full bg-green-600 hover:bg-green-700 text-white"
                     onClick={handleCreateOrder}
-                    disabled={cart.length === 0 || isSubmitting}
+                    disabled={cart.length === 0 || isSubmitting || !hasCustomerDetails}
                   >
                     {isSubmitting ? 'Processing...' : 'Generate Invoice'}
                     <Printer className="w-4 h-4 ml-2" />
@@ -837,6 +919,7 @@ export default function StoreBilling() {
                       setTax(0);
                       setCustomerName('');
                       setCustomerNumber('');
+                      setInvoiceSuccessMessage('');
                     }}
                     disabled={isSubmitting}
                   >
