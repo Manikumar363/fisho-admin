@@ -30,6 +30,7 @@ const Transactions: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [txnType, setTxnType] = useState('');
   const [stores, setStores] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedStoreId, setSelectedStoreId] = useState('');
@@ -50,6 +51,7 @@ const Transactions: React.FC = () => {
 
       const matchesStore = !selectedStoreId || String(storeId) === String(selectedStoreId);
       const matchesPaymentMethod = !paymentMethod || String(payment).toLowerCase() === String(paymentMethod).toLowerCase();
+      const matchesStatus = !statusFilter || String(status).toLowerCase() === String(statusFilter).toLowerCase();
       const matchesTxnType = !txnType || String(txn.type || '').toLowerCase() === String(txnType).toLowerCase();
       const matchesOrderFilter =
         orderFilter === 'all' ||
@@ -63,11 +65,11 @@ const Transactions: React.FC = () => {
           .toLowerCase()
           .includes(query);
 
-      return matchesStore && matchesPaymentMethod && matchesTxnType && matchesOrderFilter && matchesSearch;
+      return matchesStore && matchesPaymentMethod && matchesStatus && matchesTxnType && matchesOrderFilter && matchesSearch;
     });
 
     return filtered;
-  }, [transactions, search, paymentMethod, txnType, selectedStoreId, orderFilter]);
+  }, [transactions, search, paymentMethod, statusFilter, txnType, selectedStoreId, orderFilter]);
 
   useEffect(() => {
     const fetchStores = async () => {
@@ -92,6 +94,7 @@ const Transactions: React.FC = () => {
       try {
         let url = `/api/transactions/get-all?page=${page}&limit=${limit}`;
         if (paymentMethod) url += `&paymentMethod=${encodeURIComponent(paymentMethod)}`;
+        if (statusFilter) url += `&status=${encodeURIComponent(statusFilter)}`;
         if (txnType) url += `&type=${encodeURIComponent(txnType)}`;
         if (selectedStoreId) url += `&storeId=${encodeURIComponent(selectedStoreId)}`;
         if (fromDate) url += `&fromDate=${encodeURIComponent(fromDate)}`;
@@ -120,11 +123,11 @@ const Transactions: React.FC = () => {
       }
     };
     fetchTransactions();
-  }, [paymentMethod, txnType, selectedStoreId, fromDate, toDate, page, limit]);
+  }, [paymentMethod, statusFilter, txnType, selectedStoreId, fromDate, toDate, page, limit]);
 
   useEffect(() => {
     setPage(1);
-  }, [paymentMethod, txnType, selectedStoreId, fromDate, toDate]);
+  }, [paymentMethod, statusFilter, txnType, selectedStoreId, fromDate, toDate]);
 
   if (loading) {
     return (
@@ -230,6 +233,18 @@ const Transactions: React.FC = () => {
                 <option value="wallet">Wallet</option>
                 <option value="cod">Cash on Delivery</option>
                 <option value="online">Online</option>
+              </select>
+            </div>
+            <div className="min-w-[180px]">
+              <select
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value)}
+              >
+                <option value="">Status</option>
+                <option value="completed">Completed</option>
+                <option value="pending">Pending</option>
+                <option value="failed">Failed</option>
               </select>
             </div>
             <div className="min-w-[180px]">
