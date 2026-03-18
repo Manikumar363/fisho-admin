@@ -56,6 +56,16 @@ export default function Section1Editor({ sectionItem, onCancel }: Section1Editor
   const [image3Path, setImage3Path] = useState<string>('');
   const [description2, setDescription2] = useState('Fisho.ae reigns supreme in providing fresh fish in Dubai. We effectively source fish from only the biggest suppliers to guarantee fast deliveries that center around the freshness and taste of our products. Our pride lies in our main goal, ensuring customer satisfaction. We bring the seafood market to your home so that you may save time and effort among other market struggles. So spare some time and see the benefits offered by our online seafood in Dubai for your good life as seafood lovers.');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasUserEdited, setHasUserEdited] = useState(false);
+  const [initialSectionState, setInitialSectionState] = useState<{
+    mainTitle: string;
+    description1: string;
+    title2: string;
+    description2: string;
+    image1Path: string;
+    image2Path: string;
+    image3Path: string;
+  } | null>(null);
   const IMAGE_BASE = ((import.meta as any).env?.VITE_IMAGE_BASE_URL || (import.meta as any).env?.VITE_BASE_URL || '') as string;
 
   const resolveImageUrl = (path?: string) => {
@@ -82,6 +92,17 @@ export default function Section1Editor({ sectionItem, onCancel }: Section1Editor
     setImage1Preview(resolveImageUrl(sectionItem.image1Left));
     setImage2Preview(resolveImageUrl(sectionItem.image1Right));
     setImage3Preview(resolveImageUrl(sectionItem.image2));
+
+    setInitialSectionState({
+      mainTitle: sectionItem.title1 || sectionItem.title || '',
+      description1: sectionItem.description1 || '',
+      title2: sectionItem.title2 || '',
+      description2: sectionItem.description2 || '',
+      image1Path: sectionItem.image1Left || '',
+      image2Path: sectionItem.image1Right || '',
+      image3Path: sectionItem.image2 || '',
+    });
+    setHasUserEdited(false);
   }, [sectionItem]);
 
   const uploadImage = async (file: File): Promise<string> => {
@@ -120,6 +141,7 @@ export default function Section1Editor({ sectionItem, onCancel }: Section1Editor
 
       const reader = new FileReader();
       reader.onloadend = () => {
+        setHasUserEdited(true);
         if (imageNumber === 1) {
           setImage1File(file);
           setImage1Path('');
@@ -139,6 +161,7 @@ export default function Section1Editor({ sectionItem, onCancel }: Section1Editor
   };
 
   const handleRemoveImage = (imageNumber: 1 | 2 | 3) => {
+    setHasUserEdited(true);
     if (imageNumber === 1) {
       setImage1File(null);
       setImage1Preview('');
@@ -218,7 +241,7 @@ export default function Section1Editor({ sectionItem, onCancel }: Section1Editor
         body: JSON.stringify(payload),
       });
 
-      toast.success(res?.message || 'Section content updated successfully');
+      toast.success(res?.message || 'Section Content updated Successfully');
       setIsSubmitting(false);
       onCancel();
     } catch (e: any) {
@@ -228,6 +251,19 @@ export default function Section1Editor({ sectionItem, onCancel }: Section1Editor
       setIsSubmitting(false);
     }
   };
+
+  const hasSectionChanges = initialSectionState
+    ? mainTitle !== initialSectionState.mainTitle ||
+      description1 !== initialSectionState.description1 ||
+      title2 !== initialSectionState.title2 ||
+      description2 !== initialSectionState.description2 ||
+      image1Path !== initialSectionState.image1Path ||
+      image2Path !== initialSectionState.image2Path ||
+      image3Path !== initialSectionState.image3Path ||
+      image1File !== null ||
+      image2File !== null ||
+      image3File !== null
+    : false;
 
   return (
     <div className="space-y-6">
@@ -262,7 +298,10 @@ export default function Section1Editor({ sectionItem, onCancel }: Section1Editor
                 <Input
                   id="mainTitle"
                   value={mainTitle}
-                  onChange={(e) => setMainTitle(e.target.value)}
+                  onChange={(e) => {
+                    setMainTitle(e.target.value);
+                    setHasUserEdited(true);
+                  }}
                   placeholder="Enter main title"
                   className="text-base"
                 />
@@ -351,7 +390,12 @@ export default function Section1Editor({ sectionItem, onCancel }: Section1Editor
                 <ReactQuill
                   theme="snow"
                   value={description1}
-                  onChange={setDescription1}
+                  onChange={(value, _delta, source) => {
+                    setDescription1(value);
+                    if (source === 'user') {
+                      setHasUserEdited(true);
+                    }
+                  }}
                   modules={modules}
                   formats={formats}
                   placeholder="Enter detailed description for section 1"
@@ -367,7 +411,10 @@ export default function Section1Editor({ sectionItem, onCancel }: Section1Editor
                 <Input
                   id="title2"
                   value={title2}
-                  onChange={(e) => setTitle2(e.target.value)}
+                  onChange={(e) => {
+                    setTitle2(e.target.value);
+                    setHasUserEdited(true);
+                  }}
                   placeholder="Enter section 2 title"
                   className="text-base"
                 />
@@ -416,7 +463,12 @@ export default function Section1Editor({ sectionItem, onCancel }: Section1Editor
                 <ReactQuill
                   theme="snow"
                   value={description2}
-                  onChange={setDescription2}
+                  onChange={(value, _delta, source) => {
+                    setDescription2(value);
+                    if (source === 'user') {
+                      setHasUserEdited(true);
+                    }
+                  }}
                   modules={modules}
                   formats={formats}
                   placeholder="Enter detailed description for section 2"
@@ -431,7 +483,7 @@ export default function Section1Editor({ sectionItem, onCancel }: Section1Editor
             <div className="flex gap-3 border-t pt-6">
               <Button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !hasUserEdited || !hasSectionChanges}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
               >
                 {isSubmitting && <Loader className="w-4 h-4 mr-2 animate-spin" />}

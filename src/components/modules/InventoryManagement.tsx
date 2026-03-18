@@ -68,6 +68,14 @@ export default function InventoryManagement() {
   const CATEGORIES_PAGE_SIZE = 20;
   const PRODUCTS_PAGE_SIZE = 20;
   const VARIANTS_PAGE_SIZE = 20;
+
+  const isValidTwoDecimalInput = (value: string) =>
+    value === '' || /^\d*(\.\d{0,2})?$/.test(value);
+
+  const toTwoDecimalString = (value: string | number) => {
+    const parsed = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(parsed) ? parsed.toFixed(2) : '';
+  };
   
 
   // Category state
@@ -900,6 +908,18 @@ const handleRemoveWeight = (weight: number) => {
   // Handle product variant row field changes
   const handleProductVariantRowChange = (rowKey: string, field: string, value: string | boolean) => {
     setProductVariantRows(prev => {
+      const decimalFields = new Set([
+        'costPricePerKg',
+        'profitPercent',
+        'displayPrice',
+        'discountPercent',
+        'sellingPrice',
+      ]);
+
+      if (typeof value === 'string' && decimalFields.has(field) && !isValidTwoDecimalInput(value)) {
+        return prev;
+      }
+
       const current = prev[rowKey] || { 
         costPricePerKg: '', 
         profitPercent: '', 
@@ -2668,6 +2688,10 @@ const handleRemoveWeight = (weight: number) => {
                             placeholder="0.00"
                             value={rowData.displayPrice}
                             onChange={e => handleProductVariantRowChange(rowKey, 'displayPrice', e.target.value)}
+                            onBlur={() => {
+                              if (!rowData.displayPrice) return;
+                              handleProductVariantRowChange(rowKey, 'displayPrice', toTwoDecimalString(rowData.displayPrice));
+                            }}
                             className="w-24"
                             disabled={isSubmitting}
                             title="Display Price (editable)"
@@ -2681,6 +2705,10 @@ const handleRemoveWeight = (weight: number) => {
                             placeholder="0.00"
                             value={rowData.sellingPrice}
                             onChange={e => handleProductVariantRowChange(rowKey, 'sellingPrice', e.target.value)}
+                            onBlur={() => {
+                              if (!rowData.sellingPrice) return;
+                              handleProductVariantRowChange(rowKey, 'sellingPrice', toTwoDecimalString(rowData.sellingPrice));
+                            }}
                             className="w-24"
                             disabled={isSubmitting}
                             title="Selling Price (editable)"
@@ -3768,11 +3796,11 @@ const handleRemoveWeight = (weight: number) => {
                                     
                                     const rowKey = getVariantRowKey(cutTypeId, v.weight);
                                     variantRows[rowKey] = {
-                                      costPricePerKg: String(v.costPrice),
-                                      profitPercent: String(v.profit),
-                                      displayPrice: String(v.displayPrice),
-                                      discountPercent: String(v.discount),
-                                      sellingPrice: String(v.sellingPrice),
+                                      costPricePerKg: toTwoDecimalString(v.costPrice ?? 0),
+                                      profitPercent: toTwoDecimalString(v.profit ?? 0),
+                                      displayPrice: toTwoDecimalString(v.displayPrice ?? 0),
+                                      discountPercent: toTwoDecimalString(v.discount ?? 0),
+                                      sellingPrice: toTwoDecimalString(v.sellingPrice ?? 0),
                                       featured: v.featured,
                                       bestSeller: v.bestSeller,
                                       expressDelivery: v.isExpressDelivery,

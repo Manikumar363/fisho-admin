@@ -885,7 +885,7 @@ export default function OrderDetails() {
             <CardContent className="space-y-3">
               <div>
                 <p className="text-sm font-semibold text-gray-800">Order ID</p>
-                <p className='text-gray-600'>{order.invoiceNo}</p>
+                <p className='text-gray-600'>{order._id}</p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-gray-800">Order Date</p>

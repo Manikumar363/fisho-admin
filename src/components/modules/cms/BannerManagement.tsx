@@ -23,6 +23,14 @@ export default function BannerManagement({ banner, onSave, onCancel, onError }: 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const isEditMode = Boolean(banner && (banner.id || banner._id));
+  const hasFormChanges = isEditMode
+    ? title.trim() !== (banner?.title || '').trim() ||
+      status !== (banner?.status || 'Active') ||
+      imagePreview !== (banner?.image || '') ||
+      imageFile !== null
+    : true;
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -313,7 +321,7 @@ export default function BannerManagement({ banner, onSave, onCancel, onError }: 
                   <Button
                     type="submit"
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !hasFormChanges}
                   >
                     {isSubmitting ? 'Saving...' : 'Save Banner'}
                   </Button>

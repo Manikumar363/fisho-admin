@@ -104,8 +104,8 @@ const getCategoryMeta = (category: any): { id: string; name?: string } | null =>
 
 export default function StoreBilling() {
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [discount, setDiscount] = useState(0);
-  const [tax, setTax] = useState(0);
+  const [discount, setDiscount] = useState<number | ''>(0);
+  const [tax, setTax] = useState<number | ''>(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [invoiceSuccessMessage, setInvoiceSuccessMessage] = useState('');
@@ -385,9 +385,12 @@ export default function StoreBilling() {
     setCart(cart.filter((item) => item.id !== id));
   };
 
+  const discountValue = discount === '' ? 0 : discount;
+  const taxValue = tax === '' ? 0 : tax;
+
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const discountAmount = (subtotal * discount) / 100;
-  const taxAmount = ((subtotal - discountAmount) * tax) / 100;
+  const discountAmount = (subtotal * discountValue) / 100;
+  const taxAmount = ((subtotal - discountAmount) * taxValue) / 100;
   const total = subtotal - discountAmount + taxAmount;
   const hasCustomerDetails = customerName.trim().length > 0 && customerNumber.trim().length > 0;
 
@@ -445,9 +448,9 @@ export default function StoreBilling() {
       customerNumber: normalizedCustomerNumber,
       selectedProducts,
       subTotal: subtotal,
-      discount,
+      discount: discountValue,
       discountAmount: discountAmount,
-      tax,
+      tax: taxValue,
       totalPayable: total,
       paymentMethod,
       paymentStatus: 'paid',
@@ -469,8 +472,8 @@ export default function StoreBilling() {
 
       // Reset form
       setCart([]);
-      setDiscount(0);
-      setTax(0);
+      setDiscount('');
+      setTax('');
       setCustomerName('');
       setCustomerNumber('');
       setPaymentMethod('instore');
@@ -840,7 +843,10 @@ export default function StoreBilling() {
                         type="number"
                         placeholder="0"
                         value={discount}
-                        onChange={(e) => setDiscount(Number(e.target.value))}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          setDiscount(next === '' ? '' : Number(next));
+                        }}
                         min="0"
                         max="100"
                         className="text-sm"
@@ -852,7 +858,10 @@ export default function StoreBilling() {
                         type="number"
                         placeholder="0"
                         value={tax}
-                        onChange={(e) => setTax(Number(e.target.value))}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          setTax(next === '' ? '' : Number(next));
+                        }}
                         min="0"
                         max="100"
                         className="text-sm"
@@ -882,15 +891,15 @@ export default function StoreBilling() {
                     <span className="text-gray-600">Subtotal</span>
                     <span className="font-medium"><span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(subtotal)}</span>
                   </div>
-                  {discount > 0 && (
+                  {discountValue > 0 && (
                     <div className="flex justify-between text-green-600">
-                      <span>Discount ({discount}%)</span>
+                      <span>Discount ({discountValue}%)</span>
                       <span>-<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(discountAmount)}</span>
                     </div>
                   )}
-                  {tax > 0 && (
+                  {taxValue > 0 && (
                     <div className="flex justify-between text-orange-600">
-                      <span>Tax ({tax}%)</span>
+                      <span>Tax ({taxValue}%)</span>
                       <span>+<span className="dirham-symbol mr-2">&#xea;</span>{formatPrice(taxAmount)}</span>
                     </div>
                   )}
@@ -915,8 +924,8 @@ export default function StoreBilling() {
                     className="w-full"
                     onClick={() => {
                       setCart([]);
-                      setDiscount(0);
-                      setTax(0);
+                      setDiscount('');
+                      setTax('');
                       setCustomerName('');
                       setCustomerNumber('');
                       setInvoiceSuccessMessage('');

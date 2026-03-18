@@ -337,22 +337,22 @@ export default function Enquiries() {
             <div className="flex-1 overflow-y-auto px-6 py-6">
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
                 <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="min-w-0">
-                    <label className="text-gray-600">Enquiry ID</label>
+                    <label className="block text-gray-600">Enquiry ID</label>
                     <p className="break-all text-gray-900">{viewingEnquiry.id}</p>
                   </div>
                   <div className="min-w-0">
-                    <label className="text-gray-600">Date</label>
+                    <label className="block text-gray-600">Date</label>
                     <p className="text-gray-900">{formatDate(viewingEnquiry.date)}</p>
                   </div>
                   <div className="min-w-0">
-                    <label className="text-gray-600">Name</label>
+                    <label className="block text-gray-600">Name</label>
                     <p className="text-gray-900">{viewingEnquiry.name}</p>
                   </div>
                   <div className="min-w-0">
-                    <label className="text-gray-600">Platform</label>
-                    <div className="mt-1">
+                    <label className="block text-gray-600">Platform</label>
+                    <div className="mt-2">
                       <Badge
                         variant={viewingEnquiry.platform === 'iOS' ? 'default' : 'secondary'}
                         className={
@@ -369,26 +369,26 @@ export default function Enquiries() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="min-w-0">
-                    <label className="text-gray-600">Email</label>
-                    <p className="break-all text-gray-900">{viewingEnquiry.email}</p>
+                    <label className="block text-gray-600">Email</label>
+                    <p className="break-words [overflow-wrap:anywhere] text-gray-900">{viewingEnquiry.email}</p>
                   </div>
                   <div className="min-w-0">
-                    <label className="text-gray-600">Mobile Number</label>
+                    <label className="block text-gray-600">Mobile Number</label>
                     <p className="text-gray-900">{viewingEnquiry.mobile}</p>
                   </div>
                 </div>
 
                 {viewingEnquiry.subject && (
                   <div>
-                    <label className="text-gray-600">Subject</label>
+                    <label className="block text-gray-600">Subject</label>
                     <p className="text-gray-900">{viewingEnquiry.subject}</p>
                   </div>
                 )}
 
                 <div>
-                  <label className="text-gray-600">Message</label>
+                  <label className="block text-gray-600">Message</label>
                   <p className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-4 text-gray-900">
                     {viewingEnquiry.message}
                   </p>
@@ -397,7 +397,7 @@ export default function Enquiries() {
 
                 {viewingEnquiry.imageUrl && (
                   <div className="rounded-lg border border-gray-200 bg-gray-50 p-5 xl:sticky xl:top-0 xl:self-start">
-                  <label className="text-gray-600">Image</label>
+                  <label className="block text-gray-600">Image</label>
                   <div className="mt-3 space-y-4">
                     <div className="flex min-h-[320px] items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-white p-3">
                       <img

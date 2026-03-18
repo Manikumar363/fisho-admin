@@ -58,6 +58,7 @@ export default function TextContentEditor({
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pageId, setPageId] = useState<string | null>(null);
+  const [initialContent, setInitialContent] = useState('');
 
   const contentTypeLabels = {
     terms: 'Terms of Use',
@@ -67,6 +68,21 @@ export default function TextContentEditor({
     deliveryPrivacy: 'Delivery Privacy',
     returnRefund: 'Return and Refund Policy',
     cancelPolicy: 'Cancellation Policy'
+  };
+
+  const getSuccessMessage = (apiMessage?: string) => {
+    const label = contentTypeLabels[contentType];
+    const fallback = `${label} Content updated Successfully`;
+    if (!apiMessage) return fallback;
+
+    const normalized = apiMessage.trim();
+    const lower = normalized.toLowerCase();
+    if (lower.includes(label.toLowerCase())) return normalized;
+    if (lower === 'page updated successfully' || lower === 'content updated successfully') {
+      return fallback;
+    }
+
+    return normalized;
   };
 
   const contentTypeIds = {
@@ -103,6 +119,7 @@ export default function TextContentEditor({
         if (res.page) {
           setTitle(res.page.title);
           setContent(res.page.description);
+          setInitialContent(res.page.description);
           setPageId(res.page._id);
         }
       } catch (e: any) {
@@ -163,12 +180,13 @@ export default function TextContentEditor({
       if (!res?.success) throw new Error(res?.message || 'Failed to update content');
 
       const updatedAt = res.page?.updatedAt || new Date().toISOString();
-      toast.success(res.message || 'Content updated successfully');
+      const successMessage = getSuccessMessage(res.message);
       onSave({ 
         title, 
         content, 
         lastUpdated: updatedAt,
-        updatedAtIso: updatedAt  // Pass ISO for consistent formatting
+        updatedAtIso: updatedAt,  // Pass ISO for consistent formatting
+        message: successMessage,
       });
     } catch (err: any) {
       const msg = err?.message || 'Failed to save content';
@@ -182,6 +200,8 @@ export default function TextContentEditor({
       setIsSubmitting(false);
     }
   };
+
+  const hasContentChanges = content !== initialContent;
 
   return (
     <div className="space-y-6">
@@ -263,7 +283,7 @@ export default function TextContentEditor({
                   <Button
                     type="submit"
                     className="bg-blue-600 hover:bg-blue-700"
-                    disabled={!content || isSubmitting}
+                    disabled={!content || isSubmitting || !hasContentChanges}
                   >
                     {isSubmitting ? (
                       <span className="inline-flex items-center gap-2">

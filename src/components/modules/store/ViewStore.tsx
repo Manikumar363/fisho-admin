@@ -87,6 +87,19 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalOrders, setTotalOrders] = useState(0);
+
+  const isValidTwoDecimalInput = (value: string) =>
+    value === '' || /^\d*(\.\d{0,2})?$/.test(value);
+
+  const toTwoDecimalString = (value: string | number) => {
+    const parsed = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(parsed) ? parsed.toFixed(2) : '';
+  };
+
+  const toTwoDecimalNumber = (value: string | number) => {
+    const formatted = toTwoDecimalString(value);
+    return formatted ? Number(formatted) : 0;
+  };
   
   const userRole = getUserRole();
 
@@ -163,7 +176,7 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
           } else if (variants.length > 1) {
             variantLabel = `${variants.length} variants`;
           }
-          const stock = Number(it.totalStock ?? 0);
+          const stock = toTwoDecimalNumber(it.totalStock ?? 0);
           const invId = toIdString(it._id);
           const idStr = invId || `${toIdString(it.productId) || 'row'}-${idx}`;
           return {
@@ -340,10 +353,14 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
       );
       if (!res.success) throw new Error(res.message || 'Failed to add stock');
       const inv = res.inventory;
-      const total = Number(inv?.totalStock ?? NaN);
+      const totalRaw = Number(inv?.totalStock ?? NaN);
       setInventory(prev => prev.map(item =>
         item.inventoryId === inv?._id
-          ? { ...item, stock: Number.isFinite(total) ? total : item.stock, alert: (Number.isFinite(total) && total < 10 ? 'red' : 'green') }
+          ? {
+              ...item,
+              stock: Number.isFinite(totalRaw) ? toTwoDecimalNumber(totalRaw) : item.stock,
+              alert: (Number.isFinite(totalRaw) && totalRaw < 10 ? 'red' : 'green')
+            }
           : item
       ));
       setAddStockOpen(false);
@@ -423,7 +440,7 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
           } else if (variants.length > 1) {
             variantLabel = `${variants.length} variants`;
           }
-          const stock = Number(it.totalStock ?? 0);
+          const stock = toTwoDecimalNumber(it.totalStock ?? 0);
           const invId = toIdString(it._id);
           const idStr = invId || `${toIdString(it.productId) || 'row'}-${idx}`;
           return {
@@ -606,11 +623,20 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
             <Input
               type="number"
               inputMode="decimal"
-              step="0.1"
+              step="0.01"
               min="0"
               placeholder="e.g., 5"
               value={addStockValue}
-              onChange={(e) => setAddStockValue(e.target.value)}
+              onChange={(e) => {
+                const next = e.target.value;
+                if (isValidTwoDecimalInput(next)) {
+                  setAddStockValue(next);
+                }
+              }}
+              onBlur={() => {
+                if (!addStockValue) return;
+                setAddStockValue(toTwoDecimalString(addStockValue));
+              }}
             />
           </div>
           <DialogFooter>
@@ -678,11 +704,23 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
               <Input
                 type="number"
                 inputMode="decimal"
-                step="0.1"
+                step="0.01"
                 min="0"
                 placeholder="e.g., 50"
                 value={addProductForm.stock}
-                onChange={(e) => setAddProductForm({ ...addProductForm, stock: e.target.value })}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  if (isValidTwoDecimalInput(next)) {
+                    setAddProductForm({ ...addProductForm, stock: next });
+                  }
+                }}
+                onBlur={() => {
+                  if (!addProductForm.stock) return;
+                  setAddProductForm({
+                    ...addProductForm,
+                    stock: toTwoDecimalString(addProductForm.stock),
+                  });
+                }}
               />
             </div>
           </div>

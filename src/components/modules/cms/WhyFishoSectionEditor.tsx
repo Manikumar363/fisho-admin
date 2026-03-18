@@ -61,6 +61,11 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
   const [cardImagePath, setCardImagePath] = useState('');
   const [cardImagePreview, setCardImagePreview] = useState<string>('');
   const [uploadingCard, setUploadingCard] = useState(false);
+  const [initialSectionState, setInitialSectionState] = useState<{
+    title: string;
+    description1: string;
+    cardsSignature: string;
+  } | null>(null);
 
   const IMAGE_BASE = ((import.meta as any).env?.VITE_IMAGE_BASE_URL || (import.meta as any).env?.VITE_BASE_URL) as string | undefined;
 
@@ -75,6 +80,16 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;
     return `${base}${normalizedPath}`;
   };
+
+  const getCardsSignature = (inputCards: WhyFishoCard[]) =>
+    JSON.stringify(
+      inputCards.map((card) => ({
+        _id: card._id || '',
+        title: card.title,
+        description: card.description,
+        image: card.image,
+      }))
+    );
 
   // Load existing section data
   useEffect(() => {
@@ -98,6 +113,11 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
       setTitle(section.title);
       setDescription1(section.description ?? section.description1 ?? '');
       setCards(section.featuredCards || []);
+      setInitialSectionState({
+        title: section.title,
+        description1: section.description ?? section.description1 ?? '',
+        cardsSignature: getCardsSignature(section.featuredCards || []),
+      });
     } catch (error: any) {
       console.error('Failed to load section data:', error);
       toast.error('Failed to load section data');
@@ -153,7 +173,7 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
         throw new Error(res?.message || 'Failed to save section');
       }
 
-      toast.success(res?.message || 'Section saved successfully');
+      toast.success(res?.message || 'Why Fisho Section updated Successfully');
       
       setTimeout(() => {
         onCancel();
@@ -306,6 +326,12 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
     setCardImagePreview('');
   };
 
+  const hasSectionChanges =
+    !initialSectionState ||
+    title !== initialSectionState.title ||
+    description1 !== initialSectionState.description1 ||
+    getCardsSignature(cards) !== initialSectionState.cardsSignature;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -332,7 +358,7 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
         </div>
         <Button 
           onClick={handleSaveSection}
-          disabled={saving}
+          disabled={saving || !hasSectionChanges}
           className="bg-green-600 hover:bg-green-700"
         >
           <Save className="w-4 h-4 mr-2" />

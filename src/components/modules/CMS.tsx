@@ -66,6 +66,32 @@ export default function CMS() {
   const [faqLoading, setFaqLoading] = useState(false);
   const [faqError, setFaqError] = useState<string | null>(null);
 
+  const textContentTypeLabels: Record<Extract<ContentType, 'terms' | 'privacy' | 'about' | 'deliveryTc' | 'deliveryPrivacy' | 'returnRefund' | 'cancelPolicy'>, string> = {
+    terms: 'Terms and Conditions',
+    privacy: 'Privacy Policy',
+    about: 'About Us',
+    deliveryTc: 'Delivery T&C',
+    deliveryPrivacy: 'Delivery Privacy',
+    returnRefund: 'Return and Refund Policy',
+    cancelPolicy: 'Cancellation Policy',
+  };
+
+  const getTextContentSuccessMessage = (label: string, apiMessage?: string) => {
+    const fallback = `${label} Content updated Successfully`;
+    if (!apiMessage) return fallback;
+
+    const normalized = apiMessage.trim();
+    const lower = normalized.toLowerCase();
+    const labelLower = label.toLowerCase();
+
+    if (lower.includes(labelLower)) return normalized;
+    if (lower === 'page updated successfully' || lower === 'content updated successfully') {
+      return fallback;
+    }
+
+    return normalized;
+  };
+
   const IMAGE_BASE = ((import.meta as any).env?.VITE_IMAGE_BASE_URL || (import.meta as any).env?.VITE_BASE_URL) as string | undefined;
 
   const [textContents, setTextContents] = useState<ContentItem[]>([
@@ -623,7 +649,7 @@ export default function CMS() {
               }
             : banner
         ));
-        toast.success('Banner Updated Successfully');
+        toast.success(bannerData.message || 'Banner Updated Successfully');
         console.log('Banner updated:', editingItem.id);   
       } else {
         // Add new banner
@@ -638,7 +664,7 @@ export default function CMS() {
           sequence: bannerData.order,
         };
         setBanners([...banners, newBanner]);
-        toast.success('Banner Successfully added');
+        toast.success(bannerData.message || 'Banner Successfully added');
         console.log('Banner created:', newBanner.id);
       }
       
@@ -664,15 +690,21 @@ export default function CMS() {
         : new Date().toISOString().split('T')[0];
 
       if (editingItem) {
+        const label = textContentTypeLabels[editingItem.type as keyof typeof textContentTypeLabels] || editingItem.title || 'Content';
+        const successMessage = getTextContentSuccessMessage(label, contentData.message);
         // Update existing content with server timestamp
         setTextContents(textContents.map(content =>
           content.id === editingItem.id
             ? { ...content, title: contentData.title, lastUpdated: updatedDate, status: 'Active' }
             : content
         ));
-        toast.success('Content updated successfully');
+        toast.success(successMessage);
         console.log('Content updated:', editingItem.id);
       } else {
+        const label = selectedContent && selectedContent in textContentTypeLabels
+          ? textContentTypeLabels[selectedContent as keyof typeof textContentTypeLabels]
+          : 'Content';
+        const successMessage = getTextContentSuccessMessage(label, contentData.message);
         // Add new content
         const typePrefix = selectedContent === 'terms' ? 'TERMS' : selectedContent === 'privacy' ? 'PRIVACY' : selectedContent === 'about' ? 'ABOUT' : 'DELIVERY';
         const existingCount = textContents.filter(c => c.type === selectedContent).length;
@@ -684,7 +716,7 @@ export default function CMS() {
           status: 'Active'
         };
         setTextContents([...textContents, newContent]);
-        toast.success('Content added successfully');
+        toast.success(successMessage);
         console.log('Content created:', newContent.id);
       }
       

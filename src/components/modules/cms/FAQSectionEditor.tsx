@@ -58,6 +58,19 @@ export default function FAQSectionEditor({ sectionItem, onCancel }: FAQSectionEd
   const [faqQuestion, setFaqQuestion] = useState('');
   const [faqAnswer, setFaqAnswer] = useState('');
   const [savingFAQ, setSavingFAQ] = useState(false);
+  const [initialSectionState, setInitialSectionState] = useState<{
+    title: string;
+    faqsSignature: string;
+  } | null>(null);
+
+  const getFaqsSignature = (inputFaqs: FAQItem[]) =>
+    JSON.stringify(
+      inputFaqs.map((faq) => ({
+        id: faq.id,
+        question: faq.question,
+        answer: faq.answer,
+      }))
+    );
 
   // Load existing section data
   useEffect(() => {
@@ -101,6 +114,10 @@ export default function FAQSectionEditor({ sectionItem, onCancel }: FAQSectionEd
       }));
       
       setFaqs(mappedFaqs);
+      setInitialSectionState({
+        title: section.title || 'Frequently Asked Questions',
+        faqsSignature: getFaqsSignature(mappedFaqs),
+      });
     } catch (error: any) {
       console.error('Failed to load section data:', error);
       toast.error('Failed to load section data');
@@ -149,7 +166,7 @@ export default function FAQSectionEditor({ sectionItem, onCancel }: FAQSectionEd
         throw new Error(res?.message || 'Failed to save FAQ section');
       }
 
-      toast.success(res.message || 'FAQ section saved successfully');
+      toast.success(res.message || 'FAQ Section updated Successfully');
       console.log('FAQ section saved:', res.section);
       
       setTimeout(() => {
@@ -258,6 +275,11 @@ export default function FAQSectionEditor({ sectionItem, onCancel }: FAQSectionEd
     setExpandedFAQs(newExpanded);
   };
 
+  const hasSectionChanges =
+    !initialSectionState ||
+    title !== initialSectionState.title ||
+    getFaqsSignature(faqs) !== initialSectionState.faqsSignature;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -284,7 +306,7 @@ export default function FAQSectionEditor({ sectionItem, onCancel }: FAQSectionEd
         </div>
         <Button 
           onClick={handleSaveSection}
-          disabled={saving}
+          disabled={saving || !hasSectionChanges}
           className="bg-green-600 hover:bg-green-700"
         >
           <Save className="w-4 h-4 mr-2" />
