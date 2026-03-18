@@ -805,10 +805,11 @@ export default function OrderDetails() {
                 const paymentMethod = order?.payment?.method?.toLowerCase() || '';
                 const paymentStatus = order?.payment?.status?.toLowerCase() || '';
                 const isOnlinePayment = paymentMethod !== 'cod' && paymentMethod !== 'cash' && paymentMethod !== 'offline';
+                const isCodPayment = paymentMethod === 'cod';
                 const isPaymentSuccessful = paymentStatus === 'paid' || paymentStatus === 'successful' || paymentStatus === 'success';
                 
-                // Show refund buttons only if order is returned AND payment is online AND payment is successful
-                const canShowRefundButtons = isReturned && isOnlinePayment && isPaymentSuccessful;
+                // Show refund buttons if returned and payment is successful for online or COD payments.
+                const canShowRefundButtons = isReturned && isPaymentSuccessful && (isOnlinePayment || isCodPayment);
                 
                 return canShowRefundButtons ? (
                   <div className="mt-4 pt-4 border-t border-gray-200">

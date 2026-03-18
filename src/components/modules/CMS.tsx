@@ -455,6 +455,7 @@ export default function CMS() {
         section?: {
           _id: string;
           title: string;
+          description?: string;
           description1: string;
           featuredCards: Array<{
             _id?: string;
@@ -483,7 +484,7 @@ export default function CMS() {
           status: section.isActive ? 'Active' : 'Inactive',
           type: 'whyFisho',
           title1: section.title,
-          description1: section.description1,
+          description1: section.description ?? section.description1,
           // Store full section data for editing
           image1Left: section.featuredCards?.[0]?.image,
           image1Right: section.featuredCards?.[1]?.image,

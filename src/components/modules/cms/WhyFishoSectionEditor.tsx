@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../../ui/alert-dialog';
-import { toast } from 'react-toastify';
+import { toast, ToastContainer } from 'react-toastify';
 import { apiFetch } from '../../../lib/api';
 
 interface WhyFishoCard {
@@ -30,6 +30,7 @@ interface WhyFishoCard {
 interface WhyFishoSectionData {
   _id?: string;
   title: string;
+  description?: string;
   description1: string;
   featuredCards: WhyFishoCard[];
   isActive?: boolean;
@@ -95,7 +96,7 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
 
       const section = res.section;
       setTitle(section.title);
-      setDescription1(section.description1);
+      setDescription1(section.description ?? section.description1 ?? '');
       setCards(section.featuredCards || []);
     } catch (error: any) {
       console.error('Failed to load section data:', error);
@@ -117,6 +118,9 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
 
     setSaving(true);
     try {
+      const sanitizedTitle = title.trim();
+      const sanitizedDescription = description1.trim();
+
       // Remove temporary _id fields from new cards before sending to backend
       const cleanedCards = cards.map(card => {
         const { _id, ...rest } = card;
@@ -128,8 +132,10 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
       });
 
       const sectionData = {
-        title,
-        description1,
+        title: sanitizedTitle,
+        // Keep both keys for backward compatibility while backend expects `description`.
+        description: sanitizedDescription,
+        description1: sanitizedDescription,
         featuredCards: cleanedCards,
         isActive: true
       };
@@ -147,7 +153,7 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
         throw new Error(res?.message || 'Failed to save section');
       }
 
-      toast.success('Section saved successfully');
+      toast.success(res?.message || 'Section saved successfully');
       
       setTimeout(() => {
         onCancel();
@@ -542,6 +548,18 @@ export default function WhyFishoSectionEditor({ sectionItem, onCancel }: WhyFish
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
     </div>
   );
 }
