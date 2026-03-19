@@ -22,7 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 
 interface Enquiry {
   id: string;
@@ -134,10 +134,10 @@ export default function Enquiries() {
 
       if (!res?.success) throw new Error(res?.message || 'Failed to delete enquiry');
 
-      setEnquiries(enquiries.filter(enquiry => enquiry.id !== enquiryToDelete));
-      toast.success(res.message || 'Enquiry deleted successfully');
+      setEnquiries((prev) => prev.filter((enquiry) => enquiry.id !== enquiryToDelete));
       setDeleteDialogOpen(false);
       setEnquiryToDelete(null);
+      toast.success(res.message || 'Enquiry deleted successfully');
     } catch (e: any) {
       const msg = e?.message || 'Failed to delete enquiry';
       toast.error(msg);
@@ -436,7 +436,10 @@ export default function Enquiries() {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmDelete}
+              onClick={(e) => {
+                e.preventDefault();
+                confirmDelete();
+              }}
               disabled={isDeleting}
               className="bg-red-600 hover:bg-red-700"
             >
