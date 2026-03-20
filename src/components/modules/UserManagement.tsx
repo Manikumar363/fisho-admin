@@ -210,8 +210,8 @@ export default function UserManagement() {
     }
 
     // Validate phone number
-    if (!/^\d{10}$/.test(vendorForm.contactNumber)) {
-      toast.error('Contact number must be exactly 10 digits');
+    if (!/^\d{9}$/.test(vendorForm.contactNumber)) {
+      toast.error('Contact number must be exactly 9 digits');
       return;
     }
 
@@ -272,8 +272,8 @@ export default function UserManagement() {
     }
 
     // Validate phone number
-    if (!/^\d{10}$/.test(vendorForm.contactNumber)) {
-      toast.error('Contact number must be exactly 10 digits');
+    if (!/^\d{9}$/.test(vendorForm.contactNumber)) {
+      toast.error('Contact number must be exactly 9 digits');
       return;
     }
 
@@ -331,8 +331,8 @@ export default function UserManagement() {
     }
 
     // Validate phone number
-    if (!/^\d{10}$/.test(endUserForm.contactNumber)) {
-      toast.error('Contact number must be exactly 10 digits');
+    if (!/^\d{9}$/.test(endUserForm.contactNumber)) {
+      toast.error('Contact number must be exactly 9 digits');
       return;
     }
 
@@ -385,8 +385,8 @@ export default function UserManagement() {
     }
 
     // Validate phone number
-    if (!/^\d{10}$/.test(subadminForm.phone)) {
-      toast.error('Contact number must be exactly 10 digits');
+    if (!/^\d{9}$/.test(subadminForm.phone)) {
+      toast.error('Contact number must be exactly 9 digits');
       return;
     }
 
@@ -449,8 +449,8 @@ export default function UserManagement() {
     }
 
     // Validate phone number
-    if (!/^\d{10}$/.test(subadminForm.phone)) {
-      toast.error('Contact number must be exactly 10 digits');
+    if (!/^\d{9}$/.test(subadminForm.phone)) {
+      toast.error('Contact number must be exactly 9 digits');
       return;
     }
 
@@ -500,8 +500,13 @@ export default function UserManagement() {
     }
 
     // Validate phone number
-    if (!/^\d{10}$/.test(deliveryPartnerForm.mobileNumber)) {
-      toast.error('Mobile number must be exactly 10 digits');
+    if (!/^\d{9}$/.test(deliveryPartnerForm.mobileNumber)) {
+      toast.error('Mobile number must be exactly 9 digits');
+      return;
+    }
+
+    if (!deliveryPartnerForm.drivingLicense || !deliveryPartnerForm.workPermit) {
+      toast.error('Please upload both driving license and work permit');
       return;
     }
 
@@ -515,7 +520,31 @@ export default function UserManagement() {
       return;
     }
 
+    const uploadImage = async (file: File): Promise<string> => {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const uploadRes = await apiFetch<{
+        message?: string;
+        location?: string;
+      }>('/api/upload-image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadRes.location) {
+        throw new Error(uploadRes.message || 'Failed to upload image');
+      }
+
+      return uploadRes.location;
+    };
+
     try {
+      const [drivingLicenseUrl, workPermitUrl] = await Promise.all([
+        uploadImage(deliveryPartnerForm.drivingLicense),
+        uploadImage(deliveryPartnerForm.workPermit),
+      ]);
+
       const res = await apiFetch<{
         success: boolean;
         message?: string;
@@ -527,6 +556,8 @@ export default function UserManagement() {
           lastName,
           phone: Number(normalizedPhone),
           email: deliveryPartnerForm.email,
+          drivingLicense: drivingLicenseUrl,
+          workPermit: workPermitUrl,
         }),
       });
 
@@ -1536,12 +1567,12 @@ export default function UserManagement() {
                   type="tel"
                   value={vendorForm.contactNumber}
                   onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 9);
                     setVendorForm({ ...vendorForm, contactNumber: value });
                   }}
-                  placeholder="Enter 10-digit phone number"
-                  maxLength={10}
-                  pattern="[0-9]{10}"
+                  placeholder="Enter 9-digit phone number"
+                  maxLength={9}
+                  pattern="[0-9]{9}"
                   required
                 />
               </div>
@@ -1568,7 +1599,7 @@ export default function UserManagement() {
                   !vendorForm.vatNumber.trim() ||
                   !vendorForm.email.trim() ||
                   !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(vendorForm.email) ||
-                  !/^\d{10}$/.test(vendorForm.contactNumber)
+                  !/^\d{9}$/.test(vendorForm.contactNumber)
                 }
               >
                 Add Vendor
@@ -1659,12 +1690,12 @@ export default function UserManagement() {
                   type="tel"
                   value={vendorForm.contactNumber}
                   onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 9);
                     setVendorForm({ ...vendorForm, contactNumber: value });
                   }}
-                  maxLength={10}
-                  pattern="[0-9]{10}"
-                  placeholder="Enter 10 digit contact number"
+                  maxLength={9}
+                  pattern="[0-9]{9}"
+                  placeholder="Enter 9 digit contact number"
                   required
                 />
               </div>
@@ -1683,7 +1714,7 @@ export default function UserManagement() {
                 !vendorForm.vatNumber.trim() ||
                 !vendorForm.email.trim() ||
                 !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(vendorForm.email) ||
-                !/^\d{10}$/.test(vendorForm.contactNumber) ||
+                !/^\d{9}$/.test(vendorForm.contactNumber) ||
                 (vendorForm.vendorName === originalVendorForm.vendorName &&
                  vendorForm.companyName === originalVendorForm.companyName &&
                  vendorForm.vatNumber === originalVendorForm.vatNumber &&
@@ -1762,11 +1793,11 @@ export default function UserManagement() {
                   type="tel"
                   value={endUserForm.contactNumber}
                   onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 9);
                     setEndUserForm({ ...endUserForm, contactNumber: value });
                   }}
-                  placeholder="Enter 10-digit phone number"
-                  maxLength={10}
+                  placeholder="Enter 9-digit phone number"
+                  maxLength={9}
                   required
                 />
               </div>
@@ -1856,14 +1887,14 @@ export default function UserManagement() {
                   type="tel"
                   value={subadminForm.phone}
                   onChange={(e) =>{
-                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 9);
                    setSubadminForm({ ...subadminForm, phone: value })}                    
 
                   } 
 
-                  placeholder="Enter 10-digit phone number"
-                  maxLength={10}
-                  pattern="[0-9]{10}"
+                  placeholder="Enter 9-digit phone number"
+                  maxLength={9}
+                  pattern="[0-9]{9}"
                   required
                 />
               </div>
@@ -1882,7 +1913,7 @@ export default function UserManagement() {
                 disabled={isAddingSubadmin  ||
                   !subadminForm.name.trim() ||
                   !subadminForm.email.trim() ||
-                  !/^\d{10}$/.test(subadminForm.phone) ||
+                  !/^\d{9}$/.test(subadminForm.phone) ||
                   !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(subadminForm.email)
                 }
               >
@@ -1938,12 +1969,12 @@ export default function UserManagement() {
                   type="tel"
                   value={subadminForm.phone}
                   onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 9);
                     setSubadminForm({ ...subadminForm, phone: value });
                   }}
-                  placeholder="Enter 10-digit phone number"
-                  maxLength={10}
-                  pattern="[0-9]{10}"
+                  placeholder="Enter 9-digit phone number"
+                  maxLength={9}
+                  pattern="[0-9]{9}"
                   required
                 />
               </div>
@@ -1959,7 +1990,7 @@ export default function UserManagement() {
                 disabled={
                   !subadminForm.name.trim() ||
                   !subadminForm.email.trim() ||
-                  !/^\d{10}$/.test(subadminForm.phone) ||
+                  !/^\d{9}$/.test(subadminForm.phone) ||
                   !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(subadminForm.email) ||
                   (subadminForm.name === originalSubadminForm.name &&
                    subadminForm.email === originalSubadminForm.email &&

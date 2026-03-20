@@ -255,8 +255,12 @@ export default function EditStore({ storeId, onBack, onStoreUpdated }: EditStore
                 <Input
                   id="contactNumber"
                   type="tel"
+                  inputMode="numeric"
+                  maxLength={9}
                   value={formData.contactNumber}
-                  onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, contactNumber: e.target.value.replace(/\D/g, '').slice(0, 9) })
+                  }
                   placeholder="Enter contact number"
                 />
               </div>

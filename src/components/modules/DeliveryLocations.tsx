@@ -552,6 +552,10 @@ export default function DeliveryLocations() {
                 <span className="text-gray-600">Numeric ID</span>
                 <span className="font-medium">{viewData.id}</span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Nearby Store</span>
+                <span className="font-medium">{viewData.nearByStore?.name || '—'}</span>
+              </div>
             </div>
           )}
 
@@ -580,7 +584,7 @@ export default function DeliveryLocations() {
                 <option value="">All Delivery Types</option>
                 <option value="express">Express Delivery</option>
                 <option value="next-day">Next Day Delivery</option>
-                <option value="both">Both</option>
+                {/* <option value="both">Both</option> */}
               </select>
             </div>
 

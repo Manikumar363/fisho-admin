@@ -768,7 +768,7 @@ export default function StoreBilling() {
                     inputMode="numeric"
                     maxLength={9}
                     value={customerNumber}
-                    onChange={(e) => setCustomerNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    onChange={(e) => setCustomerNumber(e.target.value.replace(/\D/g, '').slice(0, 9))}
                     disabled={cart.length === 0}
                   />
                 </div>

@@ -40,6 +40,12 @@ type DeliveryPartnerApiUser = {
   _id: string;
   email: string;
   phone: string;
+  profile_url?: string;
+  profile?: string;
+  profileUrl?: string;
+  profileImage?: string;
+  avatar?: string;
+  image?: string;
   countryCode?: string;
   firstName?: string;
   lastName?: string;
@@ -53,9 +59,11 @@ type DeliveryPartnerApiUser = {
 
 type DeliveryPartnerListItem = {
   id: string;
+  shortId: string;
   name: string;
   email: string;
   phone: string;
+  profile_url?: string;
   status: 'Active' | 'Inactive';
   deliveries: number;
   earnings: number;
@@ -88,6 +96,14 @@ export default function DeliveryPartnersSection({
   const [deletedUsersTotalPages, setDeletedUsersTotalPages] = useState(1);
   const [deletedUsersTotalCount, setDeletedUsersTotalCount] = useState(0);
   const deletedUsersLimit = 10;
+  const IMAGE_BASE = ((import.meta as any).env?.VITE_IMAGE_BASE_URL || (import.meta as any).env?.VITE_BASE_URL) as string | undefined;
+
+  const resolveImageUrl = (path?: string) => {
+    if (!path) return '';
+    if (/^https?:\/\//i.test(path)) return path;
+    const base = IMAGE_BASE?.replace(/\/$/, '') || '';
+    return base ? `${base}${path.startsWith('/') ? path : `/${path}`}` : path;
+  };
 
   const getStatusBadgeClass = (status: string | undefined) => {
     return status === 'Active'
@@ -97,7 +113,7 @@ export default function DeliveryPartnersSection({
 
   const isAddPartnerFormValid =
     deliveryPartnerForm.name.trim().length > 0 &&
-    /^\d{10}$/.test(deliveryPartnerForm.mobileNumber) &&
+    /^\d{9}$/.test(deliveryPartnerForm.mobileNumber) &&
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(deliveryPartnerForm.email.trim()) &&
     Boolean(deliveryPartnerForm.drivingLicense) &&
     Boolean(deliveryPartnerForm.workPermit);
@@ -125,12 +141,16 @@ export default function DeliveryPartnersSection({
           const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unnamed';
           const phone = `${user.countryCode || ''} ${user.phone || ''}`.trim();
           const status: 'Active' | 'Inactive' = user.isActive && !user.isBlocked ? 'Active' : 'Inactive';
+          const profilePath = user.profile_url || user.profileUrl || user.profileImage || user.profile || user.avatar || user.image || '';
+          const shortId = user._id ? `${user._id.substring(0, 8)}...` : '—';
 
           return {
             id: user._id,
+            shortId,
             name,
             email: user.email || '—',
             phone: phone || '—',
+            profile_url: resolveImageUrl(profilePath),
             status,
             deliveries: user.totalDeliveries || 0,
             earnings: user.totalEarnings || 0,
@@ -254,6 +274,7 @@ export default function DeliveryPartnersSection({
                 <thead>
                   <tr className="border-b border-gray-200">
                     <th className="text-left py-3 px-4">DP ID</th>
+                    <th className="text-left py-3 px-4">Profile</th>
                     <th className="text-left py-3 px-4">Name</th>
                     <th className="text-left py-3 px-4">Phone Number</th>
                     <th className="text-left py-3 px-4">Email ID</th>
@@ -266,26 +287,39 @@ export default function DeliveryPartnersSection({
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={8} className="text-center py-8 text-gray-500">
+                      <td colSpan={9} className="text-center py-8 text-gray-500">
                         Loading delivery partners...
                       </td>
                     </tr>
                   ) : error ? (
                     <tr>
-                      <td colSpan={8} className="text-center py-8 text-red-600">
+                      <td colSpan={9} className="text-center py-8 text-red-600">
                         {error}
                       </td>
                     </tr>
                   ) : getFilteredDeliveryPartners().length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="text-center py-8 text-gray-500">
+                      <td colSpan={9} className="text-center py-8 text-gray-500">
                         No delivery partners found
                       </td>
                     </tr>
                   ) : (
                     getPaginatedDeliveryPartners().map((partner) => (
                       <tr key={partner.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-3 px-4 text-blue-600">{partner.id}</td>
+                        <td className="py-3 px-4 text-blue-600">{partner.shortId}</td>
+                        <td className="py-3 px-4">
+                          {partner.profile_url ? (
+                            <img
+                              src={partner.profile_url}
+                              alt={partner.name}
+                              className="w-9 h-9 rounded-full object-cover border border-gray-200"
+                            />
+                          ) : (
+                            <div className="w-9 h-9 rounded-full bg-gray-100 text-gray-600 border border-gray-200 flex items-center justify-center text-xs font-medium">
+                              {partner.name?.charAt(0)?.toUpperCase() || 'U'}
+                            </div>
+                          )}
+                        </td>
                         <td className="py-3 px-4">{partner.name}</td>
                         <td className="py-3 px-4">{partner.phone}</td>
                         <td className="py-3 px-4">{partner.email}</td>
@@ -389,11 +423,11 @@ export default function DeliveryPartnersSection({
                   type="tel"
                   value={deliveryPartnerForm.mobileNumber}
                   onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 9);
                     setDeliveryPartnerForm({ ...deliveryPartnerForm, mobileNumber: value });
                   }}
-                  placeholder="Enter 10-digit phone number"
-                  maxLength={10}
+                  placeholder="Enter 9-digit phone number"
+                  maxLength={9}
                   required
                 />
               </div>

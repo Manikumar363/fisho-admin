@@ -2122,25 +2122,29 @@ const handleRemoveWeight = (weight: number) => {
             disabled={isSubmitting}
           />
           {categoryForm.speciesIcon ? (
-            <div className="mt-2 text-sm text-gray-600 flex items-center gap-3">
-              <img
-                src={URL.createObjectURL(categoryForm.speciesIcon)}
-                alt="New category icon preview"
-                className="w-14 h-14 rounded object-cover border"
-              />
-              <div>
-                
-                <span className="text-xs text-gray-500">{categoryForm.speciesIcon.name}</span>
+            <div className="mt-2 text-sm text-gray-600 flex items-center gap-3 min-w-0">
+              <div className="w-14 h-14 rounded border bg-gray-50 overflow-hidden flex items-center justify-center shrink-0">
+                <img
+                  src={URL.createObjectURL(categoryForm.speciesIcon)}
+                  alt="New category icon preview"
+                  className="w-full h-full object-cover"
+                  style={{ width: 56, height: 56 }}
+                />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs text-gray-500 block truncate max-w-[220px]">{categoryForm.speciesIcon.name}</span>
               </div>
             </div>
           ) : categoryForm.existingIconUrl && !categoryForm.speciesIcon ? (
-            <div className="mt-2 text-sm text-gray-600 flex items-center gap-3">
-              <ImageWithFallback
-                src={categoryForm.existingIconUrl}
-                alt={categoryForm.speciesName || 'Current category icon'}
-                className="w-14 h-14 rounded object-cover border"
-              />
-              <span>Current icon will be kept unless you upload a new one.</span>
+            <div className="mt-2 text-sm text-gray-600 flex items-center gap-3 min-w-0">
+              <div className="w-14 h-14 rounded border bg-gray-50 overflow-hidden flex items-center justify-center shrink-0">
+                <ImageWithFallback
+                  src={categoryForm.existingIconUrl}
+                  alt={categoryForm.speciesName || 'Current category icon'}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <span className="truncate">Current icon will be kept unless you upload a new one.</span>
             </div>
           ) : null}
           <p className="text-sm text-gray-500 mt-1">
