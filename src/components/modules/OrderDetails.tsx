@@ -159,6 +159,8 @@ export default function OrderDetails() {
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [refundingType, setRefundingType] = useState<string | null>(null);
+  const [refundAmount, setRefundAmount] = useState<string>('');
+  const [refundError, setRefundError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!orderId) return;
@@ -349,22 +351,36 @@ export default function OrderDetails() {
   const handleRefund = async (refundType: 'wallet' | 'account') => {
     if (!order) return;
     setRefundingType(refundType);
+    setRefundError(null);
     try {
       if (refundType === 'wallet') {
-        // Use return-to-wallet API for wallet refunds
+        // Validate refund amount
+        const maxAmount = parseFloat(order.pricing.grandTotal);
+        const enteredAmount = parseFloat(refundAmount);
+        if (isNaN(enteredAmount) || enteredAmount <= 0) {
+          setRefundError('Please enter a valid refund amount.');
+          setRefundingType(null);
+          return;
+        }
+        if (enteredAmount > maxAmount) {
+          setRefundError('Refund amount cannot be greater than total amount.');
+          setRefundingType(null);
+          return;
+        }
         const res = await apiFetch<{ success: boolean; message?: string }>(
           '/api/order/return-to-wallet',
           {
             method: 'POST',
             body: JSON.stringify({ 
               orderId: order._id, 
-              amount: order.pricing.grandTotal 
+              amount: refundAmount 
             }),
             headers: { 'Content-Type': 'application/json' },
           }
         );
         if (!res.success) throw new Error(res.message || 'Failed to process wallet refund');
         toast.success(res.message || 'Refund processed to wallet successfully');
+        setRefundAmount('');
       } else {
         // Use process-refund API for account refunds
         const res = await apiFetch<{ success: boolean; message?: string }>(
@@ -378,7 +394,6 @@ export default function OrderDetails() {
         if (!res.success) throw new Error(res.message || 'Failed to process account refund');
         toast.success(res.message || 'Refund processed to account successfully');
       }
-      
       // Refresh order data
       const refreshRes = await apiFetch<{ success: boolean; data: Order }>(
         `/api/order/order-by-id/${order._id}`
@@ -469,7 +484,7 @@ export default function OrderDetails() {
                 </div>
                 <div className="flex flex-col items-end">
                   <p className="text-sm font-semibold text-gray-800">Delivery Date</p>
-                  <p className="mt-1 text-gray-600">{order.deliveryDate ? new Date(order.deliveryDate).toLocaleString() : '—'}</p>
+                  <p className="mt-1 text-gray-600">{order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString() : '—'}</p>
                 </div>
               </div>
             </CardContent>
@@ -815,6 +830,21 @@ export default function OrderDetails() {
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <p className="text-sm font-semibold text-gray-800 mb-3">Initiate Refund</p>
                     <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="0.01"
+                          max={order.pricing.grandTotal}
+                          step="0.01"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          placeholder={`Enter amount (max ${order.pricing.grandTotal})`}
+                          value={refundAmount}
+                          onChange={e => setRefundAmount(e.target.value)}
+                          disabled={refundingType !== null}
+                        />
+                        <span className="text-gray-500 text-xs">/ {order.pricing.grandTotal}</span>
+                      </div>
+                      {refundError && <p className="text-xs text-red-600 mt-1">{refundError}</p>}
                       <Button
                         className="w-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
                         onClick={() => handleRefund('wallet')}

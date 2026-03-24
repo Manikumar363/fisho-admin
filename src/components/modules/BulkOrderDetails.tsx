@@ -175,7 +175,7 @@ export default function BulkOrderDetails() {
 
   // Get all available statuses for editing (includes cancelled, rejected)
   const getStatusFlow = () => {
-    return ['requested', 'accepted', 'quotation_added', 'payment_confirmed', 'processing', 'order_ready', 'order_delivered', 'cancelled', 'rejected'];
+    return ['requested', 'accepted', 'quotation_added', 'payment_confirmed', 'processing', 'order_ready', 'order_delivered', 'cancelled'];
   };
 
   const getStatusBadgeClass = (status: string) => {
@@ -603,6 +603,7 @@ export default function BulkOrderDetails() {
                 variant="outline"
                 onClick={startEditingPricing}
                 className="flex items-center gap-1"
+                disabled={order?.status?.toLowerCase() !== 'accepted'}
               >
                 <Edit2 className="w-4 h-4" />
                 Edit

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Eye, Plus, Trash2 } from 'lucide-react';
+import { Eye, Plus, Trash2, Download } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -34,6 +34,9 @@ interface DeliveryPartnersSectionProps {
   handleAddDeliveryPartner: (e: React.FormEvent) => void;
   handleView: (item: any, type: string) => void;
   handleDelete: (item: any, type: string) => void;
+  fromDate: string;
+  toDate: string;
+  onExport: () => void;
 }
 
 type DeliveryPartnerApiUser = {
@@ -81,6 +84,9 @@ export default function DeliveryPartnersSection({
   handleAddDeliveryPartner,
   handleView,
   handleDelete,
+  fromDate,
+  toDate,
+  onExport,
 }: DeliveryPartnersSectionProps) {
   const apiLimit = 15;
   const [deliveryPartners, setDeliveryPartners] = useState<DeliveryPartnerListItem[]>([]);

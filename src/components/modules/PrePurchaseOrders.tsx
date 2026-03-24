@@ -72,6 +72,10 @@ export default function PrePurchaseOrders() {
   const [ppos, setPpos] = useState<any[]>([]);
   const [pposLoading, setPposLoading] = useState(false);
   const [pposError, setPposError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [limit] = useState(10);
   const [vendors, setVendors] = useState<any[]>([]);
   const [vendorsLoading, setVendorsLoading] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
@@ -93,9 +97,9 @@ export default function PrePurchaseOrders() {
   ]);
 
   useEffect(() => {
-    fetchPpos();
+    fetchPpos(currentPage, searchQuery);
     fetchVendors();
-  }, []);
+  }, [currentPage, searchQuery]);
 
   useEffect(() => {
     if (!showAddForm) return;
@@ -238,20 +242,34 @@ export default function PrePurchaseOrders() {
     return computedVariants;
   };
 
-  const fetchPpos = async () => {
+  const fetchPpos = async (page = 1, search = '') => {
     setPposLoading(true);
     setPposError(null);
     try {
+      let url = '/api/ppos';
+      if (search && search.trim() !== '') {
+        // Only search param, no pagination
+        url += `?search=${encodeURIComponent(search.trim())}`;
+      } else {
+        // Pagination params only if not searching
+        url += `?page=${page}&limit=${limit}`;
+      }
       const res = await apiFetch<{
         success: boolean;
         count: number;
+        totalCount: number;
+        totalPages: number;
+        currentPage: number;
+        limit: number;
         ppos: any[];
         message?: string;
-      }>('/api/ppos');
+      }>(url);
 
       if (!res.success) throw new Error(res.message || 'Failed to fetch PPOs');
 
       setPpos(res.ppos || []);
+      setTotalPages(res.totalPages || 1);
+      setTotalCount(res.totalCount || 0);
     } catch (e: any) {
       const msg = e?.message || 'Failed to load PPOs';
       setPposError(msg);
@@ -514,29 +532,10 @@ export default function PrePurchaseOrders() {
     return ppos.filter((ppo) => isPpoInDateFilter(ppo.date, filter)).length;
   };
 
+  // No longer needed: filteredPpos, as search is now server-side
   const filteredPpos = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase();
-
-    return ppos.filter((ppo) => {
-      const matchesDate = isPpoInDateFilter(ppo.date, activeDateFilter);
-      if (!matchesDate) return false;
-
-      if (!normalizedQuery) return true;
-
-      const searchableText = [
-        ppo.billNo,
-        ppo.vendor?.name,
-        ppo.vendor?.companyName,
-        ppo.vendor?.email,
-        String(ppo.ppoValue ?? ''),
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-
-      return searchableText.includes(normalizedQuery);
-    });
-  }, [ppos, activeDateFilter, searchQuery]);
+    return ppos.filter((ppo) => isPpoInDateFilter(ppo.date, activeDateFilter));
+  }, [ppos, activeDateFilter]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1036,7 +1035,7 @@ export default function PrePurchaseOrders() {
       {/* PPO List Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Pre-Purchase Orders ({filteredPpos.length}/{ppos.length})</CardTitle>
+          <CardTitle>Pre-Purchase Orders ({totalCount})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="mb-4 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
@@ -1143,6 +1142,32 @@ export default function PrePurchaseOrders() {
               </tbody>
             </table>
           </div>
+          {/* Pagination Controls */}
+          {!pposLoading && totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <div className="text-sm text-gray-600">
+                Page {currentPage} of {totalPages} | Total: {totalCount}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

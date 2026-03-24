@@ -376,7 +376,7 @@ export default function DeliveryLocations() {
                       <th className="text-left py-3 px-4">Location Name</th>
                       <th className="text-left py-3 px-4">Delivery Type</th>
                       <th className="text-left py-3 px-4">Nearest Store</th>
-                      <th className="text-left py-3 px-4">Status</th>
+                      {/*<th className="text-left py-3 px-4">Status</th>*/}
                       <th className="text-left py-3 px-4">Actions</th>
                     </tr>
                   </thead>
@@ -408,7 +408,7 @@ export default function DeliveryLocations() {
                             </Badge>
                           </td>
                           <td className="py-3 px-4">{location.nearestStore}</td>
-                          <td className="py-3 px-4">
+                          {/* <td className="py-3 px-4"> 
                             <Badge
                               variant={location.status === 'Active' ? 'default' : 'secondary'}
                               className={
@@ -419,7 +419,7 @@ export default function DeliveryLocations() {
                             >
                               {location.status}
                             </Badge>
-                          </td>
+                          </td>*/}
                           <td className="py-3 px-4">
                             <div className="flex gap-2">
                               <Button
@@ -438,14 +438,14 @@ export default function DeliveryLocations() {
                               >
                                 <Edit className="w-4 h-4" />
                               </Button>
-                              <Button
+                              {/* <Button 
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleDeleteLocation(location)}
                                 disabled={deleteLoading}
                               >
                                 <Trash2 className="w-4 h-4 text-red-600" />
-                              </Button>
+                              </Button>*/}
                             </div>
                           </td>
                         </tr>

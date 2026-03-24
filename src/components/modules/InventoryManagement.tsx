@@ -74,7 +74,9 @@ export default function InventoryManagement() {
 
   const toTwoDecimalString = (value: string | number) => {
     const parsed = typeof value === 'number' ? value : Number(value);
-    return Number.isFinite(parsed) ? parsed.toFixed(2) : '';
+    if (!Number.isFinite(parsed)) return '';
+    if (Number.isInteger(parsed)) return parsed.toString();
+    return parsed.toFixed(2).replace(/\.00$/, '');
   };
   
 
@@ -2270,144 +2272,148 @@ const handleRemoveWeight = (weight: number) => {
     const isProductEditMode = editingProductId !== null;
 
     return (
-    <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="category">Category</Label>
-          <select
-            id="category"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            value={productForm.category}
-            onChange={e => setProductForm({ ...productForm, category: e.target.value })}
-            required
-            disabled={isSubmitting}
-          >
-            <option value="">Select Category</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>{cat.name}</option>
-            ))}
-          </select>
+      <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="category">Category</Label>
+            <select
+              id="category"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              value={productForm.category}
+              onChange={e => setProductForm({ ...productForm, category: e.target.value })}
+              required
+              disabled={isSubmitting}
+            >
+              <option value="">Select Category</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <Label htmlFor="productName">Product Name</Label>
+            <Input
+              id="productName"
+              placeholder="Enter product name"
+              value={productForm.productName}
+              onChange={e => setProductForm({ ...productForm, productName: e.target.value })}
+              required
+              disabled={isSubmitting}
+            />
+          </div>
         </div>
-        <div>
-          <Label htmlFor="productName">Product Name</Label>
-          <Input
-            id="productName"
-            placeholder="Enter product name"
-            value={productForm.productName}
-            onChange={e => setProductForm({ ...productForm, productName: e.target.value })}
-            required
-            disabled={isSubmitting}
-          />
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="productImages">Product Images</Label>
-          <Input
-            id="productImages"
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={e =>
-              setProductForm({
-                ...productForm,
-                productImages: e.target.files ? Array.from(e.target.files) : [],
-              })
-            }
-            disabled={isSubmitting}
-          />
-          {productForm.productImages.length > 0 && (
-            <div className="mt-4">
-              <p className="text-sm text-gray-600 mb-3">
-                {productForm.productImages.length} image(s) selected
-              </p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {productForm.productImages.map((file, index) => (
-                  <div
-                    key={`${file.name}-${index}`}
-                    className="relative w-32 h-32 group"
-                  >
-                    <img
-                      src={URL.createObjectURL(file)}
-                      alt="Product preview"
-                      className="w-full h-full object-cover rounded border"
-                    />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setProductForm({
-                          ...productForm,
-                          productImages: productForm.productImages.filter(
-                            (_, i) => i !== index
-                          ),
-                        })
-                      }
-                      className="absolute top-1 right-1 bg-white hover:bg-gray-100 text-red-600 hover:text-red-700 rounded-full w-6 h-6 flex items-center justify-center transition-colors border border-red-300"
-                      disabled={isSubmitting}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="productImages">Product Images</Label>
+            <Input
+              id="productImages"
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={e =>
+                setProductForm({
+                  ...productForm,
+                  productImages: e.target.files ? Array.from(e.target.files) : [],
+                })
+              }
+              disabled={isSubmitting}
+            />
+            {productForm.productImages.length > 0 && (
+              <div className="mt-4">
+                <p className="text-sm text-gray-600 mb-3">
+                  {productForm.productImages.length} image(s) selected
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {productForm.productImages.map((file, index) => (
+                    <div
+                      key={`${file.name}-${index}`}
+                      className="relative w-32 h-32 group"
                     >
-                      ✕
-                    </button>
-                  </div>
-                ))}
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt="Product preview"
+                        className="w-full h-full object-cover rounded border"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setProductForm({
+                            ...productForm,
+                            productImages: productForm.productImages.filter(
+                              (_, i) => i !== index
+                            ),
+                          })
+                        }
+                        className="absolute top-1 right-1 bg-white hover:bg-gray-100 text-red-600 hover:text-red-700 rounded-full w-6 h-6 flex items-center justify-center transition-colors border border-red-300"
+                        disabled={isSubmitting}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-          {productForm.existingImageUrls.length > 0 && (
-            <div className="mt-4">
-              <p className="text-sm text-gray-600 mb-3">
-                {productForm.existingImageUrls.length} existing image(s)
-              </p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {productForm.existingImageUrls.map((url, index) => (
-                  <div
-                    key={`${url}-${index}`}
-                    className="relative w-32 h-32 group"
-                  >
-                    <img
-                      src={url}
-                      alt="Current product"
-                      className="w-full h-full object-cover rounded border"
-                    />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setProductForm({
-                          ...productForm,
-                          existingImageUrls: productForm.existingImageUrls.filter(
-                            (_, i) => i !== index
-                          ),
-                        })
-                      }
-                      className="absolute top-1 right-2 rounded-full bg-white hover:bg-gray-100 text-red-600 hover:text-red-700 rounded-full w-6 h-6 flex items-center justify-center transition-colors border border-red-300"
-                      disabled={isSubmitting}
+            )}
+            {productForm.existingImageUrls.length > 0 && (
+              <div className="mt-4">
+                <p className="text-sm text-gray-600 mb-3">
+                  {productForm.existingImageUrls.length} existing image(s)
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {productForm.existingImageUrls.map((url, index) => (
+                    <div
+                      key={`${url}-${index}`}
+                      className="relative w-32 h-32 group"
                     >
-                      ✕
-                    </button>
-                  </div>
-                ))}
+                      <img
+                        src={url}
+                        alt="Current product"
+                        className="w-full h-full object-cover rounded border"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setProductForm({
+                            ...productForm,
+                            existingImageUrls: productForm.existingImageUrls.filter(
+                              (_, i) => i !== index
+                            ),
+                          })
+                        }
+                        className="absolute top-1 right-2 rounded-full bg-white hover:bg-gray-100 text-red-600 hover:text-red-700 rounded-full w-6 h-6 flex items-center justify-center transition-colors border border-red-300"
+                        disabled={isSubmitting}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+          <div>
+            <Label htmlFor="availableStock">Available Stock</Label>
+            <Input
+              id="availableStock"
+              type="number"
+              min="0"
+              placeholder="Enter available stock"
+              value={
+                productForm.availableStock === ''
+                  ? ''
+                  : toTwoDecimalString(productForm.availableStock)
+              }
+              onChange={e => setProductForm({ ...productForm, availableStock: e.target.value })}
+              disabled={isSubmitting}
+            />
+          </div>
         </div>
-        <div>
-          <Label htmlFor="availableStock">Available Stock</Label>
-          <Input
-            id="availableStock"
-            type="number"
-            min="0"
-            placeholder="Enter available stock"
-            value={productForm.availableStock}
-            onChange={e => setProductForm({ ...productForm, availableStock: e.target.value })}
-            disabled={isSubmitting}
-          />
-        </div>
-      </div>
 
-      <div>
-        <Label htmlFor="description">Description</Label>
-        <Textarea
-          id="description"
+        <div>
+          <Label htmlFor="description">Description</Label>
+          <Textarea
+            id="description"
           placeholder="Enter product description, origin, characteristics..."
           value={productForm.description}
           onChange={e => setProductForm({ ...productForm, description: e.target.value })}
@@ -3736,7 +3742,7 @@ const handleRemoveWeight = (weight: number) => {
                             )}
                           </div>
                         </td>
-                        <td className="py-3 px-4">{product.stock} KG</td>
+                        <td className="py-3 px-4">{toTwoDecimalString(product.stock)} KG</td>
                         <td className="py-3 px-4"><div className="flex items-center"><span className="dirham-symbol mr-2">&#xea;</span>{Number(product.costPrice).toFixed(2)}</div></td>
                         <td className="py-3 px-4">{Number(product.profit).toFixed(2)}%</td>
                         <td className="py-3 px-4">{Number(product.discount).toFixed(2)}%</td>

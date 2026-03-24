@@ -17,7 +17,9 @@ import DeliveryPartnersSection from './DeliveryPartnersSection';
 
 export default function UserManagement() {
   const [searchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState('end-users');
+  // Ensure activeTab is typed correctly for handleExport
+  type UserTabType = 'end-users' | 'vendors' | 'delivery-partners' | 'store-managers';
+  const [activeTab, setActiveTab] = useState<UserTabType>('end-users');
   const [showAddVendorModal, setShowAddVendorModal] = useState(false);
   const [showAddEndUserModal, setShowAddEndUserModal] = useState(false);
   const [showAddDeliveryPartnerModal, setShowAddDeliveryPartnerModal] = useState(false);
@@ -155,9 +157,8 @@ export default function UserManagement() {
       setDeletedUsersTotalPages(res.pagination?.totalPages || 1);
       setDeletedUsersTotalCount(res.pagination?.totalItems || 0);
     } catch (e: any) {
-      const msg = e?.message || 'Failed to load deleted users';
-      setDeletedUsersError(msg);
-      toast.error(msg);
+      const errMsg = (e as any)?.message || 'Export failed';
+      toast.error(errMsg);
     } finally {
       setDeletedUsersLoading(false);
     }
@@ -1068,6 +1069,59 @@ export default function UserManagement() {
 
   const vendorsTotalPages = Math.ceil(getFilteredVendors().length / itemsPerPage);
 
+  // Export handlers
+  const handleExport = async (type: 'end-users' | 'vendors' | 'delivery-partners' | 'store-managers') => {
+    let url = '';
+    switch (type) {
+      case 'end-users':
+        url = '/api/user/export-all-users';
+        break;
+      case 'vendors':
+        url = '/api/vendors/export-all';
+        break;
+      case 'delivery-partners':
+        url = '/api/delivery-partner/export-all-users';
+        break;
+      case 'store-managers':
+        url = '/api/subadmin/export-all-subadmins';
+        break;
+      default:
+        return;
+    }
+    try {
+      const params = [
+        fromDate ? `startDate=${encodeURIComponent(fromDate)}` : '',
+        toDate ? `endDate=${encodeURIComponent(toDate)}` : ''
+      ].filter(Boolean).join('&');
+      const endpoint = params ? `${url}?${params}` : url;
+      const res = await apiFetch<{
+        success: boolean;
+        data?: { csv: string; filename: string };
+        message?: string;
+      }>(endpoint);
+      if (!res.success || !res.data?.csv) throw new Error(res.message || 'Export failed');
+      // Decode base64 CSV or XLSX
+      const fileContent = atob(res.data.csv);
+      // Try to detect file type from filename
+      const filename = res.data.filename || `${type}-export.xlsx`;
+      const isXlsx = filename.endsWith('.xlsx');
+      const blob = new Blob([fileContent], { type: isXlsx ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'text/csv' });
+      const urlObj = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = urlObj;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(urlObj);
+      toast.success('Export successful!');
+    } catch (e: any) {
+      toast.error(e?.message || 'Export failed');
+    }
+  };
+
+  // Ensure activeTab is typed correctly for handleExport
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -1096,7 +1150,11 @@ export default function UserManagement() {
               className="w-40"
             />
           </div>
-          <Button variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-50">
+          <Button
+            variant="outline"
+            className="border-blue-600 text-blue-600 hover:bg-blue-50"
+            onClick={() => handleExport(activeTab)}
+          >
             <Download className="w-4 h-4 mr-2" />
             Export Data
           </Button>
@@ -1128,7 +1186,7 @@ export default function UserManagement() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={(tab) => {
-        setActiveTab(tab);
+        setActiveTab(tab as UserTabType);
         setSearchTerm(''); // Clear search when switching tabs
       }} className="w-full">
         <TabsList className="w-full justify-start border-b">
@@ -1267,19 +1325,24 @@ export default function UserManagement() {
           handleAddDeliveryPartner={handleAddDeliveryPartner}
           handleView={handleView}
           handleDelete={handleDelete}
+          fromDate={fromDate}
+          toDate={toDate}
+          onExport={() => handleExport('delivery-partners')}
         />
 
         <TabsContent value="store-managers">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Store Managers</CardTitle>
-              <Button 
-                onClick={openAddSubadminModal}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Subadmin
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={openAddSubadminModal}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Subadmin
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -1386,13 +1449,15 @@ export default function UserManagement() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Vendors</CardTitle>
-              <Button 
-                onClick={openAddVendorModal}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Vendor
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={openAddVendorModal}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Vendor
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -1693,9 +1758,9 @@ export default function UserManagement() {
                     const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 9);
                     setVendorForm({ ...vendorForm, contactNumber: value });
                   }}
+                  placeholder="Enter 9 digit contact number"
                   maxLength={9}
                   pattern="[0-9]{9}"
-                  placeholder="Enter 9 digit contact number"
                   required
                 />
               </div>
