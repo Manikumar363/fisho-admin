@@ -163,9 +163,16 @@ export default function DeliveryLocations() {
   };
 
   const handleEditLocation = (updatedLocation: Omit<DeliveryLocation, 'code'> & { code?: string }) => {
+    // If nearestStore is a store ID, resolve to name
+    let nearestStoreName = updatedLocation.nearestStore;
+    const foundStore = stores.find(s => s._id === updatedLocation.nearestStore);
+    if (foundStore) {
+      nearestStoreName = foundStore.name;
+    }
     const locationToUpdate: DeliveryLocation = {
       ...updatedLocation,
-      code: updatedLocation.code || editingLocation?.code || ''
+      code: updatedLocation.code || editingLocation?.code || '',
+      nearestStore: nearestStoreName
     };
     setLocations(locations.map(location => 
       location.id === locationToUpdate.id ? locationToUpdate : location

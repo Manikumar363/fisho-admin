@@ -377,39 +377,30 @@ export default function PrePurchaseOrders() {
 
   const handleDownloadPpo = async (ppoId: string) => {
     try {
-      const base = API_BASE_URL?.replace(/\/$/, '') || '';
-      const endpoint = `/api/ppos/${ppoId}/download`;
-      const token = getToken();
-
-      const response = await fetch(`${base}${endpoint}`, {
+      const token = getToken ? getToken() : '';
+      const res = await apiFetch<{
+        success: boolean;
+        message?: string;
+        data?: { invoiceUrl: string; billNo: string; fileSize: number; ppoId: string };
+      }>(`/api/ppos/${ppoId}/invoice/upload`, {
         method: 'GET',
         headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        }
+          'Authorization': `Bearer ${token}`,
+        },
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to download PPO');
+      if (!res.success || !res.data?.invoiceUrl) {
+        throw new Error(res.message || 'Failed to fetch PPO invoice');
       }
-
-      // Get the blob from response
-      const blob = await response.blob();
-      
-      // Create a download link
-      const url = window.URL.createObjectURL(blob);
+      // Download the file
       const link = document.createElement('a');
-      link.href = url;
-      link.download = `PPO_${ppoId}.pdf`;
+      link.href = res.data.invoiceUrl;
+      link.download = `ppo-invoice-${res.data.billNo || ppoId}.pdf`;
       document.body.appendChild(link);
       link.click();
-      
-      // Cleanup
       document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
-      toast.success('PPO downloaded successfully');
+      toast.success('Invoice download started');
     } catch (e: any) {
-      const msg = e?.message || 'Failed to download PPO';
+      const msg = e?.message || 'Failed to download PPO invoice';
       console.error('Download PPO error:', e);
       toast.error(msg);
     }

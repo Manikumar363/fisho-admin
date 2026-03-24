@@ -128,26 +128,29 @@ export default function BulkOrders() {
     setOrders([]);
 
     // Build query params
+    let url = '/api/bulk-order/all-orders';
     const params = new URLSearchParams();
-    params.append('page', String(currentPage));
-    params.append('limit', '20');
-
-    // Add search parameter if search input is provided
     if (searchInput.trim()) {
       params.append('search', searchInput.trim());
+      // No pagination params when searching
+    } else if (selectedStatus === 'all') {
+      // Only add pagination if status is 'all' and not searching
+      params.append('page', String(currentPage));
+      params.append('limit', '20');
     }
-
-    // Add status filter if selected
     if (selectedStatus !== 'all') {
       params.append('status', selectedStatus);
+      // Do NOT add pagination params when status filter is active
     }
-
+    if ([...params].length > 0) {
+      url += `?${params.toString()}`;
+    }
     apiFetch<{
       success: boolean;
       data: BulkOrder[];
       pagination: { page: number; limit: number; total: number; pages: number };
       message?: string;
-    }>(`/api/bulk-order/all-orders?${params.toString()}`)
+    }>(url)
       .then((res) => {
         if (!active) return;
         if (!res.success) throw new Error(res.message || 'Failed to fetch bulk orders');

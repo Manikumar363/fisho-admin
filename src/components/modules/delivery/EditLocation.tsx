@@ -35,7 +35,7 @@ interface EditLocationProps {
 export default function EditLocation({ location, onBack, onSave }: EditLocationProps) {
   const [formData, setFormData] = useState({
     locationName: location.locationName,
-    nearestStore: location.nearestStore,
+    nearestStore: '', // will set after stores load
     status: location.status === 'Active'
   });
 
@@ -75,6 +75,22 @@ export default function EditLocation({ location, onBack, onSave }: EditLocationP
       })
       .finally(() => setStoresLoading(false));
   }, []);
+
+  // Set nearestStore to the correct store ID after stores or location changes
+  useEffect(() => {
+    if (!stores.length) return;
+    // If location.nearestStore is already an ID, use it; otherwise, map name to ID
+    let storeId = '';
+    // If the value matches an ID, use it
+    if (stores.some(s => s._id === location.nearestStore)) {
+      storeId = location.nearestStore;
+    } else {
+      // Otherwise, try to match by name
+      const match = stores.find(s => s.name === location.nearestStore);
+      if (match) storeId = match._id;
+    }
+    setFormData(prev => ({ ...prev, nearestStore: storeId }));
+  }, [stores, location.nearestStore]);
 
   // Check if any changes have been made
   const hasChanges = () => {
