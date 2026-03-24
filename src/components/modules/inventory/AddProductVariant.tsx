@@ -5,7 +5,7 @@ import { Label } from '../../../components/ui/label';
 import { Button } from '../../../components/ui/button';
 import { Textarea } from '../../../components/ui/textarea';
 import { Switch } from '../../../components/ui/switch';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 import { Plus, Image as ImageIcon } from 'lucide-react';
 
 interface AddProductVariantProps {

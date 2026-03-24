@@ -36,6 +36,36 @@ const Transactions: React.FC = () => {
   const [selectedStoreId, setSelectedStoreId] = useState('');
   const [orderFilter, setOrderFilter] = useState<'all' | 'orders' | 'bulk'>('all');
 
+  // Export handler
+  const handleExport = async () => {
+    try {
+      const params = [
+        fromDate ? `startDate=${encodeURIComponent(fromDate)}` : '',
+        toDate ? `endDate=${encodeURIComponent(toDate)}` : ''
+      ].filter(Boolean).join('&');
+      const res = await apiFetch<{
+        success: boolean;
+        data?: { csv: string; filename: string };
+        message?: string;
+      }>(`/api/transactions/export-all?${params}`);
+      if (!res.success || !res.data?.csv) throw new Error(res.message || 'Export failed');
+      // Decode base64 CSV
+      const csvContent = atob(res.data.csv);
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = res.data.filename || 'transactions.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast.success('Transactions exported!');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to export transactions');
+    }
+  };
+
   const filteredTransactions = React.useMemo(() => {
     const query = search.trim().toLowerCase();
     const filtered = transactions.filter((txn) => {
@@ -129,11 +159,7 @@ const Transactions: React.FC = () => {
     setPage(1);
   }, [paymentMethod, statusFilter, txnType, selectedStoreId, fromDate, toDate]);
 
-  if (loading) {
-    return (
-      <div className="p-8 text-center text-gray-600">Loading transactions...</div>
-    );
-  }
+
 
   if (error) {
     return (
@@ -169,7 +195,7 @@ const Transactions: React.FC = () => {
               className="w-40"
             />
           </div>
-          <Button className="bg-blue-600 hover:bg-blue-700">
+          <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleExport}>
             <Download className="w-4 h-4 mr-2" />
             Export Report
           </Button>
@@ -319,7 +345,18 @@ const Transactions: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredTransactions.length === 0 ? (
+                {loading ? (
+                  // Show skeleton rows while loading
+                  Array.from({ length: 8 }).map((_, idx) => (
+                    <tr key={idx} className="border-b border-gray-100">
+                      {Array.from({ length: 9 }).map((_, colIdx) => (
+                        <td key={colIdx} className="py-3 px-4">
+                          <div className="animate-pulse h-4 bg-gray-200 rounded w-3/4 mx-auto" />
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                ) : filteredTransactions.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="py-8 text-center text-gray-500">
                       {orderFilter === 'bulk' ? 'No bulk order transactions found.' :

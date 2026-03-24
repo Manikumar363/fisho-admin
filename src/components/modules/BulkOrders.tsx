@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Search, Download, Eye, Filter, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { apiFetch } from '../../lib/api';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 
 interface BulkOrderItem {
@@ -52,7 +53,58 @@ interface BulkOrder {
 }
 
 export default function BulkOrders() {
+
   const navigate = useNavigate();
+  // Export state
+  const [exportStartDate, setExportStartDate] = useState<string>('');
+  const [exportEndDate, setExportEndDate] = useState<string>('');
+  const [exporting, setExporting] = useState(false);
+
+  // Helper to format date for input[type="date"]
+  const formatDateInput = (date: Date) => {
+    return date.toISOString().slice(0, 10);
+  };
+
+  // Export handler
+  const BASE_URL = import.meta.env.VITE_BASE_URL || '';
+  const handleExport = async () => {
+    if (!exportStartDate || !exportEndDate) {
+      toast.error('Please select both start and end dates');
+      return;
+    }
+    setExporting(true);
+    try {
+      const params = [
+        exportStartDate ? `startDate=${encodeURIComponent(exportStartDate)}` : '',
+        exportEndDate ? `endDate=${encodeURIComponent(exportEndDate)}` : ''
+      ].filter(Boolean).join('&');
+      const res = await apiFetch<{
+        success: boolean;
+        data?: { csv: string; filename: string };
+        message?: string;
+      }>(`/api/bulk-order/export-all-orders?${params}`);
+      if (!res.success || !res.data?.csv) throw new Error(res.message || 'Export failed');
+      // Decode base64 CSV or XLSX
+      const fileContent = atob(res.data.csv);
+      // Try to detect file type from filename
+      const filename = res.data.filename || 'bulk-orders-export.xlsx';
+      const isXlsx = filename.endsWith('.xlsx');
+      const blob = new Blob([fileContent], { type: isXlsx ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast.success('Export successful!');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to export orders');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // API state
   const [orders, setOrders] = useState<BulkOrder[]>([]);
@@ -220,16 +272,41 @@ export default function BulkOrders() {
   };
 
   return (
+
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="mb-2">Bulk Orders Management</h1>
           <p className="text-gray-600">Track and manage all bulk orders</p>
         </div>
-        <Button variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-50">
-          <Download className="w-4 h-4 mr-2" />
-          Export Bulk Orders
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="fromDate" className="text-sm whitespace-nowrap">From:</Label>
+            <Input
+              id="fromDate"
+              type="date"
+              value={exportStartDate}
+              max={exportEndDate || undefined}
+              onChange={e => setExportStartDate(e.target.value)}
+              className="w-40"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="toDate" className="text-sm whitespace-nowrap">To:</Label>
+            <Input
+              id="toDate"
+              type="date"
+              value={exportEndDate}
+              min={exportStartDate || undefined}
+              onChange={e => setExportEndDate(e.target.value)}
+              className="w-40"
+            />
+          </div>
+          <Button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center" style={{minWidth: 150}} onClick={handleExport} disabled={exporting}>
+            <Download className="w-4 h-4 mr-2" />
+            {exporting ? 'Exporting...' : 'Export Report'}
+          </Button>
+        </div>
       </div>
 
       {/* Search and Filters */}

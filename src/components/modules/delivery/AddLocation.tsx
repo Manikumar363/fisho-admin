@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../ui/select';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 import { apiFetch } from '../../../lib/api';
 
 interface AddLocationProps {

@@ -759,14 +759,43 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
     })();
   };
 
-const moveVariant = (index: number, direction: 'up' | 'down') => {
-  const newVariants = [...variants];
+const moveVariant = async (index: number, direction: 'up' | 'down') => {
+  if (isReordering) return;
   const targetIndex = direction === 'up' ? index - 1 : index + 1;
-  
-  if (targetIndex < 0 || targetIndex >= newVariants.length) return;
-  
-  [newVariants[index], newVariants[targetIndex]] = [newVariants[targetIndex], newVariants[index]];
-  setVariants(newVariants);
+  if (targetIndex < 0 || targetIndex >= variants.length) return;
+
+  const movingVariant = variants[index];
+  const previous = [...variants];
+  const optimistic = [...variants];
+  [optimistic[index], optimistic[targetIndex]] = [optimistic[targetIndex], optimistic[index]];
+  setVariants(optimistic);
+  setIsReordering(true);
+  try {
+    const body = {
+      id: String(movingVariant.id),
+      from: index + 1,
+      to: targetIndex + 1,
+    };
+    const res = await apiFetch<{ success: boolean; message?: string }>(
+      '/api/variants/reorder',
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }
+    );
+    if (!res?.success) {
+      setVariants(previous);
+      toast.error(res?.message || 'Failed to reorder variant');
+    } else {
+      toast.success(res?.message || 'Variant reordered successfully');
+    }
+  } catch (e: any) {
+    setVariants(previous);
+    const msg = e?.message || 'Failed to reorder variant';
+    toast.error(msg);
+  } finally {
+    setIsReordering(false);
+  }
 };
 
 const handleAddCutType = (cutTypeId: string) => {
@@ -3915,7 +3944,7 @@ const handleRemoveWeight = (weight: number) => {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200">
-                      {/* <th className="text-left py-3 px-4">Reorder</th> */}
+                      <th className="text-left py-3 px-4">Reorder</th>
                       <th className="text-left py-3 px-4">Serial No</th>
                       <th className="text-left py-3 px-4">Image</th>
                       {/* <th className="text-left py-3 px-4">Variant Name</th> */}
@@ -3941,35 +3970,35 @@ const handleRemoveWeight = (weight: number) => {
                   <tbody>
                     {variantsLoading ? (
                       <tr>
-                        <td colSpan={20} className="py-8 text-center text-gray-500">Loading variants...</td>
+                        <td colSpan={21} className="py-8 text-center text-gray-500">Loading variants...</td>
                       </tr>
                     ) : sortedVariants.length === 0 ? (
                       <tr>
-                        <td colSpan={20} className="py-8 text-center text-gray-500">No Data Found</td>
+                        <td colSpan={21} className="py-8 text-center text-gray-500">No Data Found</td>
                       </tr>
                     ) : displayVariantsPage.map((variant, pageIndex) => {
                       const originalIndex = variants.findIndex((v) => v.id === variant.id);
                       const index = (variantsPage - 1) * VARIANTS_PAGE_SIZE + pageIndex;
                       return (
                       <tr key={variant.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        {/* <td className="py-3 px-4">
+                        <td className="py-3 px-4">
                           <div className="flex flex-col gap-1">
                             <button
                               onClick={() => moveVariant(originalIndex, 'up')}
-                              disabled={originalIndex === 0}
-                              className={`p-1 rounded ${originalIndex === 0 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
+                              disabled={originalIndex === 0 || isReordering}
+                              className={`p-1 rounded ${originalIndex === 0 || isReordering ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
                             >
                               <ChevronUp className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => moveVariant(originalIndex, 'down')}
-                              disabled={originalIndex === variants.length - 1}
-                              className={`p-1 rounded ${originalIndex === variants.length - 1 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
+                              disabled={originalIndex === variants.length - 1 || isReordering}
+                              className={`p-1 rounded ${originalIndex === variants.length - 1 || isReordering ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-600'}`}
                             >
                               <ChevronDown className="w-4 h-4" />
                             </button>
                           </div>
-                        </td> */}
+                        </td>
                         <td className="py-3 px-4">{index + 1}</td>
                         <td className="py-3 px-4">
                           {variant.image ? (

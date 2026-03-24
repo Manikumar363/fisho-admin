@@ -10,7 +10,7 @@ import { Badge } from '../../ui/badge';
 import { ImageWithFallback } from '../../ui/ImageWithFallback';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../../ui/alert-dialog';
 import { apiFetch } from '../../../lib/api';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 
 const IMAGE_BASE = (import.meta.env as any).VITE_IMAGE_BASE_URL || (import.meta.env as any).VITE_BASE_URL as string | undefined;
 

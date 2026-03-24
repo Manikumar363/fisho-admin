@@ -6,7 +6,8 @@ import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { apiFetch, getAdminData, getUserRole } from '../../lib/api';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
+import { Label } from '../ui/label';
 
 interface Order {
   _id: string;
@@ -26,6 +27,49 @@ interface Order {
 }
 
 export default function OrdersManagement() {
+    // Export state
+    const [exportStartDate, setExportStartDate] = useState<string>('');
+    const [exportEndDate, setExportEndDate] = useState<string>('');
+    const [exporting, setExporting] = useState(false);
+
+    // Export handler
+    const handleExport = async () => {
+      if (!exportStartDate || !exportEndDate) {
+        toast.error('Please select both start and end dates');
+        return;
+      }
+      setExporting(true);
+      try {
+        const params = [
+          exportStartDate ? `startDate=${encodeURIComponent(exportStartDate)}` : '',
+          exportEndDate ? `endDate=${encodeURIComponent(exportEndDate)}` : ''
+        ].filter(Boolean).join('&');
+        const res = await apiFetch<{
+          success: boolean;
+          data?: { csv: string; filename: string };
+          message?: string;
+        }>(`/api/order/export-order-history?${params}`);
+        if (!res.success || !res.data?.csv) throw new Error(res.message || 'Export failed');
+        // Decode base64 CSV or XLSX
+        const fileContent = atob(res.data.csv);
+        const filename = res.data.filename || 'orders-export.xlsx';
+        const isXlsx = filename.endsWith('.xlsx');
+        const blob = new Blob([fileContent], { type: isXlsx ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        toast.success('Export successful!');
+      } catch (err: any) {
+        toast.error(err?.message || 'Failed to export orders');
+      } finally {
+        setExporting(false);
+      }
+    };
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [selectedType, setSelectedType] = useState<string>('all');
@@ -390,10 +434,34 @@ export default function OrdersManagement() {
               : 'Track and manage all online orders'}
           </p>
         </div>
-        <Button variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-50">
-          <Download className="w-4 h-4 mr-2" />
-          Export Orders
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="ordersFromDate" className="text-sm whitespace-nowrap">From:</Label>
+            <Input
+              id="ordersFromDate"
+              type="date"
+              value={exportStartDate}
+              max={exportEndDate || undefined}
+              onChange={e => setExportStartDate(e.target.value)}
+              className="w-40"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="ordersToDate" className="text-sm whitespace-nowrap">To:</Label>
+            <Input
+              id="ordersToDate"
+              type="date"
+              value={exportEndDate}
+              min={exportStartDate || undefined}
+              onChange={e => setExportEndDate(e.target.value)}
+              className="w-40"
+            />
+          </div>
+          <Button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center" style={{minWidth: 150}} onClick={handleExport} disabled={exporting}>
+            <Download className="w-4 h-4 mr-2" />
+            {exporting ? 'Exporting...' : 'Export Orders'}
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards - Horizontal Scroll */}

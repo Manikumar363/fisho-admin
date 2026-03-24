@@ -177,7 +177,7 @@ export default function Dashboard() {
   };
 
   const kpiData = [
-    { label: 'Active Users', value: (dashboardStats?.activeUsers ?? 0).toLocaleString(), icon: Users, color: 'text-indigo-600', bgColor: 'bg-indigo-100', onClick: () => navigate('/user-management?filter=end-users'), roles: ['admin', 'subadmin'] },
+    { label: 'Active Users', value: (dashboardStats?.activeUsers ?? 0).toLocaleString(), icon: Users, color: 'text-indigo-600', bgColor: 'bg-indigo-100', onClick: () => navigate('/user-management?filter=end-users'), roles: ['admin'] },
     { label: 'Total Orders', value: (dashboardStats?.totalOrders ?? 0).toLocaleString(), icon: ShoppingBag, color: 'text-blue-600', bgColor: 'bg-blue-100', onClick: () => navigate('/orders'), roles: ['admin', 'subadmin'] },
     { label: 'Transactions', value: (dashboardStats?.totalTransactions ?? 0).toLocaleString(), icon: CreditCard, color: 'text-pink-600', bgColor: 'bg-pink-100', onClick: () => navigate('/transactions'), roles: ['admin', 'subadmin'] },
     { label: 'Total Revenue', value: { symbol: true, amount: (dashboardStats?.totalRevenue ?? 0).toLocaleString() }, icon: DollarSign, color: 'text-emerald-600', bgColor: 'bg-emerald-100', onClick: () => navigate('/transactions?filter=revenue'), roles: ['admin', 'subadmin'] },

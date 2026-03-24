@@ -16,7 +16,7 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 import { apiFetch } from '../../lib/api';
 import AddLocation from './delivery/AddLocation';
 import EditLocation from './delivery/EditLocation';
@@ -376,7 +376,6 @@ export default function DeliveryLocations() {
                       <th className="text-left py-3 px-4">Location Name</th>
                       <th className="text-left py-3 px-4">Delivery Type</th>
                       <th className="text-left py-3 px-4">Nearest Store</th>
-                      <th className="text-left py-3 px-4">Orders Received</th>
                       <th className="text-left py-3 px-4">Status</th>
                       <th className="text-left py-3 px-4">Actions</th>
                     </tr>
@@ -409,7 +408,6 @@ export default function DeliveryLocations() {
                             </Badge>
                           </td>
                           <td className="py-3 px-4">{location.nearestStore}</td>
-                          <td className="py-3 px-4">{location.ordersReceived}</td>
                           <td className="py-3 px-4">
                             <Badge
                               variant={location.status === 'Active' ? 'default' : 'secondary'}
