@@ -119,7 +119,12 @@ export default function TextContentEditor({
         if (res.page) {
           setTitle(res.page.title);
           setContent(res.page.description);
-          setInitialContent(res.page.description);
+          // Always normalize and set initialContent for deliveryTc and privacy
+          if (contentType === 'deliveryTc' || contentType === 'privacy') {
+            setInitialContent((res.page.description || '').trim());
+          } else {
+            setInitialContent(res.page.description);
+          }
           setPageId(res.page._id);
         }
       } catch (e: any) {
@@ -133,6 +138,19 @@ export default function TextContentEditor({
 
     fetchContent();
   }, [contentType]);
+
+  // Keep initialContent in sync with contentItem (for edit mode or re-opening)
+  useEffect(() => {
+    if (contentItem) {
+      setTitle(contentItem.title || '');
+      setContent(contentItem.content || '');
+      if (contentType === 'deliveryTc' || contentType === 'privacy') {
+        setInitialContent((contentItem.content || '').trim());
+      } else {
+        setInitialContent(contentItem.content || '');
+      }
+    }
+  }, [contentItem, contentType]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,7 +219,14 @@ export default function TextContentEditor({
     }
   };
 
-  const hasContentChanges = content !== initialContent;
+  // Normalize for deliveryTc and privacy
+  const hasContentChanges =
+    (contentType === 'deliveryTc' || contentType === 'privacy')
+      ? (content || '').trim() !== (initialContent || '').trim()
+      : content !== initialContent;
+
+  // For all content types, require changes before enabling save
+  const isSaveDisabled = !content || isSubmitting || !hasContentChanges;
 
   return (
     <div className="space-y-6">
@@ -283,7 +308,7 @@ export default function TextContentEditor({
                   <Button
                     type="submit"
                     className="bg-blue-600 hover:bg-blue-700"
-                    disabled={!content || isSubmitting || !hasContentChanges}
+                    disabled={isSaveDisabled}
                   >
                     {isSubmitting ? (
                       <span className="inline-flex items-center gap-2">
