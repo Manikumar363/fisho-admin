@@ -20,6 +20,7 @@ import ViewStore from './store/ViewStore';
 import EditStore from './store/EditStore';
 import { apiFetch, getUserRole } from '../../lib/api';
 
+
 export default function StoreMapping() {
   const [showAddStore, setShowAddStore] = useState(false);
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
@@ -33,11 +34,20 @@ export default function StoreMapping() {
   const [searchTerm, setSearchTerm] = useState('');
   const userRole = getUserRole();
 
+
+  // Fetch stores, with search param if searchTerm is present
   useEffect(() => {
     setStoresLoading(true);
     setStoresError(null);
 
-    apiFetch<{ success: boolean; stores: any[]; message?: string }>(`/api/stores/`)
+    // Build API URL with search param if searchTerm is not empty
+    let url = '/api/stores/';
+    if (searchTerm.trim()) {
+      const encoded = encodeURIComponent(searchTerm.trim());
+      url += `?search=${encoded}`;
+    }
+
+    apiFetch<{ success: boolean; stores: any[]; message?: string }>(url, { method: 'GET' })
       .then(res => {
         if (!res.success) throw new Error(res.message || 'Failed to fetch stores');
         setStores(res.stores || []);
@@ -46,47 +56,10 @@ export default function StoreMapping() {
         setStoresError(e?.message || 'Failed to load stores');
       })
       .finally(() => setStoresLoading(false));
-  }, []);
+  }, [searchTerm]);
 
-  const filteredStores = useMemo(() => {
-    if (!searchTerm.trim()) return stores;
-    const term = searchTerm.toLowerCase().trim();
-    const normalizedTerm = term.replace(/\D/g, '');
-    return stores.filter(store => {
-      const name = store.name?.toLowerCase() || '';
-      const address = store.address?.toLowerCase() || '';
-      const managerName = store.manager?.name?.toLowerCase() || '';
-      const managerEmail = store.manager?.email?.toLowerCase() || '';
-      const phoneCandidates = [
-        store.contactNumber,
-        store.phone,
-        store.mobileNumber,
-        store?.contact?.phone,
-        store?.contact?.mobile,
-        store.manager?.phone,
-        store.manager?.mobile,
-        store.manager?.mobileNumber,
-      ]
-        .map((value) => String(value ?? '').toLowerCase())
-        .filter(Boolean);
-
-      const normalizedNumbers = phoneCandidates
-        .map(value => value.replace(/\D/g, ''))
-        .filter(Boolean);
-
-      const matchesPhoneText = phoneCandidates.some(value => value.includes(term));
-      const matchesPhoneDigits = normalizedTerm.length > 0 && normalizedNumbers.some(num => num.includes(normalizedTerm));
-
-      return (
-        name.includes(term) ||
-        address.includes(term) ||
-        managerName.includes(term) ||
-        managerEmail.includes(term) ||
-        matchesPhoneText ||
-        matchesPhoneDigits
-      );
-    });
-  }, [stores, searchTerm]);
+  // No need for filteredStores, as API returns filtered data
+  const filteredStores = stores;
 
   if (showAddStore) {
     return <AddStore 

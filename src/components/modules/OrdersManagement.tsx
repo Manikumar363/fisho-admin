@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Dialog } from '../ui/dialog';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, Filter, Eye, Download, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -27,10 +28,14 @@ interface Order {
 }
 
 export default function OrdersManagement() {
-    // Export state
-    const [exportStartDate, setExportStartDate] = useState<string>('');
-    const [exportEndDate, setExportEndDate] = useState<string>('');
-    const [exporting, setExporting] = useState(false);
+  // Rejection reason dialog state (must be inside component)
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectingOrder, setRejectingOrder] = useState<Order | null>(null);
+  // Export state
+  const [exportStartDate, setExportStartDate] = useState<string>('');
+  const [exportEndDate, setExportEndDate] = useState<string>('');
+  const [exporting, setExporting] = useState(false);
 
     // Export handler
     const handleExport = async () => {
@@ -326,10 +331,25 @@ export default function OrdersManagement() {
     }
   };
 
-  const handleRejectOrder = async (order: Order) => {
+
+  // Show dialog to enter rejection reason
+  const handleRejectOrder = (order: Order) => {
+    setRejectingOrder(order);
+    setRejectReason('');
+    setShowRejectDialog(true);
+  };
+
+  // Confirm rejection with reason
+  const confirmRejectOrder = async () => {
+    if (!rejectingOrder) return;
+    const order = rejectingOrder;
     const storeId = getStoreId(order);
     if (!storeId) {
       toast.error('Store ID not found for this order');
+      return;
+    }
+    if (!rejectReason.trim()) {
+      toast.error('Please provide a reason for rejection');
       return;
     }
     setRejectingId(order._id);
@@ -337,7 +357,8 @@ export default function OrdersManagement() {
       const payload = { 
         orderId: order._id, 
         storeId: storeId,
-        status: 'rejected' 
+        status: 'rejected',
+        rejectReason: rejectReason.trim(),
       };
       console.log('Rejecting order with payload:', payload);
       const res = await apiFetch<{ success: boolean; data?: { order: Partial<Order> }; message?: string }>(
@@ -351,11 +372,14 @@ export default function OrdersManagement() {
       if (!res.success) throw new Error(res.message || 'Failed to reject order');
       // Merge the partial order data from API with existing order data
       if (res.data?.order) {
-        setOrders((prev) => prev.map((o) => (o._id === order._id ? { ...o, ...res.data!.order } : o)));
+        setOrders((prev) => prev.map((o) => (o._id === order._id ? { ...o, ...res.data!.order, rejectReason: rejectReason.trim() } : o)));
       } else {
-        setOrders((prev) => prev.map((o) => (o._id === order._id ? { ...o, status: 'rejected' } : o)));
+        setOrders((prev) => prev.map((o) => (o._id === order._id ? { ...o, status: 'rejected', rejectReason: rejectReason.trim() } : o)));
       }
       toast.success('Order rejected successfully');
+      setShowRejectDialog(false);
+      setRejectingOrder(null);
+      setRejectReason('');
     } catch (err: any) {
       console.error('Reject order error:', err);
       toast.error(err?.message || 'Failed to reject order');
@@ -754,7 +778,7 @@ export default function OrdersManagement() {
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-4">Order ID</th>
-                  {userRole === 'subadmin' && <th className="text-left py-3 px-4">Store</th>}
+                  <th className="text-left py-3 px-4">Store</th>
                   <th className="text-left py-3 px-4">Customer</th>
                   <th className="text-left py-3 px-4">Items</th>
                   <th className="text-left py-3 px-4">Amount</th>
@@ -768,15 +792,15 @@ export default function OrdersManagement() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={userRole === 'subadmin' ? 10 : 9} className="py-4 px-4 text-center text-gray-600">Loading orders...</td>
+                    <td colSpan={10} className="py-4 px-4 text-center text-gray-600">Loading orders...</td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan={userRole === 'subadmin' ? 10 : 9} className="py-4 px-4 text-center text-red-600">{error}</td>
+                    <td colSpan={10} className="py-4 px-4 text-center text-red-600">{error}</td>
                   </tr>
                 ) : filteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={userRole === 'subadmin' ? 10 : 9} className="py-4 px-4 text-center text-gray-500">
+                    <td colSpan={10} className="py-4 px-4 text-center text-gray-500">
                       No orders found
                     </td>
                   </tr>
@@ -792,7 +816,7 @@ export default function OrdersManagement() {
                     return (
                       <tr key={order._id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-3 px-4 text-blue-600">{order.invoiceNo || order._id}</td>
-                        {userRole === 'subadmin' && <td className="py-3 px-4">{getStoreName(order)}</td>}
+                        <td className="py-3 px-4">{getStoreName(order)}</td>
                         <td className="py-3 px-4">{order.shippingAddress?.name || '—'}</td>
                         <td className="py-3 px-4">{order.items?.length || 0}</td>
                         <td className="py-3 px-4"><span className="dirham-symbol mr-2">&#xea;</span>{parseFloat(order.pricing?.grandTotal || '0').toFixed(2)}</td>
@@ -834,8 +858,40 @@ export default function OrdersManagement() {
                                   onClick={() => handleRejectOrder(order)}
                                   disabled={acceptingId === order._id || rejectingId === order._id}
                                 >
-                                  {rejectingId === order._id ? 'Rejecting...' : 'Reject'}
+                                  Reject
                                 </Button>
+                                    {/* Reject Reason Dialog */}
+                                    {showRejectDialog && (
+                                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                                        <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
+                                          <h2 className="text-lg font-semibold mb-4">Reject Order</h2>
+                                          <label className="block text-sm font-medium mb-2">Reason for rejection <span className="text-red-500">*</span></label>
+                                          <textarea
+                                            className="w-full border rounded p-2 mb-4 min-h-[80px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            value={rejectReason}
+                                            onChange={e => setRejectReason(e.target.value)}
+                                            placeholder="Enter reason for rejecting this order"
+                                            disabled={rejectingId === (rejectingOrder && rejectingOrder._id)}
+                                          />
+                                          <div className="flex justify-end gap-2">
+                                            <Button
+                                              variant="outline"
+                                              onClick={() => { setShowRejectDialog(false); setRejectingOrder(null); setRejectReason(''); }}
+                                              disabled={rejectingId === (rejectingOrder && rejectingOrder._id)}
+                                            >
+                                              Cancel
+                                            </Button>
+                                            <Button
+                                              className="bg-red-600 hover:bg-red-700 text-white"
+                                              onClick={confirmRejectOrder}
+                                              disabled={rejectingId === (rejectingOrder && rejectingOrder._id)}
+                                            >
+                                              {rejectingId === (rejectingOrder && rejectingOrder._id) ? 'Rejecting...' : 'Reject Order'}
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
                               </>
                             )}
                             <button

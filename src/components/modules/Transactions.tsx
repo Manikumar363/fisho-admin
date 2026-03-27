@@ -269,8 +269,8 @@ const Transactions: React.FC = () => {
               >
                 <option value="">Status</option>
                 <option value="completed">Completed</option>
-                <option value="pending">Pending</option>
-                <option value="failed">Failed</option>
+                <option value="refunded">Refunded</option>
+                <option value="partially_refunded">Partially Refunded</option>
               </select>
             </div>
             <div className="min-w-[180px]">

@@ -90,6 +90,7 @@ export default function UserManagement() {
   const [endUsersError, setEndUsersError] = useState<string | null>(null);
   const [endUsersPage, setEndUsersPage] = useState(1);
   const [endUsersTotalPages, setEndUsersTotalPages] = useState(1);
+  const [endUsersTotalCount, setEndUsersTotalCount] = useState(0);
 
   // Deleted Users API integration
   const [deletedUsers, setDeletedUsers] = useState<any[]>([]);
@@ -127,17 +128,25 @@ export default function UserManagement() {
     if (activeTab !== 'end-users') return;
     setEndUsersLoading(true);
     setEndUsersError(null);
-    apiFetch<{ success: boolean; users: any[]; pagination?: any; message?: string }>(`/api/user/all-users?page=${endUsersPage}&limit=${itemsPerPage}`)
+    let url = '/api/user/all-users';
+    let params = '';
+    if (searchTerm) {
+      params = `search=${encodeURIComponent(searchTerm)}`;
+    } else {
+      params = [`page=${endUsersPage}`, `limit=${itemsPerPage}`].join('&');
+    }
+    apiFetch<{ success: boolean; users: any[]; pagination?: any; message?: string }>(`${url}?${params}`)
       .then(res => {
         if (!res.success) throw new Error(res.message || 'Failed to fetch users');
         setEndUsers(res.users || []);
         setEndUsersTotalPages(res.pagination?.totalPages || 1);
+        setEndUsersTotalCount(res.pagination?.totalItems || 0);
       })
       .catch(e => {
         setEndUsersError(e?.message || 'Failed to load users');
       })
       .finally(() => setEndUsersLoading(false));
-  }, [activeTab, endUsersPage, itemsPerPage]);
+  }, [activeTab, endUsersPage, itemsPerPage, searchTerm]);
 
   const fetchDeletedUsers = async () => {
     setDeletedUsersLoading(true);
@@ -168,7 +177,12 @@ export default function UserManagement() {
     if (activeTab !== 'vendors') return;
     setVendorsLoading(true);
     setVendorsError(null);
-    apiFetch<{ success: boolean; vendors: any[]; message?: string }>(`/api/vendors`)
+    let url = '/api/vendors';
+    let params = '';
+    if (searchTerm) {
+      params = `search=${encodeURIComponent(searchTerm)}`;
+    }
+    apiFetch<{ success: boolean; vendors: any[]; message?: string }>(`${url}${params ? `?${params}` : ''}`)
       .then(res => {
         if (!res.success) throw new Error(res.message || 'Failed to fetch vendors');
         setVendors(res.vendors || []);
@@ -177,13 +191,20 @@ export default function UserManagement() {
         setVendorsError(e?.message || 'Failed to load vendors');
       })
       .finally(() => setVendorsLoading(false));
-  }, [activeTab]);
+  }, [activeTab, searchTerm]);
 
   useEffect(() => {
     if (activeTab !== 'store-managers') return;
     setStoreManagersLoading(true);
     setStoreManagersError(null);
-    apiFetch<{ success: boolean; subadmins: any[]; pagination?: any; message?: string }>(`/api/subadmin/all-subadmins?page=${storeManagersPage}&limit=${itemsPerPage}`)
+    let url = '/api/subadmin/all-subadmins';
+    let params = '';
+    if (searchTerm) {
+      params = `search=${encodeURIComponent(searchTerm)}`;
+    } else {
+      params = [`page=${storeManagersPage}`, `limit=${itemsPerPage}`].join('&');
+    }
+    apiFetch<{ success: boolean; subadmins: any[]; pagination?: any; message?: string }>(`${url}?${params}`)
       .then(res => {
         if (!res.success) throw new Error(res.message || 'Failed to fetch store managers');
         setStoreManagers(res.subadmins || []);
@@ -193,7 +214,7 @@ export default function UserManagement() {
         setStoreManagersError(e?.message || 'Failed to load store managers');
       })
       .finally(() => setStoreManagersLoading(false));
-  }, [activeTab, storeManagersPage, itemsPerPage]);
+  }, [activeTab, storeManagersPage, itemsPerPage, searchTerm]);
 
   const vendorsStatic = [
     { id: 'VN-001', vendorName: 'Coastal Fisheries Ltd', companyName: 'Coastal Fisheries Private Limited', vatNumber: 'VAT123456789', email: 'info@coastalfisheries.com', phone: '+91 98765 33331', status: 'Active' },
@@ -1167,20 +1188,20 @@ export default function UserManagement() {
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <Input
-                placeholder="Search by name, phone, email, or user ID..."
+                placeholder="Search by name, phone, email"
                 className="pl-10"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Button 
+            {/* <Button  
               variant="outline"
               onClick={() => setShowFilterModal(true)}
               className={hasActiveFilters() ? 'border-blue-600 text-blue-600' : ''}
             >
               <Filter className="w-4 h-4 mr-2" />
               Filters {hasActiveFilters() && <span className="ml-1 text-xs bg-blue-600 text-white px-2 py-0.5 rounded">Active</span>}
-            </Button>
+            </Button>*/}
           </div>
         </CardContent>
       </Card>
@@ -1282,7 +1303,7 @@ export default function UserManagement() {
               {!endUsersLoading && !endUsersError && getFilteredEndUsers().length > 0 && (
                 <div className="flex items-center justify-between mt-4 pt-4 border-t">
                   <div className="text-sm text-gray-600">
-                    Showing {((endUsersPage - 1) * itemsPerPage) + 1} to {Math.min(endUsersPage * itemsPerPage, getFilteredEndUsers().length)} of {getFilteredEndUsers().length} users
+                    Showing {((endUsersPage - 1) * itemsPerPage) + 1} to {Math.min(endUsersPage * itemsPerPage, endUsersTotalCount)} of {endUsersTotalCount} users
                   </div>
                   <div className="flex gap-2">
                     <Button
@@ -2285,7 +2306,7 @@ export default function UserManagement() {
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <Input
-                placeholder="Search by name, phone, email, or user ID..."
+                placeholder="Search by name, phone, email"
                 className="pl-10"
                 value={deletedUsersSearchTerm}
                 onChange={(e) => setDeletedUsersSearchTerm(e.target.value)}

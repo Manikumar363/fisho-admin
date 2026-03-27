@@ -738,13 +738,13 @@ export default function StoreBilling() {
         </div>
 
         {/* Billing Summary Sidebar */}
-        <div>
-          <Card className="sticky top-6">
+        <div className="h-[90vh]">
+          <Card className="h-full flex flex-col sticky top-6">
             <CardHeader>
               <CardTitle>Billing Summary</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
+            <CardContent className="flex-1 flex flex-col p-4">
+              <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar">
                 {invoiceSuccessMessage && (
                   <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
                     {invoiceSuccessMessage}
@@ -774,7 +774,7 @@ export default function StoreBilling() {
                 </div>
 
                 {/* Cart Items */}
-                <div className="max-h-64 overflow-y-auto space-y-3">
+                <div className="space-y-3">
                   {cart.length === 0 ? (
                     <p className="text-center text-gray-500 py-8 text-sm">No items in cart</p>
                   ) : (

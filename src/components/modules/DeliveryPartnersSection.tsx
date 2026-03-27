@@ -129,16 +129,20 @@ export default function DeliveryPartnersSection({
     setLoading(true);
     setError(null);
 
-    const params = new URLSearchParams();
-    params.append('page', String(deliveryPartnersPage));
-    params.append('limit', String(apiLimit));
+    let url = '/api/delivery-partner/all-users';
+    let params = '';
+    if (searchTerm && searchTerm.trim()) {
+      params = `search=${encodeURIComponent(searchTerm.trim())}`;
+    } else {
+      params = [`page=${deliveryPartnersPage}`, `limit=${apiLimit}`].join('&');
+    }
 
     apiFetch<{
       success: boolean;
       users: DeliveryPartnerApiUser[];
       pagination?: { page: number; limit: number; totalItems: number; totalPages: number };
       message?: string;
-    }>(`/api/delivery-partner/all-users?${params.toString()}`)
+    }>(`${url}?${params}`)
       .then((res) => {
         if (!active) return;
         if (!res.success) throw new Error(res.message || 'Failed to fetch delivery partners');
@@ -178,7 +182,7 @@ export default function DeliveryPartnersSection({
     return () => {
       active = false;
     };
-  }, [deliveryPartnersPage]);
+  }, [deliveryPartnersPage, searchTerm]);
 
   const fetchDeletedUsers = async () => {
     setDeletedUsersLoading(true);

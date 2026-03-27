@@ -61,7 +61,6 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
   useEffect(() => {
     const adminData = getAdminData();
     const role = getUserRole();
-    
     if (adminData?.name) {
       setAdminName(adminData.name);
     }
@@ -69,6 +68,15 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
       setUserRole(role);
     }
   }, []);
+
+  // Set document title based on user role
+  useEffect(() => {
+    if (userRole === 'subadmin') {
+      document.title = 'Fisho | Store Manager';
+    } else {
+      document.title = 'Fisho | Admin Dashboard';
+    }
+  }, [userRole]);
 
   // Fetch notifications on mount (socket will handle real-time updates)
   useEffect(() => {

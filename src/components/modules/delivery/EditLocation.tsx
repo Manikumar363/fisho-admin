@@ -158,11 +158,12 @@ export default function EditLocation({ location, onBack, onSave }: EditLocationP
       if (deliveryTypes.express) selectedTypes.push('Express Delivery');
       if (deliveryTypes.nextDay) selectedTypes.push('Next Day Delivery');
 
-      // Prepare the payload for the API
+      // Prepare the payload for the API, including nearByStore
       const payload = {
         name: formData.locationName.trim(),
         expressDelivery: deliveryTypes.express,
-        isActive: formData.status
+        isActive: formData.status,
+        nearByStore: formData.nearestStore // <-- include nearest store (store ID)
       };
 
       // Call the PUT API
@@ -187,7 +188,7 @@ export default function EditLocation({ location, onBack, onSave }: EditLocationP
         status: formData.status ? 'Active' : 'Inactive'
       };
 
-      toast.success(response.message || 'Location updated successfully');
+      toast.success(response.message );
       onSave(updatedLocation);
     } catch (error: any) {
       const errorMsg = error?.message || 'Failed to update location';
@@ -298,7 +299,7 @@ export default function EditLocation({ location, onBack, onSave }: EditLocationP
               )}
             </div>
 
-            {/* Orders Received (Read-only) */}
+            {/* Orders Received (Read-only) 
             <div className="space-y-2">
               <Label htmlFor="ordersReceived">Orders Received</Label>
               <Input
@@ -307,7 +308,7 @@ export default function EditLocation({ location, onBack, onSave }: EditLocationP
                 disabled
                 className="bg-gray-50"
               />
-            </div>
+            </div>*/}
 
             {/* Status Toggle */}
             <div className="flex items-center justify-between border border-gray-200 rounded-lg p-4">

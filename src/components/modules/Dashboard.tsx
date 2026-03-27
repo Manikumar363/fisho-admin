@@ -59,7 +59,7 @@ export default function Dashboard() {
   const [dashboardStats, setDashboardStats] = useState<any>({
     activeUsers: 0,
     totalOrders: 0,
-    inventoryAlerts: [],
+    inventoryAlerts: 0,
     totalTransactions: 0,
     totalRevenue: 0,
     expressOrders: 0,
@@ -181,7 +181,7 @@ export default function Dashboard() {
     { label: 'Total Orders', value: (dashboardStats?.totalOrders ?? 0).toLocaleString(), icon: ShoppingBag, color: 'text-blue-600', bgColor: 'bg-blue-100', onClick: () => navigate('/orders'), roles: ['admin', 'subadmin'] },
     { label: 'Transactions', value: (dashboardStats?.totalTransactions ?? 0).toLocaleString(), icon: CreditCard, color: 'text-pink-600', bgColor: 'bg-pink-100', onClick: () => navigate('/transactions'), roles: ['admin', 'subadmin'] },
     { label: 'Total Revenue', value: { symbol: true, amount: (dashboardStats?.totalRevenue ?? 0).toLocaleString() }, icon: DollarSign, color: 'text-emerald-600', bgColor: 'bg-emerald-100', onClick: () => navigate('/transactions?filter=revenue'), roles: ['admin', 'subadmin'] },
-    { label: 'Inventory Alerts', value: (dashboardStats?.inventoryAlerts?.length ?? 0).toString(), icon: AlertTriangle, color: 'text-amber-600', bgColor: 'bg-amber-100', onClick: () => navigate('/inventory-management?filter=low-stock'), roles: ['admin'] },
+    { label: 'Inventory Alerts', value: (dashboardStats?.inventoryAlerts ?? 0).toString(), icon: AlertTriangle, color: 'text-amber-600', bgColor: 'bg-amber-100', onClick: () => navigate('/inventory-management?filter=low-stock'), roles: ['admin', 'subadmin'] },
     { label: 'Express Orders', value: (dashboardStats?.expressOrders ?? 0).toLocaleString(), icon: Zap, color: 'text-orange-600', bgColor: 'bg-orange-100', onClick: () => navigate('/orders?type=express'), roles: ['admin', 'subadmin'] },
     { label: 'Next-Day Orders', value: (dashboardStats?.nextDayOrders ?? 0).toLocaleString(), icon: Calendar, color: 'text-green-600', bgColor: 'bg-green-100', onClick: () => navigate('/orders?type=next-day'), roles: ['admin', 'subadmin'] },
     { label: 'Bulk Orders', value: (dashboardStats?.bulkOrders ?? 0).toLocaleString(), icon: PackageIcon, color: 'text-purple-600', bgColor: 'bg-purple-100', onClick: () => navigate('/orders?type=bulk'), roles: ['admin', 'subadmin'] },

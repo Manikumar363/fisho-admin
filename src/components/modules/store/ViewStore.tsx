@@ -14,6 +14,8 @@ interface ViewStoreProps {
   storeId: string;
   onBack: () => void;
 }
+// Use Vite env for API base URL
+const API_BASE_URL = import.meta.env.VITE_BASE_URL || '';
 
 interface OrderItem {
   snapshot: {
@@ -57,7 +59,14 @@ interface Order {
 }
 
 export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
-  const [selectedMonth, setSelectedMonth] = useState('december-2024');
+  // Set default selectedMonth to latest month (this month)
+  const months = [
+    'january', 'february', 'march', 'april', 'may', 'june',
+    'july', 'august', 'september', 'october', 'november', 'december'
+  ];
+  const now = new Date();
+  const defaultMonth = `${months[now.getMonth()]}-${now.getFullYear()}`;
+  const [selectedMonth, setSelectedMonth] = useState(defaultMonth);
   const [store, setStore] = useState<any | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -466,9 +475,58 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
     }
   };
 
-  const handleDownloadLedger = () => {
-    console.log('Downloading ledger for month:', selectedMonth);
-    // Download logic here
+  // Helper to map month value to API month/year
+  const getMonthYearFromSelection = (selected: string) => {
+    // e.g., 'february-2026' => { month: 2, year: 2026 }
+    const [monthStr, yearStr] = selected.split('-');
+    const months = [
+      'january', 'february', 'march', 'april', 'may', 'june',
+      'july', 'august', 'september', 'october', 'november', 'december'
+    ];
+    const month = months.indexOf(monthStr.toLowerCase()) + 1;
+    const year = Number(yearStr);
+    return { month, year };
+  };
+
+
+
+  const handleDownloadLedger = async () => {
+    try {
+      const { month, year } = getMonthYearFromSelection(selectedMonth);
+      if (!month || !year) {
+        toast.error('Invalid month selection.');
+        return;
+      }
+      // Prevent selecting a future month
+      const now = new Date();
+      const selectedDate = new Date(year, month - 1);
+      if (selectedDate > now) {
+        toast.error('Cannot download ledger for a future month.');
+        return;
+      }
+      // Use apiFetch for authentication and error handling
+      const url = `/api/order/ledger/export?storeId=${storeId}&month=${month}&year=${year}`;
+      const json = await apiFetch<any>(url);
+      if (!json.success || !json.data?.csv) {
+        toast.error(json.message || 'No ledger data available.');
+        return;
+      }
+      // Decode base64 CSV
+      const csvData = atob(json.data.csv);
+      const blob = new Blob([csvData], { type: 'text/csv' });
+      const filename = json.data.filename || 'ledger.csv';
+      // Trigger download
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success('Ledger downloaded!');
+    } catch (err: any) {
+      console.error('[Ledger] Error:', err);
+      toast.error(err?.message || 'Error downloading ledger.');
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -864,25 +922,47 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
                 Download the complete ledger report for the selected month
               </p>
               <p className="text-sm text-gray-500 mt-1">
-                Current Selection: {selectedMonth === 'december-2024' ? 'December 2024' : 
-                  selectedMonth === 'november-2024' ? 'November 2024' : 
-                  selectedMonth === 'october-2024' ? 'October 2024' : 
-                  selectedMonth === 'september-2024' ? 'September 2024' : 'August 2024'}
+                Current Selection: {(() => {
+                  if (!selectedMonth) return '—';
+                  const [month, year] = selectedMonth.split('-');
+                  if (!month || !year) return selectedMonth;
+                  // Capitalize first letter of month
+                  const monthName = month.charAt(0).toUpperCase() + month.slice(1);
+                  return `${monthName} ${year}`;
+                })()}
               </p>
             </div>
             <div className="flex items-center gap-4">
-              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Select month" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="december-2024">December 2024</SelectItem>
-                  <SelectItem value="november-2024">November 2024</SelectItem>
-                  <SelectItem value="october-2024">October 2024</SelectItem>
-                  <SelectItem value="september-2024">September 2024</SelectItem>
-                  <SelectItem value="august-2024">August 2024</SelectItem>
-                </SelectContent>
-              </Select>
+              {/* Dynamic month/year options for last 12 months */}
+              {(() => {
+                const months = [
+                  'january', 'february', 'march', 'april', 'may', 'june',
+                  'july', 'august', 'september', 'october', 'november', 'december'
+                ];
+                const now = new Date();
+                const options = [];
+                for (let i = 0; i < 12; i++) {
+                  const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                  const monthStr = months[d.getMonth()];
+                  const yearStr = d.getFullYear();
+                  const value = `${monthStr}-${yearStr}`;
+                  // Capitalize for label
+                  const label = `${monthStr.charAt(0).toUpperCase() + monthStr.slice(1)} ${yearStr}`;
+                  options.push({ value, label });
+                }
+                return (
+                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Select month" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {options.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                );
+              })()}
               <Button 
                 onClick={handleDownloadLedger}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
