@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -22,6 +23,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Skeleton } from '../ui/skeleton';
 import { toast } from 'react-toastify';
 import { getAdminData, getUserRole, apiFetch } from '../../lib/api';
+
+
+
+  // Capitalize and prettify status (replace underscores with spaces, capitalize each word)
+  const capitalize = (str?: string) => {
+    if (!str) return '-';
+    return str
+      .replace(/_/g, ' ')
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -186,7 +199,7 @@ export default function Dashboard() {
     { label: 'Next-Day Orders', value: (dashboardStats?.nextDayOrders ?? 0).toLocaleString(), icon: Calendar, color: 'text-green-600', bgColor: 'bg-green-100', onClick: () => navigate('/orders?type=next-day'), roles: ['admin', 'subadmin'] },
     { label: 'Bulk Orders', value: (dashboardStats?.bulkOrders ?? 0).toLocaleString(), icon: PackageIcon, color: 'text-purple-600', bgColor: 'bg-purple-100', onClick: () => navigate('/orders?type=bulk'), roles: ['admin', 'subadmin'] },
     { label: 'Waste Management', value: '3.2%', icon: AlertTriangle, color: 'text-red-600', bgColor: 'bg-red-100', onClick: () => navigate('/waste-management'), roles: ['admin', 'subadmin'] },
-    { label: "Today's Revenue", value: (dashboardStats?.todaysRevenue ?? 0).toLocaleString(), icon: Receipt, color: 'text-teal-600', bgColor: 'bg-teal-100', onClick: () => navigate('/transactions'), roles: ['admin', 'subadmin'] }
+    { label: "Today's Revenue", value: { symbol: true, amount: (dashboardStats?.todaysRevenue ?? 0).toLocaleString() }, icon: Receipt, color: 'text-teal-600', bgColor: 'bg-teal-100', onClick: () => navigate('/transactions'), roles: ['admin', 'subadmin'] }
   ];
 
   // Filter KPI data based on user role
@@ -338,7 +351,7 @@ export default function Dashboard() {
                         </td>
                         <td className="py-3 px-4">
                           <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${statusColor}`}>
-                            {(order.status || '-').charAt(0).toUpperCase() + (order.status || '-').slice(1)}
+                            {capitalize(order.status)}
                           </span>
                         </td>
                         <td className="py-3 px-4">

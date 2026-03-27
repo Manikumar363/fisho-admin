@@ -206,7 +206,11 @@ export default function BulkOrders() {
 
   const capitalize = (str: string | undefined | null) => {
     if (!str) return '—';
-    return str.charAt(0).toUpperCase() + str.slice(1);
+    return str
+      .replace(/_/g, ' ')
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
   };
 
   const getStatusBadgeClass = (status: string | undefined) => {

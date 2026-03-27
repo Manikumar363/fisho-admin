@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { io, Socket } from 'socket.io-client';
+// Socket instance (singleton)
+let socket: Socket | null = null;
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -56,7 +59,10 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   
   // Use notification context
-  const { unreadCount, setNotifications, setUnreadCount } = useNotifications();
+  const { unreadCount, setNotifications, setUnreadCount, notifications } = useNotifications();
+  // Ref to always have latest notifications in socket handler
+  const notificationsRef = useRef(notifications);
+  useEffect(() => { notificationsRef.current = notifications; }, [notifications]);
 
   useEffect(() => {
     const adminData = getAdminData();
@@ -78,7 +84,7 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
     }
   }, [userRole]);
 
-  // Fetch notifications on mount (socket will handle real-time updates)
+  // Fetch notifications on mount and set up socket for real-time updates
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
@@ -99,7 +105,37 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
     };
 
     fetchNotifications();
-  }, [setNotifications, setUnreadCount]);
+
+    // Setup socket connection and event listeners
+    if (!socket) {
+      socket = io(import.meta.env.VITE_BASE_URL || window.location.origin, {
+        transports: ['websocket'],
+        withCredentials: true
+      });
+    }
+
+    // Handler for new notification event
+    const handleNewNotification = (notification: any) => {
+      // Use notificationsRef to always get latest notifications array
+      setNotifications([notification, ...(Array.isArray(notificationsRef.current) ? notificationsRef.current : [])]);
+      setUnreadCount(typeof unreadCount === 'number' ? unreadCount + 1 : 1);
+    };
+
+    // Listen for the correct event based on userRole
+    if (userRole === 'subadmin') {
+      socket.on('new_store_notification', handleNewNotification);
+    } else {
+      socket.on('new_admin_notification', handleNewNotification);
+    }
+
+    // Cleanup
+    return () => {
+      if (socket) {
+        socket.off('new_admin_notification', handleNewNotification);
+        socket.off('new_store_notification', handleNewNotification);
+      }
+    };
+  }, [setNotifications, setUnreadCount, userRole]);
 
   const handleConfirmLogout = () => {
     setShowLogoutDialog(false);

@@ -84,6 +84,11 @@ export default function OrdersManagement() {
   // User and store state
   const [userRole, setUserRole] = useState<string>('admin');
   const [storeId, setStoreId] = useState<string | null>(null);
+  // Store filter for sub-admin
+  const [stores, setStores] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedStoreId, setSelectedStoreId] = useState<string>('');
+  const [storesLoading, setStoresLoading] = useState(false);
+  const [showStoreMenu, setShowStoreMenu] = useState(false);
 
   // API state
   const [orders, setOrders] = useState<Order[]>([]);
@@ -119,12 +124,31 @@ export default function OrdersManagement() {
     setUserRole(role || 'admin');
 
     if (role === 'subadmin') {
-      const adminData = getAdminData();
-      if (adminData?.store?.id) {
-        setStoreId(adminData.store.id);
-      } else if (adminData?.id) {
-        setStoreId(adminData.id);
-      }
+      setStoresLoading(true);
+      // Fetch stores for sub-admin
+      apiFetch<{ success: boolean; stores?: any[]; message?: string }>(`/api/stores/`)
+        .then((res) => {
+          if (!res.success) throw new Error(res.message || 'Failed to fetch stores');
+          // Only include stores assigned to this sub-admin
+          const adminData = getAdminData();
+          let allowedStoreIds: string[] = [];
+          if (adminData?.stores && Array.isArray(adminData.stores)) {
+            allowedStoreIds = adminData.stores.map((s: any) => s.id || s._id).filter(Boolean);
+          } else if (adminData?.store?.id) {
+            allowedStoreIds = [adminData.store.id];
+          } else if (adminData?.id) {
+            allowedStoreIds = [adminData.id];
+          }
+          const mapped = (res.stores || [])
+            .map((store) => ({ id: String(store._id || store.id || ''), name: store.name || 'Unnamed Store' }))
+            .filter((store) => store.id && (allowedStoreIds.length === 0 || allowedStoreIds.includes(store.id)));
+          setStores(mapped);
+          // Do NOT set selectedStoreId by default. Only set when user selects.
+        })
+        .catch((err) => {
+          toast.error(err?.message || 'Failed to fetch stores');
+        })
+        .finally(() => setStoresLoading(false));
     }
   }, []);
 
@@ -147,16 +171,18 @@ export default function OrdersManagement() {
     params.append('page', String(currentPage));
     params.append('limit', '20');
     
-    // For sub-admin, filter by storeId
-    if (userRole === 'subadmin' && storeId) {
+    // For sub-admin, only add storeId if a store is selected (not on initial load)
+    if (userRole === 'subadmin' && selectedStoreId) {
+      params.append('storeId', selectedStoreId);
+    }
+    // For admin, keep old logic
+    if (userRole !== 'subadmin' && storeId) {
       params.append('storeId', storeId);
     }
-    
     // Add search parameter if search input is provided
     if (searchInput.trim()) {
       params.append('search', searchInput.trim());
     }
-    
     if (selectedType !== 'all') {
       const apiDeliveryType = selectedType === 'next-day' ? 'nextDay' : selectedType;
       params.append('deliveryType', apiDeliveryType);
@@ -199,7 +225,7 @@ export default function OrdersManagement() {
       });
 
     return () => { active = false; };
-  }, [selectedType, selectedStatus, currentPage, userRole, storeId, searchInput]);
+  }, [selectedType, selectedStatus, currentPage, userRole, storeId, searchInput, selectedStoreId]);
 
   const normalizeDeliveryType = (type?: string) => {
     const normalized = (type || '').toLowerCase().replace(/[_\s]/g, '-');
@@ -256,9 +282,11 @@ export default function OrdersManagement() {
 
   const capitalize = (str?: string) => {
     if (!str) return 'N/A';
-    return str.replace(/_/g, ' ').split(' ').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-    ).join(' ');
+    return str
+      .replace(/_/g, ' ')
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
   };
 
   const getStatusBadgeClass = (status?: string) => {
@@ -678,6 +706,61 @@ export default function OrdersManagement() {
                 onChange={handleSearchChange}
               />
             </div>
+            {/* Store filter for sub-admins */}
+            {userRole === 'subadmin' && (
+              <div className="relative min-w-[180px]">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowStoreMenu(prev => !prev)}
+                  className={selectedStoreId ? 'border-blue-600 text-blue-600' : ''}
+                  style={{ minWidth: 150 }}
+                  type="button"
+                >
+                  <span className="truncate">
+                    {storesLoading ? 'Loading...' : (selectedStoreId ? (stores.find(s => s.id === selectedStoreId)?.name || 'Store') : 'All Stores')}
+                  </span>
+                </Button>
+                {showStoreMenu && (
+                  <div className="absolute right-0 top-full mt-2 w-56 bg-white border rounded-lg shadow-lg z-20">
+                    <div className="p-3 border-b flex items-center justify-between">
+                      <span className="font-semibold">Select Store</span>
+                      <button
+                        onClick={() => setShowStoreMenu(false)}
+                        className="text-gray-400 hover:text-gray-600"
+                        type="button"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="p-2 max-h-60 overflow-y-auto">
+                      <button
+                        onClick={() => { setSelectedStoreId(''); setShowStoreMenu(false); }}
+                        className={`w-full text-left px-3 py-2 rounded hover:bg-gray-50 ${!selectedStoreId ? 'bg-blue-50 text-blue-600' : ''}`}
+                        type="button"
+                      >
+                        All Stores
+                      </button>
+                      {storesLoading && (
+                        <div className="px-3 py-2 text-gray-400">Loading stores...</div>
+                      )}
+                      {!storesLoading && stores.length === 0 && (
+                        <div className="px-3 py-2 text-gray-400">No stores</div>
+                      )}
+                      {!storesLoading && stores.map((store) => (
+                        <button
+                          key={store.id}
+                          onClick={() => { setSelectedStoreId(store.id); setShowStoreMenu(false); }}
+                          className={`w-full text-left px-3 py-2 rounded hover:bg-gray-50 ${selectedStoreId === store.id ? 'bg-blue-50 text-blue-600' : ''}`}
+                          type="button"
+                        >
+                          {store.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="relative">
               <Button 
                 variant="outline"
@@ -692,7 +775,6 @@ export default function OrdersManagement() {
                   </Badge>
                 )}
               </Button>
-              
               {showFilterMenu && (
                 <div className="absolute right-0 top-full mt-2 w-56 bg-white border rounded-lg shadow-lg z-10">
                   <div className="p-3 border-b">
