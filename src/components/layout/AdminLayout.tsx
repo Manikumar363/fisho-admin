@@ -256,6 +256,14 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
       icon: MapPin,
       path: '/store-mapping',
       roles: ['admin', 'subadmin']
+    },
+    {
+      id:'inventory-alerts',
+      label: 'Inventory Alerts',
+      icon: Package,
+      path: '/inventory-alerts',
+      roles: ['subadmin']
+
     }
   ];
 

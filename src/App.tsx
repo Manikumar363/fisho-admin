@@ -6,6 +6,7 @@ import OTPVerification from './components/auth/OTPVerification';
 import ResetPassword from './components/auth/ResetPassword';
 import AdminLayout from './components/layout/AdminLayout';
 import Dashboard from './components/modules/Dashboard';
+import InventoryAlertsSubadmin from './components/modules/inventory/InventoryAlertsSubadmin';
 import UserManagement from './components/modules/UserManagement';
 import InventoryManagement from './components/modules/InventoryManagement';
 import AddInventoryItem from './components/modules/inventory/AddInventoryItem';
@@ -126,6 +127,8 @@ export default function App() {
                     <Route path="/profile" element={<Profile />} />
                     <Route path="/change-password" element={<ChangePassword />} />
                     <Route path="/notifications" element={<Notifications />} />
+                    {/* Subadmin Inventory Alerts Route */}
+                    <Route path="/inventory-alerts" element={<InventoryAlertsSubadmin />} />
                   </Routes>
                 </AdminLayout>
               </NotificationProvider>
