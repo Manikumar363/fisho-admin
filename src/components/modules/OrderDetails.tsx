@@ -813,57 +813,53 @@ export default function OrderDetails() {
                 </Badge>
               </div>
 
-              {/* Refund Options for Cancelled Orders */}
+              {/* Refund Button for Paid & Rejected Orders */}
               {(() => {
                 const normalizedOrderStatus = order?.status?.toLowerCase() || '';
-                const isReturned = normalizedOrderStatus === 'return_requested' || normalizedOrderStatus === 'return' || normalizedOrderStatus === 'returned';
-                const paymentMethod = order?.payment?.method?.toLowerCase() || '';
                 const paymentStatus = order?.payment?.status?.toLowerCase() || '';
-                const isOnlinePayment = paymentMethod !== 'cod' && paymentMethod !== 'cash' && paymentMethod !== 'offline';
-                const isCodPayment = paymentMethod === 'cod';
-                const isPaymentSuccessful = paymentStatus === 'paid' || paymentStatus === 'successful' || paymentStatus === 'success';
-                
-                // Show refund buttons if returned and payment is successful for online or COD payments.
-                const canShowRefundButtons = isReturned && isPaymentSuccessful && (isOnlinePayment || isCodPayment);
-                
-                return canShowRefundButtons ? (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <p className="text-sm font-semibold text-gray-800 mb-3">Initiate Refund</p>
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          min="0.01"
-                          max={order.pricing.grandTotal}
-                          step="0.01"
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                          placeholder={`Enter amount (max ${order.pricing.grandTotal})`}
-                          value={refundAmount}
-                          onChange={e => setRefundAmount(e.target.value)}
+                const isRejected = normalizedOrderStatus === 'rejected' || normalizedOrderStatus === 'cancelled';
+                const isPaid = paymentStatus === 'paid' || paymentStatus === 'completed' || paymentStatus === 'success' || paymentStatus === 'successful';
+                if (isRejected && isPaid) {
+                  return (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <p className="text-sm font-semibold text-gray-800 mb-3">Initiate Refund</p>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="0.01"
+                            max={order.pricing.grandTotal}
+                            step="0.01"
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            placeholder={`Enter amount (max ${order.pricing.grandTotal})`}
+                            value={refundAmount}
+                            onChange={e => setRefundAmount(e.target.value)}
+                            disabled={refundingType !== null}
+                          />
+                          <span className="text-gray-500 text-xs">/ {order.pricing.grandTotal}</span>
+                        </div>
+                        {refundError && <p className="text-xs text-red-600 mt-1">{refundError}</p>}
+                        <Button
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
+                          onClick={() => handleRefund('wallet')}
                           disabled={refundingType !== null}
-                        />
-                        <span className="text-gray-500 text-xs">/ {order.pricing.grandTotal}</span>
+                        >
+                          <Wallet className="w-4 h-4" />
+                          {refundingType === 'wallet' ? 'Processing...' : 'Refund to Wallet'}
+                        </Button>
+                        <Button
+                          className="w-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center gap-2"
+                          onClick={() => handleRefund('account')}
+                          disabled={refundingType !== null}
+                        >
+                          <CardIcon className="w-4 h-4" />
+                          {refundingType === 'account' ? 'Processing...' : 'Refund to Account'}
+                        </Button>
                       </div>
-                      {refundError && <p className="text-xs text-red-600 mt-1">{refundError}</p>}
-                      <Button
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
-                        onClick={() => handleRefund('wallet')}
-                        disabled={refundingType !== null}
-                      >
-                        <Wallet className="w-4 h-4" />
-                        {refundingType === 'wallet' ? 'Processing...' : 'Refund to Wallet'}
-                      </Button>
-                      <Button
-                        className="w-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center gap-2"
-                        onClick={() => handleRefund('account')}
-                        disabled={refundingType !== null}
-                      >
-                        <CardIcon className="w-4 h-4" />
-                        {refundingType === 'account' ? 'Processing...' : 'Refund to Account'}
-                      </Button>
                     </div>
-                  </div>
-                ) : null;
+                  );
+                }
+                return null;
               })()}
             </CardContent>
           </Card>

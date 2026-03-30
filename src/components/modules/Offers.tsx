@@ -325,7 +325,9 @@ const Offers: React.FC = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => setEditingOffer(offer)}
+                              onClick={() => offer.status !== 'expired' && setEditingOffer(offer)}
+                              disabled={offer.status === 'expired'}
+                              className={offer.status === 'expired' ? 'opacity-50 cursor-not-allowed' : ''}
                             >
                               <Edit className="w-4 h-4" />
                             </Button>

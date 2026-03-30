@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Eye, Plus, Trash2, Download } from 'lucide-react';
 import { Badge } from '../ui/badge';
+import { Switch } from '../ui/switch';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
@@ -90,6 +91,33 @@ export default function DeliveryPartnersSection({
 }: DeliveryPartnersSectionProps) {
   const apiLimit = 15;
   const [deliveryPartners, setDeliveryPartners] = useState<DeliveryPartnerListItem[]>([]);
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
+    // Toggle status handler
+    const handleToggleStatus = async (partner: DeliveryPartnerListItem) => {
+      setStatusUpdatingId(partner.id);
+      try {
+        const newStatus = partner.status === 'Active' ? false : true;
+        const res = await apiFetch<{ success: boolean; message?: string }>(
+          `/api/delivery-partner/update-user/${partner.id}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ isActive: newStatus }),
+          }
+        );
+        if (!res.success) throw new Error(res.message || 'Failed to update status');
+        // Update local state for immediate feedback
+        setDeliveryPartners((prev) =>
+          prev.map((p) =>
+            p.id === partner.id ? { ...p, status: newStatus ? 'Active' : 'Inactive' } : p
+          )
+        );
+      } catch (err: any) {
+        alert(err?.message || 'Failed to update status');
+      } finally {
+        setStatusUpdatingId(null);
+      }
+    };
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalItems, setTotalItems] = useState(0);
@@ -339,9 +367,21 @@ export default function DeliveryPartnersSection({
                           {partner.earnings.toLocaleString()}
                         </td>
                         <td className="py-3 px-4">
-                          <Badge className={getStatusBadgeClass(partner.status)}>
-                            {partner.status}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge className={getStatusBadgeClass(partner.status)}>
+                              {partner.status}
+                            </Badge>
+                            <Switch
+                              checked={partner.status === 'Active'}
+                              onCheckedChange={() => handleToggleStatus(partner)}
+                              disabled={statusUpdatingId === partner.id}
+                              aria-label={
+                                partner.status === 'Active'
+                                  ? 'Deactivate delivery partner'
+                                  : 'Activate delivery partner'
+                              }
+                            />
+                          </div>
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex gap-2">

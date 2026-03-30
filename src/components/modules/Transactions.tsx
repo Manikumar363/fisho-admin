@@ -390,7 +390,11 @@ const Transactions: React.FC = () => {
                       </td>
                       <td className="py-3 px-4">{txn.user ? `${txn.user.firstName} ${txn.user.lastName}` : '-'}</td>
                       <td className="py-3 px-4 text-green-600">{txn.type === 'in' ? (<><span className="dirham-symbol mr-2">&#xea;</span>{txn.amount}</>) : '-'}</td>
-                      <td className="py-3 px-4 text-red-600">{txn.type === 'out' ? (<><span className="dirham-symbol mr-2">&#xea;</span>{txn.amount}</>) : '-'}</td>
+                      <td className="py-3 px-4 text-red-600">
+                        {typeof txn.refundedAmount === 'number' && txn.refundedAmount > 0
+                          ? (<><span className="dirham-symbol mr-2">&#xea;</span>{txn.refundedAmount}</>)
+                          : (txn.type === 'out' ? (<><span className="dirham-symbol mr-2">&#xea;</span>{txn.amount}</>) : '-')}
+                      </td>
                       <td className="py-3 px-4">{txn.paymentMethod}</td>
                       <td className="py-3 px-4">
                         <Badge variant={txn.status === 'completed' ? 'default' : 'secondary'}>

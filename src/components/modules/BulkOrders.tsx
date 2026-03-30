@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Download, Eye, Filter, X } from 'lucide-react';
+import { Search, Download, Eye, Filter, X, ClipboardCheck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -7,6 +7,15 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { apiFetch } from '../../lib/api';
 import { toast } from 'react-toastify';
+  // Copy Order ID to clipboard
+  const handleCopyOrderId = async (orderId: string) => {
+    try {
+      await navigator.clipboard.writeText(orderId);
+      toast.success('Order ID copied to clipboard');
+    } catch {
+      toast.error('Failed to copy Order ID');
+    }
+  };
 import { useNavigate } from 'react-router-dom';
 
 interface BulkOrderItem {
@@ -501,8 +510,11 @@ export default function BulkOrders() {
 
                     return (
                       <tr key={order._id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-3 px-4 text-blue-600 font-medium">
-                          {order._id ? order._id.substring(0, 12) + '...' : 'N/A'}
+                        <td className="py-3 px-4 text-blue-600 font-medium cursor-pointer group select-none" onClick={() => handleCopyOrderId(order._id)} title="Copy Order ID">
+                          <span className="inline-flex items-center gap-1">
+                            {order._id ? order._id.substring(0, 12) + '...' : 'N/A'}
+                            
+                          </span>
                         </td>
                         <td className="py-3 px-4">
                           <div>

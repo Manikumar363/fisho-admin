@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Plus, Search, Filter, Edit, Trash2, ChevronRight, ToggleLeft, ToggleRight, ChevronUp, ChevronDown, GripVertical, Eye, Loader, X, Image as ImageIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
@@ -22,7 +23,14 @@ import InventoryAlerts from './inventory/InventoryAlerts';
 const IMAGE_BASE = ((import.meta as any).env?.VITE_IMAGE_BASE_URL || (import.meta as any).env?.VITE_BASE_URL) as string | undefined;
 
 export default function InventoryManagement() {
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('categories');
+    // Set tab from URL on mount or when URL changes
+    useEffect(() => {
+      const params = new URLSearchParams(location.search);
+      const tab = params.get('tab');
+      if (tab) setActiveTab(tab);
+    }, [location.search]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
