@@ -46,6 +46,10 @@ export default function Enquiries() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [sortOption, setSortOption] = useState<'aToZ' | 'zToA' | ''>('');
   const [platformFilter, setPlatformFilter] = useState<'All' | 'iOS' | 'Android' | 'Web'>('All');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [limit] = useState(10);
 
   const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
 
@@ -64,6 +68,33 @@ export default function Enquiries() {
     setLoading(true);
     setError(null);
     try {
+      const params = new URLSearchParams();
+
+      const trimmedSearch = searchQuery.trim();
+      const hasSortFilter = sortOption !== '';
+      const hasPlatformFilter = platformFilter !== 'All';
+      const hasQueryFilters = trimmedSearch.length > 0 || hasSortFilter || hasPlatformFilter;
+
+      if (!hasQueryFilters) {
+        params.append('page', String(page));
+        params.append('limit', String(limit));
+      }
+
+      if (trimmedSearch) {
+        params.append('search', trimmedSearch);
+      }
+
+      if (sortOption === 'aToZ') {
+        params.append('sortOrder', 'asc');
+      } else if (sortOption === 'zToA') {
+        params.append('sortOrder', 'desc');
+      }
+
+      if (platformFilter !== 'All') {
+        const platformValue = platformFilter.toLowerCase();
+        params.append('platform', platformValue);
+      }
+
       const res = await apiFetch<{
         success: boolean;
         querys?: Array<{
@@ -79,8 +110,14 @@ export default function Enquiries() {
           createdAt: string;
           updatedAt: string;
         }>;
+        pagination?: {
+          page: number;
+          limit: number;
+          totalItems: number;
+          totalPages: number;
+        };
         message?: string;
-      }>('/api/query/get-all');
+      }>(`/api/query/get-all?${params.toString()}`);
 
       if (!res?.success) throw new Error(res?.message || 'Failed to fetch enquiries');
 
@@ -98,6 +135,15 @@ export default function Enquiries() {
         }));
 
       setEnquiries(mapped);
+      if (hasQueryFilters) {
+        setPage(1);
+        setTotalPages(1);
+        setTotalItems(mapped.length);
+      } else {
+        setPage(res.pagination?.page || page);
+        setTotalPages(res.pagination?.totalPages || 1);
+        setTotalItems(res.pagination?.totalItems || 0);
+      }
     } catch (e: any) {
       const msg = e?.message || 'Failed to load enquiries';
       setError(msg);
@@ -109,7 +155,11 @@ export default function Enquiries() {
 
   useEffect(() => {
     fetchEnquiries();
-  }, []);
+  }, [page, limit, searchQuery, sortOption, platformFilter]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, sortOption, platformFilter]);
 
   const handleDeleteEnquiry = (enquiryId: string) => {
     setEnquiryToDelete(enquiryId);
@@ -134,7 +184,7 @@ export default function Enquiries() {
 
       if (!res?.success) throw new Error(res?.message || 'Failed to delete enquiry');
 
-      setEnquiries((prev) => prev.filter((enquiry) => enquiry.id !== enquiryToDelete));
+      await fetchEnquiries();
       setDeleteDialogOpen(false);
       setEnquiryToDelete(null);
       toast.success(res.message || 'Enquiry deleted successfully');
@@ -145,29 +195,6 @@ export default function Enquiries() {
       setIsDeleting(false);
     }
   };
-
-  const filteredEnquiries = enquiries
-    .filter(enquiry => {
-      // Search filter
-      const matchesSearch = 
-        enquiry.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        enquiry.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        enquiry.mobile.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      // Platform filter
-      const matchesPlatform = platformFilter === 'All' || enquiry.platform === platformFilter;
-      
-      return matchesSearch && matchesPlatform;
-    })
-    .sort((a, b) => {
-      // Sort by name
-      if (sortOption === 'aToZ') {
-        return a.name.localeCompare(b.name);
-      } else if (sortOption === 'zToA') {
-        return b.name.localeCompare(a.name);
-      }
-      return 0; // No sorting
-    });
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -219,7 +246,7 @@ export default function Enquiries() {
                 <option value="All">All Platforms</option>
                 <option value="iOS">iOS</option>
                 <option value="Android">Android</option>
-                <option value="Web">Web</option>
+                <option value="Website">Web</option>
               </select>
             </div>
           </div>
@@ -257,8 +284,8 @@ export default function Enquiries() {
                       {error}
                     </td>
                   </tr>
-                ) : filteredEnquiries.length > 0 ? (
-                  filteredEnquiries.map((enquiry) => (
+                ) : enquiries.length > 0 ? (
+                  enquiries.map((enquiry) => (
                     <tr key={enquiry.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 text-gray-900">
                         {formatDate(enquiry.date)}
@@ -318,6 +345,32 @@ export default function Enquiries() {
               </tbody>
             </table>
           </div>
+
+          {!loading && !error && !searchQuery.trim() && sortOption === '' && platformFilter === 'All' && totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-gray-200 px-6 py-4">
+              <p className="text-sm text-gray-600">
+                Showing page {page} of {totalPages} | Total enquiries: {totalItems}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                  disabled={page <= 1}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={page >= totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

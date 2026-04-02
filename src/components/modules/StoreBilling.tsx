@@ -852,7 +852,7 @@ export default function StoreBilling() {
                         className="text-sm"
                       />
                     </div>
-                    <div className="flex-1">
+                    {/* <div className="flex-1"> 
                       <label className="text-xs text-gray-600 block mb-1">Tax %</label>
                       <Input
                         type="number"
@@ -866,7 +866,7 @@ export default function StoreBilling() {
                         max="100"
                         className="text-sm"
                       />
-                    </div>
+                    </div>*/}
                   </div>
 
                   {/* <div className="space-y-2"> 

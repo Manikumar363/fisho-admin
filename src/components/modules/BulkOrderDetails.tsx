@@ -58,6 +58,10 @@ interface BulkOrder {
     state: string;
     country: string;
     landmark: string;
+    flat: string;
+    floor: string;
+    building: string;
+    
   };
   items: BulkOrderItem[];
   pricing: {
@@ -150,6 +154,23 @@ export default function BulkOrderDetails() {
   const capitalize = (str: string | undefined | null) => {
     if (!str || typeof str !== 'string') return '';
     return str.charAt(0).toUpperCase() + str.slice(1);
+  };
+
+  const formatShippingAddress = (shippingAddress?: BulkOrder['shippingAddress']) => {
+    if (!shippingAddress) return '—';
+
+    const parts = [     
+      shippingAddress.flat || '',
+    shippingAddress.floor || '',
+    shippingAddress.building || '',
+      shippingAddress.city || '',
+      shippingAddress.landmark || '',
+      shippingAddress.state || '',
+      shippingAddress.country || '',
+      shippingAddress.pincode || '',
+    ].filter(Boolean);
+
+    return parts.length > 0 ? parts.join(', ') : '—';
   };
 
   // Map backend enum to display label
@@ -577,15 +598,7 @@ export default function BulkOrderDetails() {
             </div>
             <div>
               <p className="text-sm text-gray-600">Address</p>
-              <p className="text-sm">{order.shippingAddress?.addressLine1}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Landmark</p>
-              <p className="text-sm">{order.shippingAddress?.landmark || '—'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Country</p>
-              <p className="text-sm">{order.shippingAddress?.country}</p>
+              <p className="text-sm">{formatShippingAddress(order.shippingAddress)}</p>
             </div>
           </CardContent>
         </Card>

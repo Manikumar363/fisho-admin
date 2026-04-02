@@ -59,6 +59,7 @@ type DeliveryPartnerApiUser = {
   deleteReason?: string;
   totalDeliveries?: number;
   totalEarnings?: number;
+  createdAt?: string;
 };
 
 type DeliveryPartnerListItem = {
@@ -158,11 +159,20 @@ export default function DeliveryPartnersSection({
     setError(null);
 
     let url = '/api/delivery-partner/all-users';
-    let params = '';
+    const params = new URLSearchParams();
     if (searchTerm && searchTerm.trim()) {
-      params = `search=${encodeURIComponent(searchTerm.trim())}`;
+      params.append('search', searchTerm.trim());
     } else {
-      params = [`page=${deliveryPartnersPage}`, `limit=${apiLimit}`].join('&');
+      params.append('page', String(deliveryPartnersPage));
+      params.append('limit', String(apiLimit));
+    }
+
+    if (filters.sortBy === 'recently-added') {
+      params.append('sortBy', 'createdAt');
+      params.append('sortOrder', 'desc');
+    } else if (filters.sortBy === 'oldest-added') {
+      params.append('sortBy', 'createdAt');
+      params.append('sortOrder', 'asc');
     }
 
     apiFetch<{
@@ -170,7 +180,7 @@ export default function DeliveryPartnersSection({
       users: DeliveryPartnerApiUser[];
       pagination?: { page: number; limit: number; totalItems: number; totalPages: number };
       message?: string;
-    }>(`${url}?${params}`)
+    }>(`${url}?${params.toString()}`)
       .then((res) => {
         if (!active) return;
         if (!res.success) throw new Error(res.message || 'Failed to fetch delivery partners');
@@ -210,7 +220,7 @@ export default function DeliveryPartnersSection({
     return () => {
       active = false;
     };
-  }, [deliveryPartnersPage, searchTerm]);
+  }, [deliveryPartnersPage, searchTerm, filters.sortBy]);
 
   const fetchDeletedUsers = async () => {
     setDeletedUsersLoading(true);
@@ -261,14 +271,7 @@ export default function DeliveryPartnersSection({
       });
     }
 
-    const sorted = [...filtered];
-    if (filters.sortBy === 'name-asc') {
-      sorted.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
-    } else if (filters.sortBy === 'name-desc') {
-      sorted.sort((a, b) => b.name.toLowerCase().localeCompare(a.name.toLowerCase()));
-    }
-
-    return sorted;
+    return filtered;
   };
 
   const getPaginatedDeliveryPartners = () => {

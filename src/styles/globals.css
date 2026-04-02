@@ -1,7 +1,8 @@
 /* Font Face Declarations */
 @font-face {
   font-family: "UAESymbol";
-  src: url("/fonts/font1.woff2") format("woff2"),
+  src:
+    url("/fonts/font1.woff2") format("woff2"),
     url("/fonts/font1.woff") format("woff"),
     url("/fonts/font1.ttf") format("truetype");
 }
@@ -141,8 +142,14 @@
     @apply border-border outline-ring/50;
   }
 
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground overflow-hidden;
   }
 }
 

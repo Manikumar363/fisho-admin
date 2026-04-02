@@ -129,13 +129,23 @@ export default function UserManagement() {
     setEndUsersLoading(true);
     setEndUsersError(null);
     let url = '/api/user/all-users';
-    let params = '';
+    const params = new URLSearchParams();
     if (searchTerm) {
-      params = `search=${encodeURIComponent(searchTerm)}`;
+      params.append('search', searchTerm);
     } else {
-      params = [`page=${endUsersPage}`, `limit=${itemsPerPage}`].join('&');
+      params.append('page', String(endUsersPage));
+      params.append('limit', String(itemsPerPage));
     }
-    apiFetch<{ success: boolean; users: any[]; pagination?: any; message?: string }>(`${url}?${params}`)
+
+    if (filters.sortBy === 'recently-added') {
+      params.append('sortBy', 'createdAt');
+      params.append('sortOrder', 'desc');
+    } else if (filters.sortBy === 'oldest-added') {
+      params.append('sortBy', 'createdAt');
+      params.append('sortOrder', 'asc');
+    }
+
+    apiFetch<{ success: boolean; users: any[]; pagination?: any; message?: string }>(`${url}?${params.toString()}`)
       .then(res => {
         if (!res.success) throw new Error(res.message || 'Failed to fetch users');
         setEndUsers(res.users || []);
@@ -146,7 +156,7 @@ export default function UserManagement() {
         setEndUsersError(e?.message || 'Failed to load users');
       })
       .finally(() => setEndUsersLoading(false));
-  }, [activeTab, endUsersPage, itemsPerPage, searchTerm]);
+  }, [activeTab, endUsersPage, itemsPerPage, searchTerm, filters.sortBy]);
 
   const fetchDeletedUsers = async () => {
     setDeletedUsersLoading(true);
@@ -178,11 +188,18 @@ export default function UserManagement() {
     setVendorsLoading(true);
     setVendorsError(null);
     let url = '/api/vendors';
-    let params = '';
+    const params = new URLSearchParams();
     if (searchTerm) {
-      params = `search=${encodeURIComponent(searchTerm)}`;
+      params.append('search', searchTerm);
     }
-    apiFetch<{ success: boolean; vendors: any[]; message?: string }>(`${url}${params ? `?${params}` : ''}`)
+    if (filters.sortBy === 'recently-added') {
+      params.append('sortBy', 'createdAt');
+      params.append('sortOrder', 'desc');
+    } else if (filters.sortBy === 'oldest-added') {
+      params.append('sortBy', 'createdAt');
+      params.append('sortOrder', 'asc');
+    }
+    apiFetch<{ success: boolean; vendors: any[]; message?: string }>(`${url}${params.toString() ? `?${params.toString()}` : ''}`)
       .then(res => {
         if (!res.success) throw new Error(res.message || 'Failed to fetch vendors');
         setVendors(res.vendors || []);
@@ -191,20 +208,30 @@ export default function UserManagement() {
         setVendorsError(e?.message || 'Failed to load vendors');
       })
       .finally(() => setVendorsLoading(false));
-  }, [activeTab, searchTerm]);
+  }, [activeTab, searchTerm, filters.sortBy]);
 
   useEffect(() => {
     if (activeTab !== 'store-managers') return;
     setStoreManagersLoading(true);
     setStoreManagersError(null);
     let url = '/api/subadmin/all-subadmins';
-    let params = '';
+    const params = new URLSearchParams();
     if (searchTerm) {
-      params = `search=${encodeURIComponent(searchTerm)}`;
+      params.append('search', searchTerm);
     } else {
-      params = [`page=${storeManagersPage}`, `limit=${itemsPerPage}`].join('&');
+      params.append('page', String(storeManagersPage));
+      params.append('limit', String(itemsPerPage));
     }
-    apiFetch<{ success: boolean; subadmins: any[]; pagination?: any; message?: string }>(`${url}?${params}`)
+
+    if (filters.sortBy === 'recently-added') {
+      params.append('sortBy', 'createdAt');
+      params.append('sortOrder', 'desc');
+    } else if (filters.sortBy === 'oldest-added') {
+      params.append('sortBy', 'createdAt');
+      params.append('sortOrder', 'asc');
+    }
+
+    apiFetch<{ success: boolean; subadmins: any[]; pagination?: any; message?: string }>(`${url}?${params.toString()}`)
       .then(res => {
         if (!res.success) throw new Error(res.message || 'Failed to fetch store managers');
         setStoreManagers(res.subadmins || []);
@@ -214,7 +241,7 @@ export default function UserManagement() {
         setStoreManagersError(e?.message || 'Failed to load store managers');
       })
       .finally(() => setStoreManagersLoading(false));
-  }, [activeTab, storeManagersPage, itemsPerPage, searchTerm]);
+  }, [activeTab, storeManagersPage, itemsPerPage, searchTerm, filters.sortBy]);
 
   const vendorsStatic = [
     { id: 'VN-001', vendorName: 'Coastal Fisheries Ltd', companyName: 'Coastal Fisheries Private Limited', vatNumber: 'VAT123456789', email: 'info@coastalfisheries.com', phone: '+91 98765 33331', status: 'Active' },
@@ -904,7 +931,7 @@ export default function UserManagement() {
   };
 
   const hasActiveFilters = () => {
-    return filters.status !== '';
+    return filters.status !== '' || filters.sortBy !== 'recently-added';
   };
 
   const getStatusBadgeClass = (status: string | boolean | undefined | null) => {
@@ -916,18 +943,6 @@ export default function UserManagement() {
       ? 'bg-green-100 text-green-700 border border-green-300'
       : 'bg-gray-100 text-red-700 border border-red-300';
   };
-
-  const storeManagerSortOptions = [
-    ...(storeManagers.some((manager) => manager.createdAt)
-      ? [{ value: 'recently-added', label: 'Recently Added' }]
-      : []),
-    ...(storeManagers.some((manager) => manager.name)
-      ? [
-          { value: 'name-asc', label: 'Name (A-Z)' },
-          { value: 'name-desc', label: 'Name (Z-A)' },
-        ]
-      : []),
-  ];
 
   // Filter functions
   const getFilteredEndUsers = () => {
@@ -964,29 +979,7 @@ export default function UserManagement() {
       });
     }
 
-    // Apply sorting
-    const sorted = [...filtered];
-    if (filters.sortBy === 'name-asc') {
-      sorted.sort((a, b) => {
-        const nameA = `${a.firstName} ${a.lastName}`.toLowerCase();
-        const nameB = `${b.firstName} ${b.lastName}`.toLowerCase();
-        return nameA.localeCompare(nameB);
-      });
-    } else if (filters.sortBy === 'name-desc') {
-      sorted.sort((a, b) => {
-        const nameA = `${a.firstName} ${a.lastName}`.toLowerCase();
-        const nameB = `${b.firstName} ${b.lastName}`.toLowerCase();
-        return nameB.localeCompare(nameA);
-      });
-    } else if (filters.sortBy === 'recently-added') {
-      sorted.sort((a, b) => {
-        const dateA = new Date(a.createdAt).getTime();
-        const dateB = new Date(b.createdAt).getTime();
-        return dateB - dateA;
-      });
-    }
-
-    return sorted;
+    return filtered;
   };
 
   const getFilteredStoreManagers = () => {
@@ -1008,29 +1001,7 @@ export default function UserManagement() {
       });
     }
 
-    // Apply sorting
-    const sorted = [...filtered];
-    if (filters.sortBy === 'name-asc') {
-      sorted.sort((a, b) => {
-        const nameA = a.name?.toLowerCase() || '';
-        const nameB = b.name?.toLowerCase() || '';
-        return nameA.localeCompare(nameB);
-      });
-    } else if (filters.sortBy === 'name-desc') {
-      sorted.sort((a, b) => {
-        const nameA = a.name?.toLowerCase() || '';
-        const nameB = b.name?.toLowerCase() || '';
-        return nameB.localeCompare(nameA);
-      });
-    } else if (filters.sortBy === 'recently-added') {
-      sorted.sort((a, b) => {
-        const dateA = new Date(a.createdAt).getTime();
-        const dateB = new Date(b.createdAt).getTime();
-        return dateB - dateA;
-      });
-    }
-
-    return sorted;
+    return filtered;
   };
 
   const getFilteredVendors = () => {
@@ -1056,29 +1027,7 @@ export default function UserManagement() {
       });
     }
 
-    // Apply sorting
-    const sorted = [...filtered];
-    if (filters.sortBy === 'name-asc') {
-      sorted.sort((a, b) => {
-        const nameA = a.name?.toLowerCase() || '';
-        const nameB = b.name?.toLowerCase() || '';
-        return nameA.localeCompare(nameB);
-      });
-    } else if (filters.sortBy === 'name-desc') {
-      sorted.sort((a, b) => {
-        const nameA = a.name?.toLowerCase() || '';
-        const nameB = b.name?.toLowerCase() || '';
-        return nameB.localeCompare(nameA);
-      });
-    } else if (filters.sortBy === 'recently-added') {
-      sorted.sort((a, b) => {
-        const dateA = new Date(a.createdAt).getTime();
-        const dateB = new Date(b.createdAt).getTime();
-        return dateB - dateA;
-      });
-    }
-
-    return sorted;
+    return filtered;
   };
 
   const getPaginatedVendors = () => {
@@ -1184,7 +1133,7 @@ export default function UserManagement() {
 
       <Card>
         <CardContent className="p-4">
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <Input
@@ -1194,14 +1143,14 @@ export default function UserManagement() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            {/* <Button  
+            <Button  
               variant="outline"
               onClick={() => setShowFilterModal(true)}
               className={hasActiveFilters() ? 'border-blue-600 text-blue-600' : ''}
             >
               <Filter className="w-4 h-4 mr-2" />
               Filters {hasActiveFilters() && <span className="ml-1 text-xs bg-blue-600 text-white px-2 py-0.5 rounded">Active</span>}
-            </Button>*/}
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -2423,195 +2372,40 @@ export default function UserManagement() {
           </DialogHeader>
           
           <div className="space-y-4 py-4">
-            {activeTab === 'end-users' && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="statusFilter">Status</Label>
-                  <select
-                    id="statusFilter"
-                    value={filters.status}
-                    onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">All Statuses</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Sort By</Label>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="sort-recently-added"
+                    name="sortBy"
+                    value="recently-added"
+                    checked={filters.sortBy === 'recently-added'}
+                    onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <Label htmlFor="sort-recently-added" className="text-sm font-normal cursor-pointer">
+                    Recently Added
+                  </Label>
                 </div>
-
-                <div className="space-y-3">
-                  <Label>Sort By</Label>
-                  <div className="space-y-2">
-                    <div className="flex items-center">
-                      <input
-                        type="radio"
-                        id="recently-added"
-                        name="sortBy"
-                        value="recently-added"
-                        checked={filters.sortBy === 'recently-added'}
-                        onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
-                        className="mr-3"
-                      />
-                      <label htmlFor="recently-added" className="cursor-pointer">Recently Added</label>
-                    </div>
-                    <div className="flex items-center">
-                      <input
-                        type="radio"
-                        id="name-asc"
-                        name="sortBy"
-                        value="name-asc"
-                        checked={filters.sortBy === 'name-asc'}
-                        onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
-                        className="mr-3"
-                      />
-                      <label htmlFor="name-asc" className="cursor-pointer">Name (A to Z)</label>
-                    </div>
-                    <div className="flex items-center">
-                      <input
-                        type="radio"
-                        id="name-desc"
-                        name="sortBy"
-                        value="name-desc"
-                        checked={filters.sortBy === 'name-desc'}
-                        onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
-                        className="mr-3"
-                      />
-                      <label htmlFor="name-desc" className="cursor-pointer">Name (Z to A)</label>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {activeTab === 'vendors' && (
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">Sort By</Label>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="vendor-recently-added"
-                      name="vendor-sortBy"
-                      value="recently-added"
-                      checked={filters.sortBy === 'recently-added'}
-                      onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
-                      className="w-4 h-4 text-blue-600"
-                    />
-                    <Label htmlFor="vendor-recently-added" className="text-sm font-normal cursor-pointer">
-                      Recently Added
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="vendor-name-asc"
-                      name="vendor-sortBy"
-                      value="name-asc"
-                      checked={filters.sortBy === 'name-asc'}
-                      onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
-                      className="w-4 h-4 text-blue-600"
-                    />
-                    <Label htmlFor="vendor-name-asc" className="text-sm font-normal cursor-pointer">
-                      Name (A-Z)
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="vendor-name-desc"
-                      name="vendor-sortBy"
-                      value="name-desc"
-                      checked={filters.sortBy === 'name-desc'}
-                      onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
-                      className="w-4 h-4 text-blue-600"
-                    />
-                    <Label htmlFor="vendor-name-desc" className="text-sm font-normal cursor-pointer">
-                      Name (Z-A)
-                    </Label>
-                  </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="sort-oldest-added"
+                    name="sortBy"
+                    value="oldest-added"
+                    checked={filters.sortBy === 'oldest-added'}
+                    onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <Label htmlFor="sort-oldest-added" className="text-sm font-normal cursor-pointer">
+                    Oldest Added
+                  </Label>
                 </div>
               </div>
-            )}
+            </div>
 
-            {activeTab === 'delivery-partners' && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="dp-status" className="text-sm font-medium">Status</Label>
-                  <select
-                    id="dp-status"
-                    value={filters.status}
-                    onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">All Status</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium">Sort By</Label>
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="radio"
-                        id="dp-name-asc"
-                        name="dp-sortBy"
-                        value="name-asc"
-                        checked={filters.sortBy === 'name-asc'}
-                        onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
-                        className="w-4 h-4 text-blue-600"
-                      />
-                      <Label htmlFor="dp-name-asc" className="text-sm font-normal cursor-pointer">
-                        Name (A-Z)
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="radio"
-                        id="dp-name-desc"
-                        name="dp-sortBy"
-                        value="name-desc"
-                        checked={filters.sortBy === 'name-desc'}
-                        onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
-                        className="w-4 h-4 text-blue-600"
-                      />
-                      <Label htmlFor="dp-name-desc" className="text-sm font-normal cursor-pointer">
-                        Name (Z-A)
-                      </Label>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {activeTab === 'store-managers' && (
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">Sort By</Label>
-                {storeManagerSortOptions.length === 0 ? (
-                  <p className="text-sm text-gray-500">No sort options available</p>
-                ) : (
-                  <div className="space-y-2">
-                    {storeManagerSortOptions.map((option) => (
-                      <div key={option.value} className="flex items-center space-x-2">
-                        <input
-                          type="radio"
-                          id={`sm-${option.value}`}
-                          name="sm-sortBy"
-                          value={option.value}
-                          checked={filters.sortBy === option.value}
-                          onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
-                          className="w-4 h-4 text-blue-600"
-                        />
-                        <Label htmlFor={`sm-${option.value}`} className="text-sm font-normal cursor-pointer">
-                          {option.label}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           <DialogFooter className="flex gap-2">

@@ -17,6 +17,12 @@ import { toast } from 'react-toastify';
     toast.success(`${label} copied!`);
   };
 
+  const formatAmount = (value: unknown) => {
+    const numeric = typeof value === 'number' ? value : parseFloat(String(value ?? 0));
+    if (!Number.isFinite(numeric)) return '0.00';
+    return numeric.toFixed(2);
+  };
+
 const Transactions: React.FC = () => {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -207,19 +213,19 @@ const Transactions: React.FC = () => {
         <Card>
           <CardContent className="p-6">
             <p className="text-gray-600 mb-2">Total Amount In</p>
-            <p className="text-green-600"><span className="dirham-symbol mr-2">&#xea;</span>{stats.moneyIn?.toLocaleString?.() ?? 0}</p>
+            <p className="text-green-600"><span className="dirham-symbol mr-2">&#xea;</span>{formatAmount(stats.moneyIn)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-6">
             <p className="text-gray-600 mb-2">Total Amount Out</p>
-            <p className="text-red-600"><span className="dirham-symbol mr-2">&#xea;</span>{stats.moneyOut?.toLocaleString?.() ?? 0}</p>
+            <p className="text-red-600"><span className="dirham-symbol mr-2">&#xea;</span>{formatAmount(stats.moneyOut)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-6">
             <p className="text-gray-600 mb-2">Net Amount</p>
-            <p className="text-blue-600"><span className="dirham-symbol mr-2">&#xea;</span>{stats.netAmount?.toLocaleString?.() ?? 0}</p>
+            <p className="text-blue-600"><span className="dirham-symbol mr-2">&#xea;</span>{formatAmount(stats.netAmount)}</p>
           </CardContent>
         </Card>
       </div>
@@ -259,6 +265,7 @@ const Transactions: React.FC = () => {
                 <option value="wallet">Wallet</option>
                 <option value="cod">Cash on Delivery</option>
                 <option value="online">Online</option>
+                <option value="pos">POS</option>
               </select>
             </div>
             <div className="min-w-[180px]">
@@ -389,11 +396,11 @@ const Transactions: React.FC = () => {
                         ) : (orderId ? shortId(orderId) : '-')}
                       </td>
                       <td className="py-3 px-4">{txn.user ? `${txn.user.firstName} ${txn.user.lastName}` : '-'}</td>
-                      <td className="py-3 px-4 text-green-600">{txn.type === 'in' ? (<><span className="dirham-symbol mr-2">&#xea;</span>{txn.amount}</>) : '-'}</td>
+                      <td className="py-3 px-4 text-green-600">{txn.type === 'in' ? (<><span className="dirham-symbol mr-2">&#xea;</span>{formatAmount(txn.amount)}</>) : '-'}</td>
                       <td className="py-3 px-4 text-red-600">
                         {typeof txn.refundedAmount === 'number' && txn.refundedAmount > 0
-                          ? (<><span className="dirham-symbol mr-2">&#xea;</span>{txn.refundedAmount}</>)
-                          : (txn.type === 'out' ? (<><span className="dirham-symbol mr-2">&#xea;</span>{txn.amount}</>) : '-')}
+                          ? (<><span className="dirham-symbol mr-2">&#xea;</span>{formatAmount(txn.refundedAmount)}</>)
+                          : (txn.type === 'out' ? (<><span className="dirham-symbol mr-2">&#xea;</span>{formatAmount(txn.amount)}</>) : '-')}
                       </td>
                       <td className="py-3 px-4">{txn.paymentMethod}</td>
                       <td className="py-3 px-4">

@@ -6,6 +6,13 @@ import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -70,8 +77,12 @@ const Offers: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [offerToDelete, setOfferToDelete] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterOption, setFilterOption] = useState('all');
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCoupons, setTotalCoupons] = useState(0);
   const [stats, setStats] = useState({
     activeCoupons: 0,
     expiredCoupons: 0,
@@ -90,16 +101,46 @@ const Offers: React.FC = () => {
   }, [location]);
 
   useEffect(() => {
-    fetchCoupons();
-  }, []);
+    fetchCoupons(currentPage, searchQuery, filterOption);
+  }, [currentPage, searchQuery, filterOption]);
 
-  const fetchCoupons = async () => {
+  const fetchCoupons = async (page = 1, search = '', filter = 'all') => {
     try {
       setLoading(true);
-      const response = await apiFetch<CouponsResponse>('/api/coupons/get-all');
+      const params = new URLSearchParams();
+
+      const trimmedSearch = search.trim();
+      const url = trimmedSearch ? '/api/coupons/get-all' : '/api/coupons/get-all';
+      if (trimmedSearch) {
+        params.append('search', trimmedSearch);
+      } else {
+        params.append('page', String(page));
+        params.append('limit', '10');
+      }
+
+      if (filter === 'new-to-old') {
+        params.append('sortBy', 'createdAt');
+        params.append('sortOrder', 'desc');
+      } else if (filter === 'old-to-new') {
+        params.append('sortBy', 'createdAt');
+        params.append('sortOrder', 'asc');
+      } else if (filter === 'active' || filter === 'inactive') {
+        params.append('status', filter);
+      }
+
+      const response = await apiFetch<CouponsResponse>(`${url}?${params.toString()}`);
       if (response.success) {
         setOffers(response.coupons);
         setStats(response.stats);
+        if (trimmedSearch) {
+          setCurrentPage(1);
+          setTotalPages(1);
+          setTotalCoupons(response.coupons.length);
+        } else {
+          setCurrentPage(response.pagination?.currentPage || page);
+          setTotalPages(response.pagination?.totalPages || 1);
+          setTotalCoupons(response.pagination?.totalCoupons || response.stats?.totalCoupons || 0);
+        }
       }
     } catch (error: any) {
       toast.error(error.message || 'Failed to fetch coupons');
@@ -117,7 +158,7 @@ const Offers: React.FC = () => {
     usageLimit: number;
   }) => {
     // This will be implemented when you add the create API
-    fetchCoupons();
+    fetchCoupons(currentPage, searchQuery, filterOption);
     setShowAddOffer(false);
     toast.success('Offer created successfully');
   };
@@ -127,7 +168,7 @@ const Offers: React.FC = () => {
     setOffers(offers.map(o => o._id === updatedOffer._id ? updatedOffer : o));
     setEditingOffer(null);
     // Refresh the list to get latest stats
-    fetchCoupons();
+    fetchCoupons(currentPage, searchQuery, filterOption);
   };
 
   const handleDeleteOffer = (offerId: string) => {
@@ -149,7 +190,7 @@ const Offers: React.FC = () => {
           setOffers(offers.filter(offer => offer._id !== offerToDelete));
           toast.success(response.message || 'Offer deleted successfully');
           // Refresh stats after deletion
-          fetchCoupons();
+          fetchCoupons(currentPage, searchQuery, filterOption);
         } else {
           toast.error('Failed to delete offer');
         }
@@ -161,12 +202,6 @@ const Offers: React.FC = () => {
     setDeleteDialogOpen(false);
     setOfferToDelete(null);
   };
-
-  const filteredOffers = offers.filter(offer =>
-    offer.couponName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    offer.couponDescription.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    offer._id.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   const getStatusBadgeClass = (status: string) => {
     switch (status.toLowerCase()) {
@@ -250,11 +285,35 @@ const Offers: React.FC = () => {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <Input
-              placeholder="Search by offer ID, coupon name, or description..."
-              className="pl-10"
+              placeholder="Search by Coupon Name, or Description..."
+              className="pl-10 pr-44"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
             />
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 w-40">
+              <Select
+                value={filterOption}
+                onValueChange={(value) => {
+                  setFilterOption(value);
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="h-8 w-full rounded-md border-gray-200 bg-white text-sm">
+                  <SelectValue placeholder="Filter" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Filters</SelectItem>
+                  <SelectItem value="new-to-old">New to Old</SelectItem>
+                  <SelectItem value="old-to-new">Old to New</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="expired">Expired</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -282,14 +341,14 @@ const Offers: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredOffers.length === 0 ? (
+                  {offers.length === 0 ? (
                     <tr>
                       <td colSpan={10} className="text-center py-8 text-gray-500">
                         No offers found
                       </td>
                     </tr>
                   ) : (
-                    filteredOffers.map((offer) => (
+                    offers.map((offer) => (
                       <tr key={offer._id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-3 px-4 font-medium">{offer.couponName}</td>
                         <td className="py-3 px-4 max-w-xs truncate">{offer.couponDescription}</td>
@@ -345,6 +404,32 @@ const Offers: React.FC = () => {
                   )}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {!loading && !searchQuery.trim() && totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <div className="text-sm text-gray-600">
+                Page {currentPage} of {totalPages} | Total coupons: {totalCoupons}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

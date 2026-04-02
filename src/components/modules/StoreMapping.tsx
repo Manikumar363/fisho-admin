@@ -161,7 +161,7 @@ export default function StoreMapping() {
                           className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
                           onClick={() => {
                             navigator.clipboard.writeText(store._id);
-                            toast.success('Store ID copied to clipboard');
+                            toast.success('Store ID copied');
                           }}
                           title={`Click to copy: ${store._id}`}
                         >

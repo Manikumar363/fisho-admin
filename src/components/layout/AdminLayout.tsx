@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 // Socket instance (singleton)
 let socket: Socket | null = null;
@@ -59,10 +59,7 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   
   // Use notification context
-  const { unreadCount, setNotifications, setUnreadCount, notifications } = useNotifications();
-  // Ref to always have latest notifications in socket handler
-  const notificationsRef = useRef(notifications);
-  useEffect(() => { notificationsRef.current = notifications; }, [notifications]);
+  const { unreadCount, setNotifications, setUnreadCount, addNotification } = useNotifications();
 
   useEffect(() => {
     const adminData = getAdminData();
@@ -116,9 +113,7 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
 
     // Handler for new notification event
     const handleNewNotification = (notification: any) => {
-      // Use notificationsRef to always get latest notifications array
-      setNotifications([notification, ...(Array.isArray(notificationsRef.current) ? notificationsRef.current : [])]);
-      setUnreadCount(typeof unreadCount === 'number' ? unreadCount + 1 : 1);
+      addNotification(notification);
     };
 
     // Listen for the correct event based on userRole
@@ -135,7 +130,7 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
         socket.off('new_store_notification', handleNewNotification);
       }
     };
-  }, [setNotifications, setUnreadCount, userRole]);
+  }, [setNotifications, setUnreadCount, userRole, addNotification]);
 
   const handleConfirmLogout = () => {
     setShowLogoutDialog(false);

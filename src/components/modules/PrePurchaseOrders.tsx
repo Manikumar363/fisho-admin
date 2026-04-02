@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Eye, Edit, Trash2, Download, X, Calendar, Search, Funnel } from 'lucide-react';
+import { Plus, Eye, Edit, Trash2, Download, X, Calendar, Search } from 'lucide-react';
 import { API_BASE_URL, apiFetch, getToken } from '../../lib/api';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -10,15 +10,6 @@ import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Textarea } from '../ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '../ui/dropdown-menu';
 
 interface Particular {
   id: string;
@@ -52,6 +43,8 @@ interface ProductVariant {
 
 export default function PrePurchaseOrders() {
   type PpoDateFilter = 'all' | 'today' | 'this_week' | 'this_month';
+  type PpoNameSort = 'none' | 'aToZ' | 'zToA';
+  type PpoListFilterOption = 'all' | 'today' | 'this_week' | 'this_month' | 'name_aToZ' | 'name_zToA';
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -84,6 +77,8 @@ export default function PrePurchaseOrders() {
   const [variantsLoading, setVariantsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeDateFilter, setActiveDateFilter] = useState<PpoDateFilter>('all');
+  const [activeNameSort, setActiveNameSort] = useState<PpoNameSort>('none');
+  const [activeListFilter, setActiveListFilter] = useState<PpoListFilterOption>('all');
   const [particulars, setParticulars] = useState<Particular[]>([
     {
       id: '1',
@@ -523,10 +518,46 @@ export default function PrePurchaseOrders() {
     return ppos.filter((ppo) => isPpoInDateFilter(ppo.date, filter)).length;
   };
 
-  // No longer needed: filteredPpos, as search is now server-side
+  const handleListFilterChange = (value: PpoListFilterOption) => {
+    setActiveListFilter(value);
+
+    if (value === 'all') {
+      setActiveDateFilter('all');
+      setActiveNameSort('none');
+      return;
+    }
+
+    if (value === 'today' || value === 'this_week' || value === 'this_month') {
+      setActiveDateFilter(value);
+      setActiveNameSort('none');
+      return;
+    }
+
+    if (value === 'name_aToZ') {
+      setActiveDateFilter('all');
+      setActiveNameSort('aToZ');
+      return;
+    }
+
+    setActiveDateFilter('all');
+    setActiveNameSort('zToA');
+  };
+
   const filteredPpos = useMemo(() => {
-    return ppos.filter((ppo) => isPpoInDateFilter(ppo.date, activeDateFilter));
-  }, [ppos, activeDateFilter]);
+    const dateFiltered = ppos.filter((ppo) => isPpoInDateFilter(ppo.date, activeDateFilter));
+
+    if (activeNameSort === 'none') {
+      return dateFiltered;
+    }
+
+    const sorted = [...dateFiltered].sort((a, b) => {
+      const aName = String(a?.vendor?.name || a?.notes || '').toLowerCase();
+      const bName = String(b?.vendor?.name || b?.notes || '').toLowerCase();
+      return aName.localeCompare(bName);
+    });
+
+    return activeNameSort === 'aToZ' ? sorted : sorted.reverse();
+  }, [ppos, activeDateFilter, activeNameSort]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1029,39 +1060,30 @@ export default function PrePurchaseOrders() {
           <CardTitle>Pre-Purchase Orders ({totalCount})</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="mb-4 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+          <div className="mb-4">
             <div className="relative min-w-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by PPO ID, vendor, company, email, value"
-                className="pl-10"
+                className="pl-10 pr-56"
               />
-            </div>
-
-            <div className="shrink-0">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button type="button" variant="outline" className="h-10 px-4">
-                    <Funnel className="w-4 h-4 mr-2" />
-                    Filter
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>Date Filter</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuRadioGroup
-                    value={activeDateFilter}
-                    onValueChange={(value) => setActiveDateFilter(value as PpoDateFilter)}
-                  >
-                    <DropdownMenuRadioItem value="all">All ({getDateFilterCount('all')})</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="today">Today ({getDateFilterCount('today')})</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="this_week">This Week ({getDateFilterCount('this_week')})</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="this_month">This Month ({getDateFilterCount('this_month')})</DropdownMenuRadioItem>
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 w-52">
+                <Select
+                  value={activeListFilter}
+                  onValueChange={(value) => handleListFilterChange(value as PpoListFilterOption)}
+                >
+                  <SelectTrigger className="h-8 w-full rounded-md border-gray-200 bg-white text-sm">
+                    <SelectValue placeholder="Filter" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Filters</SelectItem>
+                    <SelectItem value="name_aToZ">Name A to Z</SelectItem>
+                    <SelectItem value="name_zToA">Name Z to A</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 

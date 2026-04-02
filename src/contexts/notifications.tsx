@@ -20,39 +20,43 @@ interface NotificationContextType {
   addNotification: (notification: Notification) => void;
   markAsRead: (id: string) => void;
   clearAll: () => void;
-  setUnreadCount: (count: number) => void;
-  setNotifications: (notifications: Notification[]) => void;
+  setUnreadCount: React.Dispatch<React.SetStateAction<number>>;
+  setNotifications: React.Dispatch<React.SetStateAction<Notification[]>>;
 }
 
-const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
+const noop = () => undefined;
+const NotificationContext = createContext<NotificationContextType>({
+  unreadCount: 0,
+  notifications: [],
+  addNotification: noop,
+  markAsRead: noop,
+  clearAll: noop,
+  setUnreadCount: noop as React.Dispatch<React.SetStateAction<number>>,
+  setNotifications: noop as React.Dispatch<React.SetStateAction<Notification[]>>,
+});
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
+  const isAudioUnlockedRef = useRef(false);
   const token = getToken();
   
   const { onNewNotification } = useSocket(token || undefined);
 
   // Create and preload the notification audio once.
   useEffect(() => {
-    const audio = new Audio(`${import.meta.env.BASE_URL}notification-sound.mp3`);
+    const audio = new Audio(`${import.meta.env.BASE_URL}sound.mp3`);
     audio.preload = "auto";
     audio.volume = 1;
     audioRef.current = audio;
-
-    if (typeof window !== "undefined" && "AudioContext" in window) {
-      audioContextRef.current = new AudioContext();
-    }
 
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
-      audioContextRef.current?.close().catch(() => undefined);
-      audioContextRef.current = null;
+      isAudioUnlockedRef.current = false;
     };
   }, []);
 
@@ -61,14 +65,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const unlockAudio = async () => {
       const audio = audioRef.current;
       if (!audio) return;
+      if (isAudioUnlockedRef.current) return;
 
       try {
-        await audioContextRef.current?.resume();
         audio.muted = true;
         await audio.play();
         audio.pause();
         audio.currentTime = 0;
         audio.muted = false;
+        isAudioUnlockedRef.current = true;
 
         window.removeEventListener("click", unlockAudio);
         window.removeEventListener("touchstart", unlockAudio);
@@ -91,42 +96,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   const playNotificationSound = useCallback(async () => {
     const audio = audioRef.current;
-    const ctx = audioContextRef.current;
-
-    const playFallbackBeep = async () => {
-      if (!ctx) return;
-      if (ctx.state === "suspended") {
-        await ctx.resume();
-      }
-
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.value = 880;
-      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.18);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.2);
-    };
-
-    if (!audio) {
-      await playFallbackBeep();
-      return;
-    }
+    if (!audio || !isAudioUnlockedRef.current) return;
 
     try {
       audio.currentTime = 0;
       await audio.play();
     } catch (error) {
       console.warn("Notification sound blocked or failed:", error);
-      try {
-        await playFallbackBeep();
-      } catch (beepError) {
-        console.warn("Fallback beep failed:", beepError);
-      }
     }
   }, []);
 
@@ -137,33 +113,33 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       console.log("New notification received:", notification);
       setNotifications(prev => [notification, ...prev]);
       setUnreadCount(prev => prev + 1);
-      playNotificationSound(); // Play sound when new notification arrives
+      void playNotificationSound(); // Play sound when new notification arrives
     };
 
     onNewNotification(handleNewNotification);
-  }, [token, onNewNotification]);
+  }, [token, onNewNotification, playNotificationSound]);
 
-  const addNotification = (notification: Notification) => {
+  const addNotification = useCallback((notification: Notification) => {
     setNotifications(prev => [notification, ...prev]);
     if (!notification.isRead) {
       setUnreadCount(prev => prev + 1);
-      playNotificationSound(); // Play sound when adding unread notification
+      void playNotificationSound(); // Play sound when adding unread notification
     }
-  };
+  }, [playNotificationSound]);
 
-  const markAsRead = (id: string) => {
+  const markAsRead = useCallback((id: string) => {
     setNotifications(prev =>
       prev.map(notif =>
         notif._id === id ? { ...notif, isRead: true, readAt: new Date().toISOString() } : notif
       )
     );
     setUnreadCount(prev => Math.max(0, prev - 1));
-  };
+  }, []);
 
-  const clearAll = () => {
+  const clearAll = useCallback(() => {
     setNotifications([]);
     setUnreadCount(0);
-  };
+  }, []);
 
   return (
     <NotificationContext.Provider
@@ -184,8 +160,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
 export const useNotifications = () => {
   const context = useContext(NotificationContext);
+  // Avoid crashing the app on transient provider-mount timing issues.
   if (!context) {
-    throw new Error("useNotifications must be used within NotificationProvider");
+    console.warn("useNotifications is being used outside NotificationProvider");
   }
   return context;
 };
