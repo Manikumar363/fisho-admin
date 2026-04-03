@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
-import { Switch } from '../../ui/switch';
 import { Checkbox } from '../../ui/checkbox';
 import {
   Select,
@@ -188,7 +187,7 @@ export default function EditLocation({ location, onBack, onSave }: EditLocationP
         status: formData.status ? 'Active' : 'Inactive'
       };
 
-      toast.success(response.message );
+      toast.success(response.message || 'Location updated successfully');
       onSave(updatedLocation);
     } catch (error: any) {
       const errorMsg = error?.message || 'Failed to update location';
@@ -310,20 +309,24 @@ export default function EditLocation({ location, onBack, onSave }: EditLocationP
               />
             </div>*/}
 
-            {/* Status Toggle */}
-            <div className="flex items-center justify-between border border-gray-200 rounded-lg p-4">
-              <div className="space-y-0.5">
-                <Label htmlFor="status">Status</Label>
-                <p className="text-sm text-gray-500">
-                  {formData.status ? 'Location is active and accepting orders' : 'Location is inactive'}
-                </p>
-              </div>
-              <Switch
-                id="status"
-                checked={formData.status}
-                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, status: checked }))}
+            {/* Status */}
+            <div className="space-y-2">
+              <Label htmlFor="status">
+                Status <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={formData.status ? 'Active' : 'Inactive'}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, status: value === 'Active' }))}
                 disabled={loading}
-              />
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Action Buttons */}

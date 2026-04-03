@@ -18,10 +18,14 @@ interface OrderItem {
     unitPriceAtPurchase: number;
     retailPriceAtPurchase: number;
     subtotal: number;
+    weight?: number;
+    weightUnit?: string;
   };
   product: any;
   variant: any;
   quantity: number;
+  weight?: number;
+  weightUnit?: string;
   _id: string;
 }
 
@@ -46,7 +50,10 @@ interface Order {
   shippingAddress: {
     name: string;
     phone: string;
-    communityId?: string;
+    communityId?: string | {
+      _id: string;
+      name: string;
+    };
     building?: string;
     floor?: string;
     flat?: string;
@@ -71,6 +78,7 @@ interface Order {
   deliveryDate?: string;
   status: string;
   notes?: string;
+  returnReason?: string;
   createdAt: string;
   updatedAt: string;
   deliveryPartner?: {
@@ -104,7 +112,6 @@ const formatShippingAddress = (shippingAddress?: Order['shippingAddress']) => {
     shippingAddress.flat ? `${shippingAddress.flat}` : '',
     shippingAddress.floor ? ` ${shippingAddress.floor}` : '',
     shippingAddress.building ? ` ${shippingAddress.building}` : '',
-    shippingAddress.addressLine1 || '',
     shippingAddress.landmark ? ` ${shippingAddress.landmark}` : '',
     shippingAddress.city || '',
     shippingAddress.state || '',
@@ -119,6 +126,13 @@ const formatShippingAddress = (shippingAddress?: Order['shippingAddress']) => {
   }
 
   return '—';
+};
+
+const formatCommunityDetails = (communityId?: Order['shippingAddress']['communityId']) => {
+  if (!communityId) return '—';
+  if (typeof communityId === 'string') return communityId;
+  const parts = [communityId.name].filter(Boolean);
+  return parts.length > 0 ? parts.join(' • ') : '—';
 };
 
 // Helper for badge color
@@ -487,6 +501,10 @@ export default function OrderDetails() {
                   <p className="mt-1 text-gray-600">{order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString() : '—'}</p>
                 </div>
               </div>
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <p className="text-sm font-semibold text-gray-800 mb-1">Community</p>
+                <p className="text-gray-600">{formatCommunityDetails(order.shippingAddress?.communityId)}</p>
+              </div>
             </CardContent>
           </Card>
 
@@ -519,8 +537,22 @@ export default function OrderDetails() {
                         className="w-16 h-16 object-cover rounded"
                       />
                       <div className="flex-1">
-                        <h4>{item.snapshot.productName}</h4>
-                        <p className="text-sm text-gray-600">{item.snapshot.variantName || item.variant?.name || '—'}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4>{item.snapshot.productName}</h4>
+                          {(() => {
+                            const itemWeight = item.weight ?? item.snapshot.weight ?? item.variant?.weight;
+                            const itemWeightUnit = item.weightUnit || item.snapshot.weightUnit || item.product?.weightUnit || 'g';
+
+                            if (itemWeight === undefined || itemWeight === null) return null;
+
+                            return (
+                              <Badge className="border border-blue-300 bg-blue-50 text-blue-700">
+                                {item.snapshot.variantName || item.variant?.name || '—'} {itemWeight}{itemWeightUnit}
+                              </Badge>
+                            );
+                          })()}
+                        </div>
+                        {/* <p className="text-sm text-gray-600">{item.snapshot.variantName || item.variant?.name || '—'}</p> */}
                         <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
                       </div>
                       <div className="text-right">
@@ -573,6 +605,18 @@ export default function OrderDetails() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Return Reason */}
+          {order.returnReason && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Return Reason</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">{order.returnReason}</p>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Special Instructions */}
           {order.notes !== undefined && order.notes !== null && (
@@ -817,7 +861,7 @@ export default function OrderDetails() {
               {(() => {
                 const normalizedOrderStatus = order?.status?.toLowerCase() || '';
                 const paymentStatus = order?.payment?.status?.toLowerCase() || '';
-                const isRejected = normalizedOrderStatus === 'rejected' || normalizedOrderStatus === 'cancelled';
+                const isRejected = normalizedOrderStatus === 'rejected' || normalizedOrderStatus === 'cancelled' || normalizedOrderStatus === 'return_requested';
                 const isPaid = paymentStatus === 'paid' || paymentStatus === 'completed' || paymentStatus === 'success' || paymentStatus === 'successful';
                 if (isRejected && isPaid) {
                   return (

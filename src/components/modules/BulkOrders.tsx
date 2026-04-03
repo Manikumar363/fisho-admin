@@ -7,15 +7,6 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { apiFetch } from '../../lib/api';
 import { toast } from 'react-toastify';
-  // Copy Order ID to clipboard
-  const handleCopyOrderId = async (orderId: string) => {
-    try {
-      await navigator.clipboard.writeText(orderId);
-      toast.success('Order ID copied to clipboard');
-    } catch {
-      toast.error('Failed to copy Order ID');
-    }
-  };
 import { useNavigate } from 'react-router-dom';
 
 interface BulkOrderItem {
@@ -64,6 +55,20 @@ interface BulkOrder {
 export default function BulkOrders() {
 
   const navigate = useNavigate();
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectingOrder, setRejectingOrder] = useState<BulkOrder | null>(null);
+
+  // Copy Order ID to clipboard
+  const handleCopyOrderId = async (orderId: string) => {
+    try {
+      await navigator.clipboard.writeText(orderId);
+      toast.success('Order ID copied to clipboard');
+    } catch {
+      toast.error('Failed to copy Order ID');
+    }
+  };
+
   // Export state
   const [exportStartDate, setExportStartDate] = useState<string>('');
   const [exportEndDate, setExportEndDate] = useState<string>('');
@@ -266,20 +271,36 @@ export default function BulkOrders() {
     }
   };
 
-  const handleRejectOrder = async (order: BulkOrder) => {
+  const handleRejectOrder = (order: BulkOrder) => {
+    setRejectingOrder(order);
+    setRejectReason('');
+    setShowRejectDialog(true);
+  };
+
+  const confirmRejectOrder = async () => {
+    if (!rejectingOrder) return;
+    if (!rejectReason.trim()) {
+      toast.error('Please provide a reason for rejection');
+      return;
+    }
+
+    const order = rejectingOrder;
     setRejectingId(order._id);
     try {
       const res = await apiFetch<{ success: boolean; data?: BulkOrder; message?: string }>(
         '/api/bulk-order/status-update',
         {
           method: 'POST',
-          body: JSON.stringify({ orderId: order._id, status: 'rejected' }),
+          body: JSON.stringify({ orderId: order._id, status: 'rejected', rejectReason: rejectReason.trim() }),
           headers: { 'Content-Type': 'application/json' },
         }
       );
       if (!res.success) throw new Error(res.message || 'Failed to reject order');
       setOrders((prev) => prev.map((o) => (o._id === order._id ? { ...o, status: 'rejected' } : o)));
       toast.success(res.message || 'Order rejected successfully');
+      setShowRejectDialog(false);
+      setRejectReason('');
+      setRejectingOrder(null);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to reject order');
     } finally {
@@ -570,7 +591,7 @@ export default function BulkOrders() {
                                   onClick={() => handleRejectOrder(order)}
                                   disabled={acceptingId === order._id || rejectingId === order._id}
                                 >
-                                  {rejectingId === order._id ? 'Rejecting...' : 'Reject'}
+                                  Reject
                                 </Button>
                               </>
                             )}
@@ -617,6 +638,44 @@ export default function BulkOrders() {
           )}
         </CardContent>
       </Card>
+
+      {showRejectDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
+            <h2 className="text-lg font-semibold mb-4">Reject Bulk Order</h2>
+            <label className="block text-sm font-medium mb-2">
+              Reason for rejection <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              className="w-full border rounded p-2 mb-4 min-h-[80px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Enter reason for rejecting this order"
+              disabled={!!rejectingId}
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowRejectDialog(false);
+                  setRejectReason('');
+                  setRejectingOrder(null);
+                }}
+                disabled={!!rejectingId}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={confirmRejectOrder}
+                disabled={!!rejectingId}
+              >
+                {rejectingId ? 'Rejecting...' : 'Reject Order'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

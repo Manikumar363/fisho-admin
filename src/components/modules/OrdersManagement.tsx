@@ -292,10 +292,13 @@ export default function OrdersManagement() {
   const getStatusBadgeClass = (status?: string) => {
     if (!status) return 'bg-gray-100 text-gray-700 border border-gray-300';
     const statusLower = status.toLowerCase();
-    if (statusLower === 'pending') return 'bg-orange-100 text-orange-700 border border-orange-300';
+    if (statusLower === 'pending') return 'bg-amber-100 text-amber-700 border border-amber-300';
     if (statusLower === 'accepted' || statusLower === 'accept') return 'bg-green-100 text-green-700 border border-green-300';
     if (statusLower === 'rejected' || statusLower === 'cancelled') return 'bg-red-100 text-red-700 border border-red-300';
     if (statusLower === 'delivered') return 'bg-blue-100 text-blue-700 border border-blue-300';
+    if (statusLower === 'refunded') return 'bg-orange-100 text-orange-700 border border-orange-300';
+     if (statusLower === 'return_requested') return 'bg-blue-100 text-blue-700 border border-blue-300';
+      if (statusLower === 'ready_to_pickup') return 'bg-amber-100 text-amber-700 border border-amber-300';
     return 'bg-gray-100 text-gray-700 border border-gray-300';
   };
 

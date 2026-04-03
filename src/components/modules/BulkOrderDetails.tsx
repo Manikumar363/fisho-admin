@@ -151,6 +151,38 @@ export default function BulkOrderDetails() {
     });
   };
 
+  const formatPreferredDeliveryTime = (timeValue?: string) => {
+    if (!timeValue) return '—';
+
+    const normalized = timeValue.trim();
+    if (!normalized) return '—';
+
+    if (/\b(am|pm)\b/i.test(normalized)) {
+      return normalized.toUpperCase();
+    }
+
+    const timeMatch = normalized.match(/^(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?$/);
+    if (timeMatch) {
+      let hours = Number(timeMatch[1]);
+      const minutes = Number(timeMatch[2] || '0');
+      const suffix = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      if (hours === 0) hours = 12;
+      return `${hours}:${String(minutes).padStart(2, '0')} ${suffix}`;
+    }
+
+    const parsed = new Date(normalized);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleTimeString('en-IN', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+    }
+
+    return normalized;
+  };
+
   const capitalize = (str: string | undefined | null) => {
     if (!str || typeof str !== 'string') return '';
     return str.charAt(0).toUpperCase() + str.slice(1);
@@ -521,7 +553,7 @@ export default function BulkOrderDetails() {
         </div>
       </div>
 
-      {/* Order Status and Actions */}
+      {/* Order Status and Actions 
       {isPending && (
         <Card className="border-orange-200 bg-orange-50">
           <CardContent className="p-4">
@@ -548,7 +580,7 @@ export default function BulkOrderDetails() {
             </div>
           </CardContent>
         </Card>
-      )}
+      )}*/}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Order Summary */}
@@ -597,7 +629,7 @@ export default function BulkOrderDetails() {
               <p className="font-medium">{order.shippingAddress?.phone}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Address</p>
+              <p className="text-sm text-gray-600">Delivery Location</p>
               <p className="text-sm">{formatShippingAddress(order.shippingAddress)}</p>
             </div>
           </CardContent>
@@ -648,7 +680,7 @@ export default function BulkOrderDetails() {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Shipping</span>
+                  <span className="text-sm text-gray-600">Delivery Charges</span>
                   <span className="font-medium">
                     <span className="dirham-symbol mr-2">&#xea;</span>
                     {parseFloat(String(order.pricing?.shipping || '0')).toFixed(2)}
@@ -979,7 +1011,7 @@ export default function BulkOrderDetails() {
                 <Clock className="w-4 h-4" />
                 Preferred Delivery Time
               </div>
-              <p className="font-medium text-base">{order.preferredDeliveryTime || '—'}</p>
+              <p className="font-medium text-base">{formatPreferredDeliveryTime(order.preferredDeliveryTime)}</p>
             </div>
           </div>
           {order.notes && (

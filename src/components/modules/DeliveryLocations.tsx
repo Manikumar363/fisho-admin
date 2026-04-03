@@ -133,8 +133,16 @@ export default function DeliveryLocations() {
   // Map communities to locations with store name
   useEffect(() => {
     const mapped: DeliveryLocation[] = (communities || []).map((c) => {
-      // nearByStore is now a populated object from the API
-      const storeName = c.nearByStore?.name || '-';
+      // Try to get store name from populated object first, then fallback to searching in stores array
+      let storeName = c.nearByStore?.name || '-';
+      
+      // If nearByStore is an ID (string), try to find the store name from stores array
+      if ((typeof c.nearByStore === 'string' || typeof c.nearByStore?.name === 'undefined') && c.nearByStore) {
+        const storeId = typeof c.nearByStore === 'string' ? c.nearByStore : c.nearByStore?._id;
+        const foundStore = stores.find(s => s._id === storeId);
+        storeName = foundStore?.name || '-';
+      }
+      
       return {
         id: `LOC-${String(c.id ?? c._id).padStart(3, '0')}`,
         code: String(c._id || ''),
@@ -146,7 +154,7 @@ export default function DeliveryLocations() {
       };
     });
     setLocations(mapped);
-  }, [communities]);
+  }, [communities, stores]);
 
   const handleAddLocation = (newLocation: {
     id: string;
@@ -383,18 +391,18 @@ export default function DeliveryLocations() {
                       <th className="text-left py-3 px-4">Location Name</th>
                       <th className="text-left py-3 px-4">Delivery Type</th>
                       <th className="text-left py-3 px-4">Nearest Store</th>
-                      {/*<th className="text-left py-3 px-4">Status</th>*/}
+                      <th className="text-left py-3 px-4">Status</th>
                       <th className="text-left py-3 px-4">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {error ? (
                       <tr>
-                        <td colSpan={7} className="text-center py-8 text-red-600">{error}</td>
+                        <td colSpan={8} className="text-center py-8 text-red-600">{error}</td>
                       </tr>
                     ) : paginatedLocations.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="text-center py-8 text-gray-500">
+                        <td colSpan={8} className="text-center py-8 text-gray-500">
                           No locations found
                         </td>
                       </tr>
@@ -415,6 +423,18 @@ export default function DeliveryLocations() {
                             </Badge>
                           </td>
                           <td className="py-3 px-4">{location.nearestStore}</td>
+                          <td className="py-3 px-4">
+                            <Badge
+                              variant={location.status === 'Active' ? 'default' : 'secondary'}
+                              className={
+                                location.status === 'Active'
+                                  ? 'bg-green-100 text-green-700 hover:bg-green-100'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-100'
+                              }
+                            >
+                              {location.status}
+                            </Badge>
+                          </td>
                           {/* <td className="py-3 px-4"> 
                             <Badge
                               variant={location.status === 'Active' ? 'default' : 'secondary'}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import Login from './components/auth/Login';
 import ForgotPassword from './components/auth/ForgotPassword';
 import OTPVerification from './components/auth/OTPVerification';
@@ -25,7 +25,7 @@ import DeliveryLocations from './components/modules/DeliveryLocations';
 import CMS from './components/modules/CMS';
 import Enquiries from './components/modules/Enquiries';
 import { getToken, clearAuthData } from './lib/api';
-import { ToastContainer } from 'react-toastify';
+import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Profile from './components/modules/Profile';
 import ChangePassword from './components/modules/ChangePassword';
@@ -38,6 +38,16 @@ function EditStoreWrapper() {
   const { storeId } = useParams<{ storeId: string }>();
   if (!storeId) return <Navigate to="/store-mapping" />;
   return <EditStore storeId={storeId} onBack={() => window.history.back()} />;
+}
+
+function RouteChangeToastGuard() {
+  const location = useLocation();
+
+  useEffect(() => {
+    toast.dismiss();
+  }, [location.pathname]);
+
+  return null;
 }
 
 export default function App() {
@@ -72,6 +82,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <RouteChangeToastGuard />
       {/* Toast Notifications */}
       <ToastContainer
         position="top-right"
@@ -84,6 +95,7 @@ export default function App() {
         draggable
         pauseOnHover
         theme="light"
+        style={{ zIndex: 9999 }}
       />
       <Routes>
         {/* Auth Routes */}

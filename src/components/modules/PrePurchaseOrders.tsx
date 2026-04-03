@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Eye, Edit, Trash2, Download, X, Calendar, Search } from 'lucide-react';
 import { API_BASE_URL, apiFetch, getToken } from '../../lib/api';
 import { toast, ToastContainer } from 'react-toastify';
@@ -92,9 +92,12 @@ export default function PrePurchaseOrders() {
   ]);
 
   useEffect(() => {
-    fetchPpos(currentPage, searchQuery);
     fetchVendors();
-  }, [currentPage, searchQuery]);
+  }, []);
+
+  useEffect(() => {
+    fetchPpos(currentPage, searchQuery, activeDateFilter, activeNameSort);
+  }, [currentPage, searchQuery, activeDateFilter, activeNameSort]);
 
   useEffect(() => {
     if (!showAddForm) return;
@@ -118,8 +121,8 @@ export default function PrePurchaseOrders() {
     if (totalValue === 0) {
       setRfv('');
     } else {
-      // Round to nearest 10
-      const roundedValue = Math.ceil(totalValue / 10) * 10;
+      // Round up to the next whole number
+      const roundedValue = Math.ceil(totalValue);
       setRfv(roundedValue.toFixed(2));
     }
   }, [particulars]);
@@ -191,6 +194,11 @@ export default function PrePurchaseOrders() {
 
   const roundTo2 = (value: number) => Number(value.toFixed(2));
 
+  const calculateVatInclusiveAmount = (amount: number, vatPercentage: number) => {
+    const vatAmount = (amount * vatPercentage) / 100;
+    return roundTo2(amount + vatAmount);
+  };
+
   const calculateVariantPriceFromCost = (baseCostPrice: number, weight: number, profit: number, discount: number) => {
     // Match InventoryManagement logic: cost-per-kg scaled by weight in grams.
     const variantCostPrice = (baseCostPrice * weight) / 1000;
@@ -237,18 +245,37 @@ export default function PrePurchaseOrders() {
     return computedVariants;
   };
 
-  const fetchPpos = async (page = 1, search = '') => {
+  const fetchPpos = async (
+    page = 1,
+    search = '',
+    dateFilter: PpoDateFilter = 'all',
+    nameSort: PpoNameSort = 'none'
+  ) => {
     setPposLoading(true);
     setPposError(null);
     try {
-      let url = '/api/ppos';
-      if (search && search.trim() !== '') {
-        // Only search param, no pagination
-        url += `?search=${encodeURIComponent(search.trim())}`;
-      } else {
-        // Pagination params only if not searching
-        url += `?page=${page}&limit=${limit}`;
+      const params = new URLSearchParams();
+      const hasActiveFilters = dateFilter !== 'all' || nameSort !== 'none';
+
+      if (!hasActiveFilters) {
+        params.set('page', String(page));
+        params.set('limit', String(limit));
       }
+
+      if (search && search.trim() !== '') {
+        params.set('search', search.trim());
+      }
+
+      if (dateFilter !== 'all') {
+        params.set('dateFilter', dateFilter);
+      }
+
+      if (nameSort !== 'none') {
+        params.set('sortBy', 'vendorName');
+        params.set('sortOrder', nameSort === 'aToZ' ? 'asc' : 'desc');
+      }
+
+      const url = `/api/ppos${params.toString() ? `?${params.toString()}` : ''}`;
       const res = await apiFetch<{
         success: boolean;
         count: number;
@@ -427,8 +454,8 @@ export default function PrePurchaseOrders() {
   const calculateRFV = (amount: number): string => {
     if (amount === 0) return '';
     
-    // Round to nearest 10
-    const roundedValue = Math.ceil(amount / 10) * 10;
+    // Round up to the next whole number
+    const roundedValue = Math.ceil(amount);
     return roundedValue.toFixed(2);
   };
 
@@ -442,9 +469,9 @@ export default function PrePurchaseOrders() {
         const quantity = parseFloat(updated.quantity) || 0;
         updated.amount = costPrice * quantity;
         
-        // Calculate total amount (Amount + VAT%)
+        // Calculate total amount using the entered VAT percentage
         const vat = parseFloat(updated.vat) || 0;
-        updated.totalAmount = updated.amount + (updated.amount * vat / 100);
+        updated.totalAmount = calculateVatInclusiveAmount(updated.amount, vat);
         
         // Auto-calculate RFV from totalAmount
         updated.rfv = calculateRFV(updated.totalAmount);
@@ -520,6 +547,7 @@ export default function PrePurchaseOrders() {
 
   const handleListFilterChange = (value: PpoListFilterOption) => {
     setActiveListFilter(value);
+    setCurrentPage(1);
 
     if (value === 'all') {
       setActiveDateFilter('all');
@@ -543,22 +571,6 @@ export default function PrePurchaseOrders() {
     setActiveNameSort('zToA');
   };
 
-  const filteredPpos = useMemo(() => {
-    const dateFiltered = ppos.filter((ppo) => isPpoInDateFilter(ppo.date, activeDateFilter));
-
-    if (activeNameSort === 'none') {
-      return dateFiltered;
-    }
-
-    const sorted = [...dateFiltered].sort((a, b) => {
-      const aName = String(a?.vendor?.name || a?.notes || '').toLowerCase();
-      const bName = String(b?.vendor?.name || b?.notes || '').toLowerCase();
-      return aName.localeCompare(bName);
-    });
-
-    return activeNameSort === 'aToZ' ? sorted : sorted.reverse();
-  }, [ppos, activeDateFilter, activeNameSort]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -576,6 +588,8 @@ export default function PrePurchaseOrders() {
 
     setIsSubmitting(true);
     try {
+      const parsedRfv = rfv ? parseFloat(rfv) : 0;
+
       // Map particulars to include product IDs
       const mappedParticulars = validParticulars.map(p => ({
         product: p.product,
@@ -601,7 +615,7 @@ export default function PrePurchaseOrders() {
             vendor,
             particulars: mappedParticulars,
             notes,
-            rfv: rfv ? parseFloat(rfv) : 0,
+            rfv: parsedRfv,
             ppoValue,
           }),
         });
@@ -682,7 +696,7 @@ export default function PrePurchaseOrders() {
             vendor,
             particulars: mappedParticulars,
             notes,
-            rfv: rfv ? parseFloat(rfv) : 0,
+            rfv: parsedRfv,
             ppoValue,
           }),
         });
@@ -1066,7 +1080,7 @@ export default function PrePurchaseOrders() {
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by PPO ID, vendor, company, email, value"
+                placeholder="Search by PPO ID, vendor, Name"
                 className="pl-10 pr-56"
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 w-52">
@@ -1104,10 +1118,10 @@ export default function PrePurchaseOrders() {
                   <tr><td colSpan={6} className="py-8 text-center text-gray-500">Loading PPOs...</td></tr>
                 ) : pposError ? (
                   <tr><td colSpan={6} className="py-8 text-center text-red-600">{pposError}</td></tr>
-                ) : filteredPpos.length === 0 ? (
+                ) : ppos.length === 0 ? (
                   <tr><td colSpan={6} className="py-8 text-center text-gray-500">No PPOs match your search/filter</td></tr>
                 ) : (
-                  filteredPpos.map((ppo) => (
+                  ppos.map((ppo) => (
                     <tr key={ppo._id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-3 px-4 font-semibold text-blue-600">{ppo.billNo}</td>
                       <td className="py-3 px-4">{ppo.vendor?.name || '—'}</td>
