@@ -110,10 +110,13 @@ const Offers: React.FC = () => {
       const params = new URLSearchParams();
 
       const trimmedSearch = search.trim();
+      const hasActiveFilter = filter !== 'all';
       const url = trimmedSearch ? '/api/coupons/get-all' : '/api/coupons/get-all';
       if (trimmedSearch) {
         params.append('search', trimmedSearch);
-      } else {
+      }
+
+      if (!trimmedSearch && !hasActiveFilter) {
         params.append('page', String(page));
         params.append('limit', '10');
       }
@@ -124,7 +127,7 @@ const Offers: React.FC = () => {
       } else if (filter === 'old-to-new') {
         params.append('sortBy', 'createdAt');
         params.append('sortOrder', 'asc');
-      } else if (filter === 'active' || filter === 'inactive') {
+      } else if (filter === 'active' || filter === 'inactive' || filter === 'expired') {
         params.append('status', filter);
       }
 
@@ -132,7 +135,7 @@ const Offers: React.FC = () => {
       if (response.success) {
         setOffers(response.coupons);
         setStats(response.stats);
-        if (trimmedSearch) {
+        if (trimmedSearch || hasActiveFilter) {
           setCurrentPage(1);
           setTotalPages(1);
           setTotalCoupons(response.coupons.length);

@@ -52,6 +52,13 @@ interface BulkOrder {
   shippingAddress: {
     name: string;
     phone: string;
+    addressType?: string;
+    type?: string;
+    label?: string;
+    communityId?: string | {
+      _id: string;
+      name: string;
+    };
     pincode: string;
     addressLine1: string;
     city: string;
@@ -203,6 +210,22 @@ export default function BulkOrderDetails() {
     ].filter(Boolean);
 
     return parts.length > 0 ? parts.join(', ') : '—';
+  };
+
+  const getAddressTypeLabel = (shippingAddress?: BulkOrder['shippingAddress']) => {
+    const raw =
+      shippingAddress?.addressType ||
+      shippingAddress?.type ||
+      shippingAddress?.label ||
+      'HOME';
+    return String(raw).trim().toUpperCase() || 'HOME';
+  };
+
+  const formatCommunityDetails = (communityId?: BulkOrder['shippingAddress']['communityId']) => {
+    if (!communityId) return '—';
+    if (typeof communityId === 'string') return communityId;
+    const parts = [communityId.name].filter(Boolean);
+    return parts.length > 0 ? parts.join(' • ') : '—';
   };
 
   // Map backend enum to display label
@@ -628,9 +651,23 @@ export default function BulkOrderDetails() {
               <p className="text-sm text-gray-600">Phone</p>
               <p className="font-medium">{order.shippingAddress?.phone}</p>
             </div>
-            <div>
-              <p className="text-sm text-gray-600">Delivery Location</p>
-              <p className="text-sm">{formatShippingAddress(order.shippingAddress)}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-3 text-gray-700">
+              <div className="md:col-span-2">
+                <p className="text-sm text-gray-500">Deliver to</p>
+                <p className="font-semibold">{getAddressTypeLabel(order.shippingAddress)}</p>
+              </div>
+              <div className="space-y-3">
+                <p className="text-sm"><span className="text-gray-600">Flat:</span> {order.shippingAddress?.flat || '—'}</p>
+                <p className="text-sm"><span className="text-gray-600">Floor:</span> {order.shippingAddress?.floor || '—'}</p>
+                <p className="text-sm"><span className="text-gray-600">Building:</span> {order.shippingAddress?.building || '—'}</p>
+                <p className="text-sm"><span className="text-gray-600">Community:</span> {formatCommunityDetails(order.shippingAddress?.communityId)}</p>
+                <p className="text-sm"><span className="text-gray-600">Landmark:</span> {order.shippingAddress?.landmark || '—'}</p>
+              </div>
+              <div className="space-y-3">
+                <p className="text-sm"><span className="text-gray-600">City:</span> {order.shippingAddress?.city || '—'}</p>
+                <p className="text-sm"><span className="text-gray-600">State:</span> {order.shippingAddress?.state || '—'}</p>
+                <p className="text-sm"><span className="text-gray-600">Country:</span> {order.shippingAddress?.country || '—'}</p>
+              </div>
             </div>
           </CardContent>
         </Card>

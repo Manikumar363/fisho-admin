@@ -27,6 +27,8 @@ export default function UserManagement() {
   const [showEditSubadminModal, setShowEditSubadminModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showEndUserDeleteDialog, setShowEndUserDeleteDialog] = useState(false);
+  const [endUserDeleteReason, setEndUserDeleteReason] = useState('');
   const [showDeletedUsersModal, setShowDeletedUsersModal] = useState(false);
   const [showEditVendorModal, setShowEditVendorModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
@@ -759,7 +761,56 @@ export default function UserManagement() {
 
   const handleDelete = (item: any, type: string) => {
     setSelectedItem({ ...item, type });
+
+    if (type === 'end-user') {
+      setEndUserDeleteReason('');
+      setShowEndUserDeleteDialog(true);
+      return;
+    }
+
     setShowDeleteDialog(true);
+  };
+
+  const confirmEndUserDelete = async () => {
+    if (!selectedItem) return;
+    if (!endUserDeleteReason.trim()) {
+      toast.error('Please provide a reason for deletion');
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        message?: string;
+      }>(`/api/user/delete-user/${selectedItem._id}`, {
+        method: 'DELETE',
+        body: JSON.stringify({
+          deleteReason: endUserDeleteReason.trim(),
+        }),
+      });
+
+      if (!res.success) throw new Error(res.message || 'Failed to delete user');
+
+      toast.success(res.message || 'User deleted successfully');
+      setShowEndUserDeleteDialog(false);
+      setEndUserDeleteReason('');
+      setSelectedItem(null);
+
+      // Refresh the users list
+      setEndUsersPage(1);
+      const refreshRes = await apiFetch<{ success: boolean; users: any[]; pagination?: any; message?: string }>(`/api/user/all-users?page=1&limit=${itemsPerPage}`);
+      if (refreshRes.success) {
+        setEndUsers(refreshRes.users || []);
+        setEndUsersTotalPages(refreshRes.pagination?.totalPages || 1);
+      }
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to delete user';
+      console.error('Delete end-user error:', e);
+      toast.error(msg);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const confirmDelete = async () => {
@@ -2222,6 +2273,54 @@ export default function UserManagement() {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={showEndUserDeleteDialog}
+        onOpenChange={(open) => {
+          setShowEndUserDeleteDialog(open);
+          if (!open) {
+            setEndUserDeleteReason('');
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete End User</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label htmlFor="endUserDeleteReason">Reason for deletion <span className="text-red-500">*</span></Label>
+            <textarea
+              id="endUserDeleteReason"
+              className="w-full border rounded p-2 min-h-[90px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={endUserDeleteReason}
+              onChange={(e) => setEndUserDeleteReason(e.target.value)}
+              placeholder="Enter reason for deleting this user"
+              disabled={isDeleting}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowEndUserDeleteDialog(false);
+                setEndUserDeleteReason('');
+              }}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={confirmEndUserDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete User'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>

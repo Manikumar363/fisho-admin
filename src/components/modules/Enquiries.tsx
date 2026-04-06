@@ -229,7 +229,7 @@ export default function Enquiries() {
               />
             </div>
             <div className="flex items-center gap-2">
-              <select
+              {/* <select 
                 value={sortOption}
                 onChange={(e) => setSortOption(e.target.value as 'aToZ' | 'zToA' | '')}
                 className="border rounded-md px-3 py-2 text-sm min-w-[200px] bg-white"
@@ -237,7 +237,7 @@ export default function Enquiries() {
                 <option value="">Sort by Name</option>
                 <option value="aToZ">A to Z (Customer Name)</option>
                 <option value="zToA">Z to A (Customer Name)</option>
-              </select>
+              </select>*/}
               <select
                 value={platformFilter}
                 onChange={(e) => setPlatformFilter(e.target.value as 'All' | 'iOS' | 'Android' | 'Web')}

@@ -75,12 +75,15 @@ const Transactions: React.FC = () => {
   const filteredTransactions = React.useMemo(() => {
     const query = search.trim().toLowerCase();
     const filtered = transactions.filter((txn) => {
-      const orderId = typeof txn.order === 'object' ? (txn.order?._id || txn.order?.id || '') : (txn.order || '');
+      const orderObj = typeof txn.order === 'object' ? txn.order : null;
+      const orderId = orderObj ? (orderObj._id || orderObj.id || '') : (txn.order || '');
       const storeId = txn.store?._id || txn.store?.id || txn.storeId || '';
       const isBulkOrder = !orderId && !storeId;
       const storeName = txn.store?.name || '';
       const txnId = txn._id || '';
-      const userName = txn.user ? `${txn.user.firstName || ''} ${txn.user.lastName || ''}`.trim() : '';
+      const userName = txn.user
+        ? `${txn.user.firstName || ''} ${txn.user.lastName || ''}`.trim()
+        : (orderObj?.shippingAddress?.name || '');
       const payment = txn.paymentMethod || '';
       const status = txn.status || '';
       const amount = String(txn.amount ?? '');
@@ -373,9 +376,13 @@ const Transactions: React.FC = () => {
                   </tr>
                 ) : (
                   filteredTransactions.map((txn) => {
-                    const orderId = typeof txn.order === 'object' ? (txn.order?._id || txn.order?.id || '') : (txn.order || '');
+                    const orderObj = typeof txn.order === 'object' ? txn.order : null;
+                    const orderId = orderObj ? (orderObj._id || orderObj.id || '') : (txn.order || '');
                     const storeId = txn.store?._id || txn.store?.id || txn.storeId || '';
                     const isBulkOrder = !orderId && !storeId;
+                    const displayUserName = txn.user
+                      ? `${txn.user.firstName || ''} ${txn.user.lastName || ''}`.trim()
+                      : (orderObj?.shippingAddress?.name || '-');
 
                     return (
                     <tr key={txn._id} className="border-b border-gray-100 hover:bg-gray-50">
@@ -395,7 +402,7 @@ const Transactions: React.FC = () => {
                           </Badge>
                         ) : (orderId ? shortId(orderId) : '-')}
                       </td>
-                      <td className="py-3 px-4">{txn.user ? `${txn.user.firstName} ${txn.user.lastName}` : '-'}</td>
+                      <td className="py-3 px-4">{displayUserName || '-'}</td>
                       <td className="py-3 px-4 text-green-600">{txn.type === 'in' ? (<><span className="dirham-symbol mr-2">&#xea;</span>{formatAmount(txn.amount)}</>) : '-'}</td>
                       <td className="py-3 px-4 text-red-600">
                         {typeof txn.refundedAmount === 'number' && txn.refundedAmount > 0

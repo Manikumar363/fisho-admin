@@ -50,6 +50,9 @@ interface Order {
   shippingAddress: {
     name: string;
     phone: string;
+    addressType?: string;
+    type?: string;
+    label?: string;
     communityId?: string | {
       _id: string;
       name: string;
@@ -98,6 +101,15 @@ const capitalize = (str: string | undefined | null) => {
   return str.charAt(0).toUpperCase() + str.slice(1);
 };
 
+const formatStatusDisplay = (status: string | undefined | null) => {
+  if (!status || typeof status !== 'string') return '—';
+  return status
+    .split('_')
+    .filter(Boolean)
+    .map((word) => capitalize(word))
+    .join(' ');
+};
+
 // Helper for formatting prices to 2 decimal places
 const formatPrice = (value: any): string => {
   const num = parseFloat(value);
@@ -126,6 +138,15 @@ const formatShippingAddress = (shippingAddress?: Order['shippingAddress']) => {
   }
 
   return '—';
+};
+
+const getAddressTypeLabel = (shippingAddress?: Order['shippingAddress']) => {
+  const raw =
+    shippingAddress?.addressType ||
+    shippingAddress?.type ||
+    shippingAddress?.label ||
+    'HOME';
+  return String(raw).trim().toUpperCase() || 'HOME';
 };
 
 const formatCommunityDetails = (communityId?: Order['shippingAddress']['communityId']) => {
@@ -484,7 +505,24 @@ export default function OrderDetails() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className='text-gray-600'>{formatShippingAddress(order.shippingAddress)}</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-1 text-gray-700">
+                {/* <div className="md:col-span-2"> 
+                  <p className="text-sm text-gray-500">Deliver to</p>
+                  <p className="font-semibold">{getAddressTypeLabel(order.shippingAddress)}</p>
+                </div>*/}
+                <div className="space-y-1">
+                  <p><span className="text-gray-600">Flat:</span> {order.shippingAddress?.flat || '—'}</p>
+                  <p><span className="text-gray-600">Floor:</span> {order.shippingAddress?.floor || '—'}</p>
+                  <p><span className="text-gray-600">Building:</span> {order.shippingAddress?.building || '—'}</p>
+                  <p><span className="text-gray-600">Community:</span> {formatCommunityDetails(order.shippingAddress?.communityId)}</p>
+                  <p><span className="text-gray-600">Landmark:</span> {order.shippingAddress?.landmark || '—'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p><span className="text-gray-600">City:</span> {order.shippingAddress?.city || '—'}</p>
+                  <p><span className="text-gray-600">State:</span> {order.shippingAddress?.state || '—'}</p>
+                  <p><span className="text-gray-600">Country:</span> {order.shippingAddress?.country || '—'}</p>
+                </div>
+              </div>
               <div className="mt-3 flex justify-between gap-4">
                 <div className="flex flex-col items-start">
                   <p className="text-md font-semibold text-gray-800">Delivery Type</p>
@@ -500,10 +538,6 @@ export default function OrderDetails() {
                   <p className="text-sm font-semibold text-gray-800">Delivery Date</p>
                   <p className="mt-1 text-gray-600">{order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString() : '—'}</p>
                 </div>
-              </div>
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <p className="text-sm font-semibold text-gray-800 mb-1">Community</p>
-                <p className="text-gray-600">{formatCommunityDetails(order.shippingAddress?.communityId)}</p>
               </div>
             </CardContent>
           </Card>
@@ -618,7 +652,7 @@ export default function OrderDetails() {
             </Card>
           )}
 
-          {/* Special Instructions */}
+          {/* Special Instructions 
           {order.notes !== undefined && order.notes !== null && (
             <Card>
               <CardHeader>
@@ -628,7 +662,7 @@ export default function OrderDetails() {
                 <p className="text-gray-600">{order.notes || 'No special instructions provided'}</p>
               </CardContent>
             </Card>
-          )}
+          )}*/}
 
           {/* Delivery Proofs */}
           {order.deliveryProof && order.deliveryProof.length > 0 && (
@@ -723,7 +757,7 @@ export default function OrderDetails() {
             </CardHeader>
             <CardContent>
               <Badge className={`mb-4 px-4 py-2 font-semibold border ${getStatusBadgeClass(order?.status)}`}>
-                {capitalize(order?.status || '—')}
+                {formatStatusDisplay(order?.status)}
               </Badge>
 
             {/* Status Selection Panel */}
