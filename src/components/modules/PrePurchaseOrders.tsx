@@ -615,7 +615,6 @@ export default function PrePurchaseOrders() {
             vendor,
             particulars: mappedParticulars,
             notes,
-            rfv: parsedRfv,
             ppoValue,
           }),
         });
@@ -696,7 +695,6 @@ export default function PrePurchaseOrders() {
             vendor,
             particulars: mappedParticulars,
             notes,
-            rfv: parsedRfv,
             ppoValue,
           }),
         });
@@ -1084,7 +1082,7 @@ export default function PrePurchaseOrders() {
                 className="pl-10 pr-56"
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 w-52">
-                <Select
+                {/* <Select 
                   value={activeListFilter}
                   onValueChange={(value) => handleListFilterChange(value as PpoListFilterOption)}
                 >
@@ -1096,7 +1094,7 @@ export default function PrePurchaseOrders() {
                     <SelectItem value="name_aToZ">Name A to Z</SelectItem>
                     <SelectItem value="name_zToA">Name Z to A</SelectItem>
                   </SelectContent>
-                </Select>
+                </Select>*/}
               </div>
             </div>
           </div>

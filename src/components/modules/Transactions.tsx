@@ -92,10 +92,6 @@ const Transactions: React.FC = () => {
       const matchesPaymentMethod = !paymentMethod || String(payment).toLowerCase() === String(paymentMethod).toLowerCase();
       const matchesStatus = !statusFilter || String(status).toLowerCase() === String(statusFilter).toLowerCase();
       const matchesTxnType = !txnType || String(txn.type || '').toLowerCase() === String(txnType).toLowerCase();
-      const matchesOrderFilter =
-        orderFilter === 'all' ||
-        (orderFilter === 'orders' && !isBulkOrder) ||
-        (orderFilter === 'bulk' && isBulkOrder);
 
       const matchesSearch =
         !query ||
@@ -104,11 +100,11 @@ const Transactions: React.FC = () => {
           .toLowerCase()
           .includes(query);
 
-      return matchesStore && matchesPaymentMethod && matchesStatus && matchesTxnType && matchesOrderFilter && matchesSearch;
+      return matchesStore && matchesPaymentMethod && matchesStatus && matchesTxnType && matchesSearch;
     });
 
     return filtered;
-  }, [transactions, search, paymentMethod, statusFilter, txnType, selectedStoreId, orderFilter]);
+  }, [transactions, search, paymentMethod, statusFilter, txnType, selectedStoreId]);
 
   useEffect(() => {
     const fetchStores = async () => {
@@ -131,13 +127,21 @@ const Transactions: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        let url = `/api/transactions/get-all?page=${page}&limit=${limit}`;
-        if (paymentMethod) url += `&paymentMethod=${encodeURIComponent(paymentMethod)}`;
-        if (statusFilter) url += `&status=${encodeURIComponent(statusFilter)}`;
-        if (txnType) url += `&type=${encodeURIComponent(txnType)}`;
-        if (selectedStoreId) url += `&storeId=${encodeURIComponent(selectedStoreId)}`;
-        if (fromDate) url += `&fromDate=${encodeURIComponent(fromDate)}`;
-        if (toDate) url += `&toDate=${encodeURIComponent(toDate)}`;
+        const params = new URLSearchParams();
+
+        params.set('page', String(page));
+        params.set('limit', String(limit));
+
+        if (paymentMethod) params.set('paymentMethod', paymentMethod);
+        if (statusFilter) params.set('status', statusFilter);
+        if (txnType) params.set('type', txnType);
+        if (selectedStoreId) params.set('storeId', selectedStoreId);
+        if (fromDate) params.set('fromDate', fromDate);
+        if (toDate) params.set('toDate', toDate);
+        if (orderFilter === 'orders') params.set('orderType', 'order');
+        if (orderFilter === 'bulk') params.set('orderType', 'bulkOrder');
+
+        const url = `/api/transactions/get-all${params.toString() ? `?${params.toString()}` : ''}`;
 
         const res = await apiFetch<{
           success: boolean;
@@ -162,11 +166,11 @@ const Transactions: React.FC = () => {
       }
     };
     fetchTransactions();
-  }, [paymentMethod, statusFilter, txnType, selectedStoreId, fromDate, toDate, page, limit]);
+  }, [paymentMethod, statusFilter, txnType, selectedStoreId, fromDate, toDate, page, limit, orderFilter]);
 
   useEffect(() => {
     setPage(1);
-  }, [paymentMethod, statusFilter, txnType, selectedStoreId, fromDate, toDate]);
+  }, [paymentMethod, statusFilter, txnType, selectedStoreId, fromDate, toDate, orderFilter]);
 
 
 
@@ -283,7 +287,7 @@ const Transactions: React.FC = () => {
                 <option value="partially_refunded">Partially Refunded</option>
               </select>
             </div>
-            <div className="min-w-[180px]">
+            {/* <div className="min-w-[180px]"> 
               <select
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 value={txnType}
@@ -293,7 +297,7 @@ const Transactions: React.FC = () => {
                 <option value="in">Amount In</option>
                 <option value="out">Amount Out</option>
               </select>
-            </div>
+            </div>*/}
             <div className="min-w-[180px]">
               <select
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
