@@ -10,6 +10,8 @@ export default function Notifications() {
   const navigate = useNavigate();
   const { notifications, unreadCount, setNotifications, setUnreadCount, markAsRead, clearAll } = useNotifications();
 
+  const isValidObjectId = (value: string) => /^[a-fA-F0-9]{24}$/.test(value);
+
   const formatNotificationTime = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -82,6 +84,11 @@ export default function Notifications() {
   };
 
   const handleMarkAsRead = async (notificationId: string) => {
+    if (!isValidObjectId(notificationId)) {
+      markAsRead(notificationId);
+      return;
+    }
+
     try {
       const response = await apiFetch<{
         success: boolean;
@@ -101,6 +108,17 @@ export default function Notifications() {
 
   const handleDeleteNotification = async (notificationId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+
+    if (!isValidObjectId(notificationId)) {
+      const notification = notifications.find((n: any) => n._id === notificationId);
+      const newList = notifications.filter((n: any) => n._id !== notificationId);
+      setNotifications(newList);
+      if (notification && !notification.isRead) {
+        setUnreadCount(Math.max(0, unreadCount - 1));
+      }
+      return;
+    }
+
     try {
       const response = await apiFetch<{
         success: boolean;

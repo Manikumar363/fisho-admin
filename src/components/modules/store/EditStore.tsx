@@ -218,7 +218,7 @@ export default function EditStore({ storeId, onBack, onStoreUpdated }: EditStore
   }
 
   return (
-    <div className="space-y-6 max-h-[calc(100vh-6rem)] overflow-auto">
+    <div className="space-y-6 pb-6">
       <div className="flex items-center gap-4">
         <button 
           onClick={handleBack}

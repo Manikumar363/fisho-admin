@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useSocket } from "../hooks/use-socket";
-import { getToken } from "../lib/api";
+import { apiFetch, getToken } from "../lib/api";
 
 export interface Notification {
   _id: string;
@@ -17,7 +17,7 @@ export interface Notification {
 interface NotificationContextType {
   unreadCount: number;
   notifications: Notification[];
-  addNotification: (notification: Notification) => void;
+  addNotification: (notification: Notification | any) => void;
   markAsRead: (id: string) => void;
   clearAll: () => void;
   setUnreadCount: React.Dispatch<React.SetStateAction<number>>;
@@ -44,9 +44,66 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   
   const { onNewNotification } = useSocket(token || undefined);
 
+  const isValidObjectId = useCallback((value: unknown) => {
+    if (typeof value !== 'string') return false;
+    return /^[a-fA-F0-9]{24}$/.test(value);
+  }, []);
+
+  const isTestNotification = useCallback((raw: any) => {
+    const title = String(raw?.title || '').toLowerCase();
+    const description = String(raw?.description || '').toLowerCase();
+    return title.includes('test notification') || description.includes('test notification sound trigger');
+  }, []);
+
+  const normalizeNotificationPayload = useCallback((payload: any): Notification | null => {
+    const raw = payload?.notification || payload?.data || payload;
+    if (!raw) return null;
+    if (isTestNotification(raw)) return null;
+
+    const rawId = raw._id || raw.id || raw.notificationId;
+    if (!rawId || !isValidObjectId(String(rawId))) {
+      return null;
+    }
+
+    return {
+      _id: String(rawId),
+      title: raw.title || 'Notification',
+      description: raw.description || '',
+      orderId: raw.orderId || null,
+      bulkOrderId: raw.bulkOrderId || null,
+      isRead: raw.isRead === true,
+      readAt: raw.readAt || null,
+      createdAt: raw.createdAt || new Date().toISOString(),
+      updatedAt: raw.updatedAt || new Date().toISOString(),
+    };
+  }, [isTestNotification, isValidObjectId]);
+
+  const syncNotificationsFromServer = useCallback(async () => {
+    if (!token) return;
+    try {
+      const response = await apiFetch<{
+        success: boolean;
+        notifications?: any[];
+        message?: string;
+      }>('/api/admin/notification/get-all');
+
+      if (!response.success || !response.notifications) return;
+
+      const normalized = response.notifications
+        .map((item) => normalizeNotificationPayload(item))
+        .filter((item): item is Notification => !!item);
+
+      setNotifications(normalized);
+      setUnreadCount(normalized.filter((item) => !item.isRead).length);
+    } catch (error) {
+      console.warn('Failed to sync notifications after realtime event:', error);
+    }
+  }, [token, normalizeNotificationPayload]);
+
   // Create and preload the notification audio once.
   useEffect(() => {
     const audio = new Audio(`${import.meta.env.BASE_URL}sound.mp3`);
+    
     audio.preload = "auto";
     audio.volume = 1;
     audioRef.current = audio;
@@ -99,6 +156,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     if (!audio || !isAudioUnlockedRef.current) return;
 
     try {
+      audio.pause();
       audio.currentTime = 0;
       await audio.play();
     } catch (error) {
@@ -109,23 +167,65 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     if (!token) return;
 
-    const handleNewNotification = (notification: Notification) => {
-      console.log("New notification received:", notification);
-      setNotifications(prev => [notification, ...prev]);
-      setUnreadCount(prev => prev + 1);
-      void playNotificationSound(); // Play sound when new notification arrives
+    const handleNewNotification = (payload: any) => {
+      const notification = normalizeNotificationPayload(payload);
+      if (!notification) {
+        void playNotificationSound();
+        void syncNotificationsFromServer();
+        return;
+      }
+
+      setNotifications((prev) => {
+        const existing = prev.find((n) => n._id === notification._id);
+        if (existing) {
+          return prev.map((n) => (n._id === notification._id ? { ...n, ...notification } : n));
+        }
+
+        if (!notification.isRead) {
+          setUnreadCount((count) => count + 1);
+        }
+        void playNotificationSound();
+
+        return [notification, ...prev];
+      });
+
+      if (notification.title === 'Notification' || !notification.description) {
+        void syncNotificationsFromServer();
+      }
     };
 
-    onNewNotification(handleNewNotification);
-  }, [token, onNewNotification, playNotificationSound]);
+    const unsubscribe = onNewNotification(handleNewNotification);
+    return () => {
+      unsubscribe();
+    };
+  }, [token, onNewNotification, playNotificationSound, normalizeNotificationPayload, syncNotificationsFromServer]);
 
-  const addNotification = useCallback((notification: Notification) => {
-    setNotifications(prev => [notification, ...prev]);
-    if (!notification.isRead) {
-      setUnreadCount(prev => prev + 1);
-      void playNotificationSound(); // Play sound when adding unread notification
+  const addNotification = useCallback((payload: Notification | any) => {
+    const notification = normalizeNotificationPayload(payload);
+    if (!notification) {
+      void playNotificationSound();
+      void syncNotificationsFromServer();
+      return;
     }
-  }, [playNotificationSound]);
+
+    setNotifications((prev) => {
+      const existing = prev.find((n) => n._id === notification._id);
+      if (existing) {
+        return prev.map((n) => (n._id === notification._id ? { ...n, ...notification } : n));
+      }
+
+      if (!notification.isRead) {
+        setUnreadCount((count) => count + 1);
+      }
+      void playNotificationSound();
+
+      return [notification, ...prev];
+    });
+
+    if (notification.title === 'Notification' || !notification.description) {
+      void syncNotificationsFromServer();
+    }
+  }, [playNotificationSound, normalizeNotificationPayload, syncNotificationsFromServer]);
 
   const markAsRead = useCallback((id: string) => {
     setNotifications(prev =>

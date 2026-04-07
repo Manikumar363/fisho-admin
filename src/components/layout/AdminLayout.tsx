@@ -52,6 +52,7 @@ interface AdminLayoutProps {
 export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const isStoreMappingRoute = location.pathname.startsWith('/store-mapping');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [expandedSections, setExpandedSections] = useState<string[]>(['inventory']);
   const [adminName, setAdminName] = useState('Admin User');
@@ -83,6 +84,12 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
 
   // Fetch notifications on mount and set up socket for real-time updates
   useEffect(() => {
+    const isTestNotification = (notification: any) => {
+      const title = String(notification?.title || '').toLowerCase();
+      const description = String(notification?.description || '').toLowerCase();
+      return title.includes('test notification') || description.includes('test notification sound trigger');
+    };
+
     const fetchNotifications = async () => {
       try {
         const response = await apiFetch<{
@@ -92,8 +99,9 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
         }>('/api/admin/notification/get-all');
 
         if (response.success && response.notifications) {
-          setNotifications(response.notifications);
-          const unread = response.notifications.filter((n: any) => !n.isRead).length;
+          const filteredNotifications = response.notifications.filter((notification: any) => !isTestNotification(notification));
+          setNotifications(filteredNotifications);
+          const unread = filteredNotifications.filter((n: any) => !n.isRead).length;
           setUnreadCount(unread);
         }
       } catch (error) {
@@ -268,7 +276,7 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
   );
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className={isStoreMappingRoute ? 'flex h-[100dvh] overflow-hidden bg-gray-50' : 'flex h-screen bg-gray-50'}>
       {/* Sidebar */}
       <aside
         className={`${
@@ -368,8 +376,20 @@ export default function AdminLayout({ children, onLogout }: AdminLayoutProps) {
         </header>
 
         {/* Content Area */}
-        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-6">
-          {children}
+        <main
+          className={
+            isStoreMappingRoute
+              ? 'flex-1 min-h-0 overflow-hidden'
+              : 'flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-6'
+          }
+        >
+          {isStoreMappingRoute ? (
+            <div className="h-full min-h-0 overflow-y-auto overflow-x-hidden p-6 pr-5 overscroll-contain">
+              {children}
+            </div>
+          ) : (
+            children
+          )}
         </main>
       </div>
 
