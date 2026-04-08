@@ -2110,7 +2110,7 @@ const handleRemoveWeight = (weight: number) => {
       categoryForm.existingIcon === originalCategoryForm.existingIcon &&
       !categoryForm.speciesIcon;
     return (
-      <form onSubmit={handleSubmit} className="space-y-4 max-w-[600px]">
+      <form onSubmit={handleSubmit} className="space-y-4 max-w-[600px] w-full overflow-x-hidden">
         <div>
           <Label
             htmlFor="speciesName"
@@ -2161,13 +2161,16 @@ const handleRemoveWeight = (weight: number) => {
             disabled={isSubmitting}
           />
           {categoryForm.speciesIcon ? (
-            <div className="mt-2 text-sm text-gray-600 flex items-center gap-3 min-w-0">
-              <div className="w-14 h-14 rounded border bg-gray-50 overflow-hidden flex items-center justify-center shrink-0">
+            <div className="mt-2 text-sm text-gray-600 flex items-center gap-3 min-w-0 max-w-full flex-nowrap">
+              <div
+                className="shrink-0 rounded border bg-gray-50 overflow-hidden"
+                style={{ width: 56, height: 56, minWidth: 56, minHeight: 56 }}
+              >
                 <img
                   src={URL.createObjectURL(categoryForm.speciesIcon)}
                   alt="New category icon preview"
-                  className="w-full h-full object-cover"
-                  style={{ width: 56, height: 56 }}
+                  className="block"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                 />
               </div>
               <div className="min-w-0">
@@ -2175,15 +2178,19 @@ const handleRemoveWeight = (weight: number) => {
               </div>
             </div>
           ) : categoryForm.existingIconUrl && !categoryForm.speciesIcon ? (
-            <div className="mt-2 text-sm text-gray-600 flex items-center gap-3 min-w-0">
-              <div className="w-14 h-14 rounded border bg-gray-50 overflow-hidden flex items-center justify-center shrink-0">
+            <div className="mt-2 text-sm text-gray-600 flex items-center gap-3 min-w-0 max-w-full flex-nowrap">
+              <div
+                className="shrink-0 rounded border bg-gray-50 overflow-hidden"
+                style={{ width: 56, height: 56, minWidth: 56, minHeight: 56 }}
+              >
                 <ImageWithFallback
                   src={categoryForm.existingIconUrl}
                   alt={categoryForm.speciesName || 'Current category icon'}
-                  className="w-full h-full object-cover"
+                  className="block"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                 />
               </div>
-              <span className="truncate">Current icon will be kept unless you upload a new one.</span>
+              <span className="min-w-0 truncate">Current icon will be kept unless you upload a new one.</span>
             </div>
           ) : null}
           <p className="text-sm text-gray-500 mt-1">
@@ -4137,8 +4144,12 @@ const handleRemoveWeight = (weight: number) => {
         }
         setShowAddModal(open);
       }}>
-        <DialogContent className="sm:max-w-[650px] max-h-[90vh] w-[90vw]" onInteractOutside={(e: any) => e.preventDefault()}>
-          <DialogHeader>
+        <DialogContent
+          className="max-h-[90vh] overflow-hidden flex flex-col"
+          style={{ width: '92vw', maxWidth: activeTab === 'categories' ? 650 : 900 }}
+          onInteractOutside={(e: any) => e.preventDefault()}
+        >
+          <DialogHeader className="shrink-0">
             <DialogTitle>
               { activeTab === 'products'
                 ? (editingProductId ? 'Edit' : 'Add New')
@@ -4147,9 +4158,11 @@ const handleRemoveWeight = (weight: number) => {
                 : 'Add New'} {tabLabelMap[activeTab] || 'Item'}
             </DialogTitle>
           </DialogHeader>
-          {activeTab === 'categories' && renderCategoryModal()}
-          {activeTab === 'products' && renderProductModal()}
-          {activeTab === 'variants' && renderVariantModal()}
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-1">
+            {activeTab === 'categories' && renderCategoryModal()}
+            {activeTab === 'products' && renderProductModal()}
+            {activeTab === 'variants' && renderVariantModal()}
+          </div>
         </DialogContent>
       </Dialog>
 
