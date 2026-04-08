@@ -4,7 +4,7 @@ import { ArrowLeft, Package, Truck, CreditCard, User, MapPin, Calendar, Clock, C
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { apiFetch } from '../../lib/api';
+import { apiFetch, joinImageUrl } from '../../lib/api';
 import { toast } from 'react-toastify';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -12,9 +12,8 @@ import 'react-toastify/dist/ReactToastify.css';
 const IMAGE_BASE_URL = import.meta.env.VITE_IMAGE_BASE_URL ;
 
 const getImageUrl = (imagePath: string | null | undefined): string => {
-  if (!imagePath) return `${IMAGE_BASE_URL}/placeholder-image.png`;
-  if (imagePath.startsWith('http')) return imagePath;
-  return `${IMAGE_BASE_URL}${imagePath}`;
+  if (!imagePath) return IMAGE_BASE_URL ? joinImageUrl(IMAGE_BASE_URL, 'placeholder-image.png') : '/placeholder-image.png';
+  return joinImageUrl(IMAGE_BASE_URL, imagePath);
 };
 
 interface BulkOrderItem {

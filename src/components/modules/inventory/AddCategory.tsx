@@ -9,7 +9,7 @@ import { Switch } from '../../ui/switch';
 import { Badge } from '../../ui/badge';
 import { ImageWithFallback } from '../../ui/ImageWithFallback';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../../ui/alert-dialog';
-import { apiFetch } from '../../../lib/api';
+import { apiFetch, joinImageUrl } from '../../../lib/api';
 import { toast } from 'react-toastify';
 
 const IMAGE_BASE = (import.meta.env as any).VITE_IMAGE_BASE_URL || (import.meta.env as any).VITE_BASE_URL as string | undefined;
@@ -67,7 +67,7 @@ export default function AddCategory() {
 
       const mapped = (res.categories || []).map((c) => {
         const raw = c.image || '';
-        const icon = raw ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${raw}` : raw) : '🗂️';
+        const icon = raw ? joinImageUrl(IMAGE_BASE, raw) : '🗂️';
         return {
           id: c._id,
           icon,
@@ -149,7 +149,7 @@ export default function AddCategory() {
 
       const categoryData = {
         id: res.category._id,
-        icon: IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${res.category.image}` : res.category.image,
+        icon: joinImageUrl(IMAGE_BASE, res.category.image),
         name: res.category.name,
         description: res.category.description || 'N/A',
         status: res.category.isActive ? 'Active' : 'Inactive',
@@ -217,7 +217,7 @@ export default function AddCategory() {
 
       const categoryData = {
         id: res.category._id,
-        icon: IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${res.category.image}` : res.category.image,
+        icon: joinImageUrl(IMAGE_BASE, res.category.image),
         name: res.category.name,
         status: (res.category.isActive ? 'Active' : 'Inactive') as 'Active' | 'Inactive',
         dateCreated: new Date(res.category.createdAt).toISOString().split('T')[0],

@@ -21,7 +21,7 @@ import Section1Editor from './cms/Section1Editor';
 import WhyFishoSectionEditor from './cms/WhyFishoSectionEditor';
 import MarineProductsSectionEditor from './cms/MarineProductsSectionEditor';
 import FAQSectionEditor from './cms/FAQSectionEditor';
-import { apiFetch } from '../../lib/api';
+import { apiFetch, joinImageUrl } from '../../lib/api';
 
 type ContentType = 'banners' | 'terms' | 'privacy' | 'about' | 'deliveryTc' | 'deliveryPrivacy' | 'returnRefund' | 'cancelPolicy' | 'section1' | 'whyFisho' | 'marineProducts' | 'faq';
 
@@ -263,7 +263,7 @@ export default function CMS() {
         status: b.isActive ? 'Active' : 'Inactive',
         type: 'banners',
         sequence: b.order ?? undefined,
-        image: b.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${b.image}` : b.image) : undefined,
+        image: b.image ? joinImageUrl(IMAGE_BASE, b.image) : undefined,
       }));
       setBanners(mapped);
     } catch (e: any) {

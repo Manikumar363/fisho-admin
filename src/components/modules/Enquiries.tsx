@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Eye, Trash2, Loader } from 'lucide-react';
-import { apiFetch } from '../../lib/api';
+import { apiFetch, joinImageUrl } from '../../lib/api';
 import { Card, CardContent } from '../ui/card';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -131,7 +131,7 @@ export default function Enquiries() {
           mobile: q.phone,
           platform: normalizePlatform(q.platform),
           message: q.message,
-          imageUrl: q.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${q.image}` : q.image) : undefined,
+          imageUrl: q.image ? joinImageUrl(IMAGE_BASE, q.image) : undefined,
         }));
 
       setEnquiries(mapped);

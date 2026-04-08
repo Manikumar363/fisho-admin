@@ -66,6 +66,16 @@ export type ApiError = {
   message: string;
 };
 
+export function joinImageUrl(baseUrl: string | undefined, imagePath: string | undefined) {
+  if (!imagePath) return '';
+  if (/^(https?:)?\/\//i.test(imagePath) || imagePath.startsWith('data:')) return imagePath;
+  if (!baseUrl) return imagePath;
+
+  const normalizedBase = baseUrl.replace(/\/$/, '');
+  const normalizedPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+  return `${normalizedBase}${normalizedPath}`;
+}
+
 export async function apiFetch<T = any>(path: string, init: RequestInit = {}): Promise<T> {
   const base = API_BASE_URL?.replace(/\/$/, '') || '';
   const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;

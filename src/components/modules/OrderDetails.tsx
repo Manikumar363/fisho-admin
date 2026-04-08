@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { ImageWithFallback } from '../ui/ImageWithFallback';
-import { apiFetch } from '../../lib/api';
+import { apiFetch, joinImageUrl } from '../../lib/api';
 import { toast } from 'react-toastify';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -555,9 +555,8 @@ export default function OrderDetails() {
                 {(order.items || []).map((item) => {
                   // Resolve image URL
                   let imageUrl = item.variant?.image || item.product?.image || '';
-                  if (imageUrl && imageUrl.startsWith('/')) {
-                    // Replace with your actual base URL or use import.meta.env.VITE_API_BASE_URL if set
-                    imageUrl = `${import.meta.env.VITE_IMAGE_BASE_URL || ''}${imageUrl}`;
+                  if (imageUrl && !imageUrl.startsWith('http')) {
+                    imageUrl = joinImageUrl(import.meta.env.VITE_IMAGE_BASE_URL, imageUrl);
                   }
                   if (!imageUrl) {
                     imageUrl = 'https://images.unsplash.com/photo-1565680018434-b513d5e5fd47?w=80&h=80&fit=crop';
@@ -677,8 +676,8 @@ export default function OrderDetails() {
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {order.deliveryProof.map((proofPath, index) => {
                     let imageUrl = proofPath;
-                    if (imageUrl && imageUrl.startsWith('/')) {
-                      imageUrl = `${import.meta.env.VITE_IMAGE_BASE_URL || ''}${imageUrl}`;
+                    if (imageUrl && !imageUrl.startsWith('http')) {
+                      imageUrl = joinImageUrl(import.meta.env.VITE_IMAGE_BASE_URL, imageUrl);
                     }
                     return (
                       <div key={index} className="relative group">
@@ -955,7 +954,7 @@ export default function OrderDetails() {
                 <div className="flex items-center gap-3 mb-4">
                   {order.deliveryPartner.profile_url && (
                     <ImageWithFallback
-                      src={`${import.meta.env.VITE_IMAGE_BASE_URL || ''}${order.deliveryPartner.profile_url}`}
+                      src={joinImageUrl(import.meta.env.VITE_IMAGE_BASE_URL, order.deliveryPartner.profile_url)}
                       alt={`${order.deliveryPartner.firstName} ${order.deliveryPartner.lastName}`}
                       className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
                     />

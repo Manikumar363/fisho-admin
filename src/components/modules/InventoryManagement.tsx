@@ -13,7 +13,7 @@ import { Switch } from '../ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { ImageWithFallback } from '../ui/ImageWithFallback';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
-import { apiFetch, API_BASE_URL } from '../../lib/api';
+import { apiFetch, API_BASE_URL, joinImageUrl } from '../../lib/api';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import CutTypeSection from './inventory/CutTypeSection';
@@ -308,7 +308,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
 
         const mapped = (res.categories || []).map((c) => {
           const raw = c.image || '';
-          const icon = raw ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${raw}` : raw) : '🗂️';
+          const icon = raw ? joinImageUrl(IMAGE_BASE, raw) : '🗂️';
           return {
             id: c._id,
             icon,
@@ -423,7 +423,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
           displayPrice: v.displayPrice || 0,
           sellingPrice: v.sellingPrice || 0,
           notes: v.notes,
-          image: v.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${rawImagePath}` : v.image) : undefined,
+          image: v.image ? joinImageUrl(IMAGE_BASE, rawImagePath) || undefined : undefined,
           imagePath: rawImagePath || undefined,
           status: v.isActive ? 'Active' : 'Inactive',
           lastUpdated: new Date(v.updatedAt).toISOString().split('T')[0],
@@ -519,7 +519,7 @@ const [originalVariantForm, setOriginalVariantForm] = useState({
 
       const mapped = (res.products || []).map((p) => {
         const raw = p.image || '';
-        const image = raw ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${raw}` : raw) : '';
+        const image = raw ? joinImageUrl(IMAGE_BASE, raw) : '';
 
         // Handle both shapes: category as object or as string id (or categoryId field)
         let catId: string | undefined = undefined;
@@ -1100,7 +1100,7 @@ const handleRemoveWeight = (weight: number) => {
 
       const categoryData = {
         id: res.category._id,
-        icon: IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${res.category.image}` : res.category.image,
+        icon: joinImageUrl(IMAGE_BASE, res.category.image),
         name: res.category.name,
         description: res.category.description || '',
         status: res.category.isActive ? 'Active' : 'Inactive',
@@ -1181,9 +1181,9 @@ const handleRemoveWeight = (weight: number) => {
       const variantData = {
         id: v._id,
         name: v.name,
-        image: v.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${v.image}` : v.image) : undefined,
+        image: v.image ? joinImageUrl(IMAGE_BASE, v.image) || undefined : undefined,
         productName: v.product?.name || 'N/A',
-        productImage: v.product?.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${v.product.image}` : v.product.image) : undefined,
+        productImage: v.product?.image ? joinImageUrl(IMAGE_BASE, v.product.image) || undefined : undefined,
         categoryName,
         cutTypeName: v.cutType?.name || 'N/A',
         weight: v.weight || 0,
@@ -1422,7 +1422,7 @@ const handleRemoveWeight = (weight: number) => {
         productName: v.product?.name || '',
         variantImage: null as File | null,
         existingImage: v.image || '',
-        existingImageUrl: v.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${v.image}` : v.image) : '',
+        existingImageUrl: v.image ? joinImageUrl(IMAGE_BASE, v.image) : '',
         cutType: v.cutType?._id || '',
         weight: String(v.weight || ''),
         featured: v.featured,
@@ -1585,7 +1585,7 @@ const handleRemoveWeight = (weight: number) => {
 
         const categoryData = {
           id: res.category._id,
-          icon: IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${res.category.image}` : res.category.image,
+          icon: joinImageUrl(IMAGE_BASE, res.category.image),
           iconPath: res.category.image,
           name: res.category.name,
           description: res.category.description || '',
@@ -1818,7 +1818,7 @@ const handleRemoveWeight = (weight: number) => {
           const p = res.data.product;
           if (p) {
             const raw = p.image || '';
-            const image = raw ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${raw}` : raw) : '';
+            const image = raw ? joinImageUrl(IMAGE_BASE, raw) : '';
             const cutTypes = (p.availableCutTypes || []).map((ct: any) => ct.name);
             const cutTypeIds = (p.availableCutTypes || []).map((ct: any) => ct._id);
             const mapped = {
@@ -1882,7 +1882,7 @@ const handleRemoveWeight = (weight: number) => {
                 displayPrice: v.displayPrice || 0,
                 sellingPrice: v.sellingPrice || 0,
                 notes: v.notes,
-                image: v.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${v.image}` : v.image) : undefined,
+                image: v.image ? joinImageUrl(IMAGE_BASE, v.image) || undefined : undefined,
                 status: v.isActive ? 'Active' : 'Inactive',
                 lastUpdated: new Date(v.updatedAt || v.createdAt || Date.now()).toISOString().split('T')[0],
               }));
@@ -2078,7 +2078,7 @@ const handleRemoveWeight = (weight: number) => {
               displayPrice: v.displayPrice || 0,
               sellingPrice: v.sellingPrice || 0,
               notes: v.notes,
-              image: v.image ? (IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${v.image}` : v.image) : undefined,
+              image: v.image ? joinImageUrl(IMAGE_BASE, v.image) || undefined : undefined,
               imagePath: v.image,
               status: v.isActive ? 'Active' : 'Inactive',
               lastUpdated: new Date(v.updatedAt || v.createdAt || Date.now()).toISOString().split('T')[0],
@@ -3862,7 +3862,7 @@ const handleRemoveWeight = (weight: number) => {
                                     // Store existing image PATH (not full URL) for this cut type
                                     if (v.imagePath && !existingImages[cutTypeId]) {
                                       // Store full URL for display
-                                      const imageUrl = IMAGE_BASE ? `${IMAGE_BASE.replace(/\/$/, '')}${v.imagePath}` : v.imagePath;
+                                      const imageUrl = joinImageUrl(IMAGE_BASE, v.imagePath);
                                       existingImages[cutTypeId] = imageUrl;
                                     }
                                   });
