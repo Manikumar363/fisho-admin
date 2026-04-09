@@ -28,6 +28,7 @@ interface DeliveryPartnersSectionProps {
   filters: Filters;
   deliveryPartnersPage: number;
   setDeliveryPartnersPage: React.Dispatch<React.SetStateAction<number>>;
+  refreshKey: number;
   setShowAddDeliveryPartnerModal: React.Dispatch<React.SetStateAction<boolean>>;
   showAddDeliveryPartnerModal: boolean;
   deliveryPartnerForm: DeliveryPartnerForm;
@@ -79,6 +80,7 @@ export default function DeliveryPartnersSection({
   filters,
   deliveryPartnersPage,
   setDeliveryPartnersPage,
+  refreshKey,
   setShowAddDeliveryPartnerModal,
   showAddDeliveryPartnerModal,
   deliveryPartnerForm,
@@ -220,7 +222,7 @@ export default function DeliveryPartnersSection({
     return () => {
       active = false;
     };
-  }, [deliveryPartnersPage, searchTerm, filters.sortBy]);
+  }, [deliveryPartnersPage, searchTerm, filters.sortBy, refreshKey]);
 
   const fetchDeletedUsers = async () => {
     setDeletedUsersLoading(true);

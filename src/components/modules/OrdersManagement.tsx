@@ -98,6 +98,7 @@ export default function OrdersManagement() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalOrders, setTotalOrders] = useState(0);
   const [searchInput, setSearchInput] = useState('');
+  const [refreshTick, setRefreshTick] = useState(0);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<string | null>(null);
@@ -157,6 +158,24 @@ export default function OrdersManagement() {
     const typeParam = searchParams.get('type');
     if (typeParam) setSelectedType(typeParam);
   }, [searchParams]);
+
+  // Keep orders fresh without manual page reload.
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setRefreshTick((prev) => prev + 1);
+    }, 15000);
+
+    const handleWindowFocus = () => {
+      setRefreshTick((prev) => prev + 1);
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleWindowFocus);
+    };
+  }, []);
 
   // Fetch orders from API
   useEffect(() => {
@@ -225,7 +244,7 @@ export default function OrdersManagement() {
       });
 
     return () => { active = false; };
-  }, [selectedType, selectedStatus, currentPage, userRole, storeId, searchInput, selectedStoreId]);
+  }, [selectedType, selectedStatus, currentPage, userRole, storeId, searchInput, selectedStoreId, refreshTick]);
 
   const normalizeDeliveryType = (type?: string) => {
     const normalized = (type || '').toLowerCase().replace(/[_\s]/g, '-');

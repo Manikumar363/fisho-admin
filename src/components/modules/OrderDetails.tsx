@@ -110,6 +110,12 @@ const formatStatusDisplay = (status: string | undefined | null) => {
     .join(' ');
 };
 
+const formatToastMessage = (message: string | undefined | null, fallback: string) => {
+  const text = (message || fallback || '').toString().trim();
+  if (!text) return fallback;
+  return text.replace(/_/g, ' ');
+};
+
 // Helper for formatting prices to 2 decimal places
 const formatPrice = (value: any): string => {
   const num = parseFloat(value);
@@ -299,7 +305,7 @@ export default function OrderDetails() {
       toast.success('Order accepted successfully');
     } catch (err: any) {
       console.error('Accept order error:', err);
-      toast.error(err?.message || 'Failed to accept order');
+      toast.error(formatToastMessage(err?.message, 'Failed to accept order'));
     } finally {
       setAccepting(false);
     }
@@ -336,7 +342,7 @@ export default function OrderDetails() {
       toast.success('Order rejected successfully');
     } catch (err: any) {
       console.error('Reject order error:', err);
-      toast.error(err?.message || 'Failed to reject order');
+      toast.error(formatToastMessage(err?.message, 'Failed to reject order'));
     } finally {
       setRejecting(false);
     }
@@ -361,7 +367,7 @@ export default function OrderDetails() {
       if (!res.success) throw new Error(res.message || 'Failed to update order status');
       
       // Show success toast immediately
-      toast.success(res.message || `Order status updated to ${getStatusLabel(newStatus)}`);
+      toast.success(formatToastMessage(res.message, `Order status updated to ${getStatusLabel(newStatus)}`));
       
       if (res.data) setOrder(res.data);
       
@@ -377,7 +383,7 @@ export default function OrderDetails() {
       
       setIsEditingStatus(false);
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to update order status');
+      toast.error(formatToastMessage(err?.message, 'Failed to update order status'));
     } finally {
       setUpdatingStatus(null);
     }
@@ -414,7 +420,7 @@ export default function OrderDetails() {
           }
         );
         if (!res.success) throw new Error(res.message || 'Failed to process wallet refund');
-        toast.success(res.message || 'Refund processed to wallet successfully');
+        toast.success(formatToastMessage(res.message, 'Refund processed to wallet successfully'));
         setRefundAmount('');
       } else {
         // Use process-refund API for account refunds
@@ -427,7 +433,7 @@ export default function OrderDetails() {
           }
         );
         if (!res.success) throw new Error(res.message || 'Failed to process account refund');
-        toast.success(res.message || 'Refund processed to account successfully');
+        toast.success(formatToastMessage(res.message, 'Refund processed to account successfully'));
       }
       // Refresh order data
       const refreshRes = await apiFetch<{ success: boolean; data: Order }>(
@@ -435,7 +441,7 @@ export default function OrderDetails() {
       );
       if (refreshRes.success) setOrder(refreshRes.data);
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to process refund');
+      toast.error(formatToastMessage(err?.message, 'Failed to process refund'));
     } finally {
       setRefundingType(null);
     }
@@ -515,13 +521,13 @@ export default function OrderDetails() {
                   <p><span className="text-gray-600">Floor:</span> {order.shippingAddress?.floor || '—'}</p>
                   <p><span className="text-gray-600">Building:</span> {order.shippingAddress?.building || '—'}</p>
                   <p><span className="text-gray-600">Community:</span> {formatCommunityDetails(order.shippingAddress?.communityId)}</p>
-                  <p><span className="text-gray-600">Landmark:</span> {order.shippingAddress?.landmark || '—'}</p>
+                  {/* <p><span className="text-gray-600">Landmark:</span> {order.shippingAddress?.landmark || '—'}</p> */}
                 </div>
-                <div className="space-y-1">
+                {/* <div className="space-y-1"> 
                   <p><span className="text-gray-600">City:</span> {order.shippingAddress?.city || '—'}</p>
                   <p><span className="text-gray-600">State:</span> {order.shippingAddress?.state || '—'}</p>
                   <p><span className="text-gray-600">Country:</span> {order.shippingAddress?.country || '—'}</p>
-                </div>
+                </div>*/}
               </div>
               <div className="mt-3 flex justify-between gap-4">
                 <div className="flex flex-col items-start">

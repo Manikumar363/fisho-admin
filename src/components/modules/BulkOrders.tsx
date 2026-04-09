@@ -128,11 +128,30 @@ export default function BulkOrders() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalOrders, setTotalOrders] = useState(0);
   const [searchInput, setSearchInput] = useState('');
+  const [refreshTick, setRefreshTick] = useState(0);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedOrderType, setSelectedOrderType] = useState<'all' | 'order' | 'bulkOrder'>('bulkOrder');
   const [showFilterMenu, setShowFilterMenu] = useState(false);
+
+  // Keep bulk orders fresh without manual page reload.
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setRefreshTick((prev) => prev + 1);
+    }, 15000);
+
+    const handleWindowFocus = () => {
+      setRefreshTick((prev) => prev + 1);
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleWindowFocus);
+    };
+  }, []);
 
   // Fetch bulk orders from API
   useEffect(() => {
@@ -183,7 +202,7 @@ export default function BulkOrders() {
     return () => {
       active = false;
     };
-  }, [currentPage, searchInput, selectedStatus, selectedOrderType])
+  }, [currentPage, searchInput, selectedStatus, selectedOrderType, refreshTick])
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchInput(e.target.value);

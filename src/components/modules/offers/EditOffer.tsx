@@ -47,6 +47,14 @@ export default function EditOffer({ offer, onBack, onSave }: EditOfferProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const getErrorMessage = (error: any, fallback: string) => {
+    if (typeof error === 'string' && error.trim()) return error;
+    if (error?.message && typeof error.message === 'string') return error.message;
+    if (error?.error && typeof error.error === 'string') return error.error;
+    if (error?.data?.message && typeof error.data.message === 'string') return error.data.message;
+    return fallback;
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -132,11 +140,11 @@ export default function EditOffer({ offer, onBack, onSave }: EditOfferProps) {
         toast.success(response.message || 'Offer updated successfully');
         onSave(response.coupon);
       } else {
-        toast.error('Failed to update offer');
+        toast.error(response.message || 'Failed to update offer');
       }
     } catch (error: any) {
       console.error('Error updating offer:', error);
-      toast.error(error.message || 'Failed to update offer');
+      toast.error(getErrorMessage(error, 'Failed to update offer'));
     } finally {
       setIsSubmitting(false);
     }

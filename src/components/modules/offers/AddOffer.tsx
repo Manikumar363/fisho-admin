@@ -183,7 +183,7 @@ export default function AddOffer({ onBack, onSave }: AddOfferProps) {
               {/* Minimum Order Value */}
               <div className="space-y-2">
                 <Label htmlFor="minimumOrderValue">
-                  Minimum Order Value (₹) <span className="text-red-500">*</span>
+                  Minimum Order Value (<span className="dirham-symbol">&#xea;</span>) <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="minimumOrderValue"

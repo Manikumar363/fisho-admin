@@ -118,6 +118,7 @@ export default function UserManagement() {
 
   // Delivery Partners pagination
   const [deliveryPartnersPage, setDeliveryPartnersPage] = useState(1);
+  const [deliveryPartnersRefreshKey, setDeliveryPartnersRefreshKey] = useState(0);
 
   useEffect(() => {
     const filterParam = searchParams.get('filter');
@@ -624,6 +625,7 @@ export default function UserManagement() {
         email: ''
       });
       setDeliveryPartnersPage(1);
+      setDeliveryPartnersRefreshKey((prev) => prev + 1);
     } catch (e: any) {
       const msg = e?.message || 'Failed to add delivery partner';
       console.error('Add delivery partner error:', e);
@@ -876,6 +878,7 @@ export default function UserManagement() {
         setShowDeleteDialog(false);
         setSelectedItem(null);
         setDeliveryPartnersPage(1);
+        setDeliveryPartnersRefreshKey((prev) => prev + 1);
       } else if (selectedItem.type === 'store-manager') {
         // Delete subadmin (store manager)
         const res = await apiFetch<{
@@ -1339,6 +1342,7 @@ export default function UserManagement() {
           filters={filters}
           deliveryPartnersPage={deliveryPartnersPage}
           setDeliveryPartnersPage={setDeliveryPartnersPage}
+          refreshKey={deliveryPartnersRefreshKey}
           setShowAddDeliveryPartnerModal={setShowAddDeliveryPartnerModal}
           showAddDeliveryPartnerModal={showAddDeliveryPartnerModal}
           deliveryPartnerForm={deliveryPartnerForm}
