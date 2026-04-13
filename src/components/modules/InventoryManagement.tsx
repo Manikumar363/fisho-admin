@@ -1728,6 +1728,8 @@ const handleRemoveWeight = (weight: number) => {
 
         // Build FormData with product and variants
         // Build the JSON payload in the exact format the backend expects
+        const [primaryProductImage, ...additionalProductImages] = productImageLocations;
+
         const payload = {
           product: {
             name: productForm.productName.trim(),
@@ -1747,7 +1749,8 @@ const handleRemoveWeight = (weight: number) => {
             isExpressDelivery: productForm.isExpressDelivery,
             isNextDayDelivery: false,
             order: 1,
-            image: productImageLocations[0] || ''
+            image: primaryProductImage || '',
+            images: additionalProductImages
           },
           variants: variants
         };

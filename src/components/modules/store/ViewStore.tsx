@@ -14,8 +14,7 @@ interface ViewStoreProps {
   storeId: string;
   onBack: () => void;
 }
-// Use Vite env for API base URL
-const API_BASE_URL = import.meta.env.VITE_BASE_URL || '';
+const IMAGE_BASE_URL = ((import.meta as any).env?.VITE_IMAGE_BASE_URL || '') as string;
 
 interface OrderItem {
   snapshot: {
@@ -52,6 +51,7 @@ interface Order {
   items: OrderItem[];
   orderType: string;
   invoiceUrl?: string;
+  receiptUrl?: string;
   invoiceNo: string;
   status: string;
   createdAt: string;
@@ -556,9 +556,18 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
     return 'outline';
   };
 
+  const resolveInvoiceUrl = (rawUrl?: string) => {
+    if (!rawUrl) return '';
+    if (/^https?:\/\//i.test(rawUrl)) return rawUrl;
+    const cleanBase = IMAGE_BASE_URL.replace(/\/+$/, '');
+    const cleanPath = rawUrl.replace(/^\/+/, '');
+    return cleanBase ? `${cleanBase}/${cleanPath}` : rawUrl;
+  };
+
   const handleViewInvoice = (invoiceUrl?: string) => {
-    if (invoiceUrl) {
-      window.open(invoiceUrl, '_blank');
+    const finalInvoiceUrl = resolveInvoiceUrl(invoiceUrl);
+    if (finalInvoiceUrl) {
+      window.open(finalInvoiceUrl, '_blank');
     } else {
       toast.info('Invoice not available');
     }
@@ -862,11 +871,11 @@ export default function ViewStore({ storeId, onBack }: ViewStoreProps) {
                         </Badge>
                       </td>
                       <td className="py-3 px-4">
-                        {order.invoiceUrl && (
+                        {(order.invoiceUrl || order.receiptUrl) && (
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleViewInvoice(order.invoiceUrl)}
+                            onClick={() => handleViewInvoice(order.invoiceUrl || order.receiptUrl)}
                             className="text-xs"
                           >
                             <ExternalLink className="w-3 h-3 mr-1" />

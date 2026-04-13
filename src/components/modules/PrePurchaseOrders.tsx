@@ -11,6 +11,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from '../ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 
+const IMAGE_BASE_URL = ((import.meta as any).env?.VITE_IMAGE_BASE_URL || '') as string;
+
+const resolveInvoiceUrl = (rawUrl: string) => {
+  const trimmed = String(rawUrl || '').trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+
+  const cleanBase = IMAGE_BASE_URL.trim();
+  if (!cleanBase) {
+    throw new Error('VITE_IMAGE_BASE_URL is not configured');
+  }
+
+  // Use URL API to safely join base URL and relative invoice path.
+  return new URL(trimmed.replace(/^\/+/, ''), cleanBase.endsWith('/') ? cleanBase : `${cleanBase}/`).toString();
+};
+
 interface Particular {
   id: string;
   product: string;
@@ -413,10 +429,18 @@ export default function PrePurchaseOrders() {
       if (!res.success || !res.data?.invoiceUrl) {
         throw new Error(res.message || 'Failed to fetch PPO invoice');
       }
-      // Download the file
+
+      const invoiceUrl = resolveInvoiceUrl(String(res.data.invoiceUrl || ''));
+      if (!invoiceUrl) {
+        throw new Error('Invoice URL is missing');
+      }
+
+      // Direct download avoids CORS failures from storage providers on fetch().
       const link = document.createElement('a');
-      link.href = res.data.invoiceUrl;
+      link.href = invoiceUrl;
       link.download = `ppo-invoice-${res.data.billNo || ppoId}.pdf`;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

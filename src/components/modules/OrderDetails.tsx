@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { ImageWithFallback } from '../ui/ImageWithFallback';
+import { Dialog, DialogContent, DialogTitle } from '../ui/dialog';
 import { apiFetch, joinImageUrl } from '../../lib/api';
 import { toast } from 'react-toastify';
 import { ToastContainer } from 'react-toastify';
@@ -202,6 +203,7 @@ export default function OrderDetails() {
   const [refundingType, setRefundingType] = useState<string | null>(null);
   const [refundAmount, setRefundAmount] = useState<string>('');
   const [refundError, setRefundError] = useState<string | null>(null);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!orderId) return;
@@ -686,14 +688,19 @@ export default function OrderDetails() {
                       imageUrl = joinImageUrl(import.meta.env.VITE_IMAGE_BASE_URL, imageUrl);
                     }
                     return (
-                      <div key={index} className="relative group">
+                      <div
+                        key={index}
+                        className="relative group cursor-pointer"
+                        onClick={() => {
+                          if (imageUrl) setPreviewImageUrl(imageUrl);
+                        }}
+                      >
                         <ImageWithFallback
                           src={imageUrl}
                           alt={`Delivery proof ${index + 1}`}
-                          className="w-full h-32 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => window.open(imageUrl, '_blank')}
+                          className="w-full h-32 object-cover rounded-lg border border-gray-200 hover:opacity-90 transition-opacity"
                         />
-                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-opacity rounded-lg" />
+                        <div className="absolute inset-0 pointer-events-none bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-opacity rounded-lg" />
                       </div>
                     );
                   })}
@@ -994,7 +1001,7 @@ export default function OrderDetails() {
             <CardContent className="space-y-3">
               <div>
                 <p className="text-sm font-semibold text-gray-800">Order ID</p>
-                <p className='text-gray-600'>{order._id}</p>
+                <p className='text-gray-600'>{order.invoiceNo}</p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-gray-800">Order Date</p>
@@ -1004,6 +1011,27 @@ export default function OrderDetails() {
           </Card>
         </div>
       </div>
+
+      <Dialog open={!!previewImageUrl} onOpenChange={(open) => { if (!open) setPreviewImageUrl(null); }}>
+        <DialogContent className="max-w-[96vw] w-[96vw] h-[92vh] p-0 overflow-hidden">
+          <DialogTitle className="sr-only">Delivery Proof Preview</DialogTitle>
+          <div className="w-full h-full flex items-center justify-center overflow-auto p-2 sm:p-4">
+            {previewImageUrl && (
+              <ImageWithFallback
+                src={previewImageUrl}
+                alt="Delivery proof preview"
+                className="object-contain rounded-md"
+                style={{
+                  maxWidth: '92vw',
+                  maxHeight: '86vh',
+                  width: 'auto',
+                  height: 'auto',
+                }}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Toast Notifications */}
       <ToastContainer

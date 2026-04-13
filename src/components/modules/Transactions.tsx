@@ -381,7 +381,7 @@ const Transactions: React.FC = () => {
                 ) : (
                   filteredTransactions.map((txn) => {
                     const orderObj = typeof txn.order === 'object' ? txn.order : null;
-                    const orderId = orderObj ? (orderObj._id || orderObj.id || '') : (txn.order || '');
+                    const orderId = orderObj ? (orderObj.invoiceNo || '') : (txn.order || '');
                     const storeId = txn.store?._id || txn.store?.id || txn.storeId || '';
                     const isBulkOrder = !orderId && !storeId;
                     const displayUserName = txn.user

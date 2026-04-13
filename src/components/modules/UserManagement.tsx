@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { apiFetch } from '../../lib/api';
+import { apiFetch, joinImageUrl } from '../../lib/api';
 import { useSearchParams } from 'react-router-dom';
 import { Search, Filter, Download, Edit, Eye, Plus, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
+import { ImageWithFallback } from '../ui/ImageWithFallback';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 import { Label } from '../ui/label';
@@ -2168,6 +2169,23 @@ export default function UserManagement() {
                   )}
                   {selectedItem.type === 'delivery-partner' && (
                     <>
+                      <div className="col-span-2 flex justify-center pb-2">
+                        <div
+                          className="rounded-full overflow-hidden border-2 border-gray-200 bg-gray-100 flex items-center justify-center"
+                          style={{ width: 88, height: 88, minWidth: 88, minHeight: 88, maxWidth: 88, maxHeight: 88 }}
+                        >
+                          {selectedItem.profile_url ? (
+                            <ImageWithFallback
+                              src={joinImageUrl(import.meta.env.VITE_IMAGE_BASE_URL, selectedItem.profile_url)}
+                              alt={selectedItem.name || 'Delivery partner'}
+                              className="object-cover"
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                          ) : (
+                            <span className="text-gray-400 text-xs">No Image</span>
+                          )}
+                        </div>
+                      </div>
                       <div>
                         <Label className="text-gray-600">DP ID</Label>
                         <p>{selectedItem.id}</p>
