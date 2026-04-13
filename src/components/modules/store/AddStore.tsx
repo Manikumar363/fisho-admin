@@ -154,7 +154,7 @@ export default function AddStore({ onBack, onStoreCreated }: AddStoreProps) {
           lat: latNum,
           lng: lngNum,
           description: formData.description,
-          contactNumber: formData.contactNumber,
+          phone: formData.contactNumber,
           manager: formData.managerId,
           operatingHours: parsedHours,
         }),
